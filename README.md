@@ -110,6 +110,42 @@ switch to **Studio** → Projects → the project is there. Then Invoices →
 | `npm run preview` | Preview a production build locally. |
 | `npm test` | Run the invoicing engine suite. |
 
+## Full implementation (self-host)
+
+There are two ways to run this studio.
+
+**One click — the frontend on its own.** The Vercel / DigitalOcean routes above
+deploy the portal by itself, running on the bundled demo studio. No database,
+no dashboard — a fully static preview.
+
+**One command — the whole stack.**
+[`docker-compose.yml`](docker-compose.yml) stands up Postgres (seeded with the
+*same* clients, proposals, projects and invoices), an auto-generated Adminium
+dashboard that runs that real database, and the portal:
+
+```bash
+cp .env.example .env      # then set ADMINIUM_SECRET — e.g. openssl rand -hex 32
+docker compose up
+```
+
+- **Client portal** → http://localhost:8080
+- **Adminium dashboard** → http://localhost:4600
+
+On first boot, `clients-db` applies [`db/schema.sql`](db/schema.sql) then
+[`db/seed.sql`](db/seed.sql), and Adminium imports the studio database as its
+first source connection, introspects the schema, and generates the back
+office. Finish the ~1-minute first-run wizard at `:4600` — it's pre-pointed at
+the seeded studio DB. The install spec Adminium reads to configure itself is
+[`manifest.json`](manifest.json).
+
+The seed is the app's own fiction, not a second one: Drift & Fern is still
+waiting on round 3 of the logo, `INV-2037` is still 47 days late, and Low
+Orbit's $1,200.00 part payment is a row in `payments`. A reader who has used
+the portal recognises every record.
+
+The manifest scaffolds 9 tables, 5 dashboard pages, 1 access preset
+(`studio-owner`) and 6 settings into your connected database.
+
 ## The split: the portal and the back office
 
 | In this app | In the generated dashboard |
