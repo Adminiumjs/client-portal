@@ -1,0 +1,30 @@
+{
+  "name": "client-portal",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Client Portal — an open-source client-portal and invoicing example app for Adminium.",
+  "license": "AGPL-3.0-only",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "build:demo": "tsc -b && vite build --base=/demo/client-portal/",
+    "preview": "vite preview",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "lucide-react": "^0.462.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "zustand": "^5.0.2"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.2",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.7.2",
+    "vite": "^7.0.0",
+    "vitest": "^2.1.9"
+  }
+}

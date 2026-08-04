@@ -1,0 +1,7 @@
+# Serve the built SPA on :80 with gzip and a single-page fallback.
+:80 {
+	root * /srv
+	encode gzip
+	try_files {path} /index.html
+	file_server
+}

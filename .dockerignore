@@ -1,0 +1,14 @@
+node_modules
+dist
+.git
+.github
+.vercel
+.DS_Store
+*.local
+npm-debug.log
+# Full-stack self-host assets — not needed to build the static web image.
+.env
+.env.*
+docker-compose.yml
+db
+manifest.json

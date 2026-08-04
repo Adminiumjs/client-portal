@@ -1,0 +1,753 @@
+/*
+ * View-specific rules, imported last so they win a tie with components.css.
+ *
+ * Positional properties are LOGICAL throughout. Note `.ol-num` uses
+ * `text-align: end` rather than `right`: in an RTL locale a money column
+ * aligns to the correct edge without a second rule, while the digits inside it
+ * stay LTR because `.ol-mono` isolates them.
+ */
+
+.ol-section-title {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+  margin: 0 0 11px;
+}
+
+.ol-fullwidth {
+  width: 100%;
+}
+
+.ol-prose {
+  font-size: 13.5px;
+  font-weight: 500;
+  line-height: 1.65;
+  color: var(--fg-muted);
+  margin: 0 0 11px;
+}
+
+.ol-prose:last-child {
+  margin-block-end: 0;
+}
+
+.ol-col__empty {
+  margin: 0;
+  padding: 16px 4px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--fg-subtle);
+  text-align: center;
+}
+
+.ol-facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 9px 14px;
+  margin: 0;
+  font-size: 13px;
+}
+
+.ol-facts dt {
+  font-weight: 600;
+  color: var(--fg-subtle);
+}
+
+.ol-facts dd {
+  margin: 0;
+  font-weight: 700;
+  text-align: end;
+}
+
+/* --------------------------------------------------------------- the tables */
+
+.ol-tablewrap {
+  overflow-x: auto;
+}
+
+.ol-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.ol-table th {
+  text-align: start;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+  padding: 0 10px 8px;
+  white-space: nowrap;
+}
+
+.ol-table td {
+  padding: 10px;
+  border-block-start: 1px solid var(--border);
+  vertical-align: top;
+}
+
+/* Money and quantity columns align to the block's END edge, so they mirror. */
+.ol-num {
+  text-align: end;
+  white-space: nowrap;
+}
+
+.ol-table tfoot td {
+  font-weight: 700;
+  color: var(--fg-muted);
+  border-block-start: 1px solid var(--border);
+}
+
+.ol-table tfoot td:first-child {
+  text-align: end;
+}
+
+.ol-table__grand td {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--fg);
+  border-block-start: 2px solid var(--border-strong);
+}
+
+.ol-table__bal {
+  font-weight: 800;
+}
+
+.ol-table td .ol-chip {
+  margin-inline-start: 7px;
+}
+
+.ol-balance {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  margin-block-start: 14px;
+  padding-block-start: 13px;
+  border-block-start: 1px solid var(--border);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--fg-muted);
+}
+
+.ol-balance__value {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--fg);
+}
+
+/* -------------------------------------------------------------------- home */
+
+.ol-agingstrip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 11px;
+  margin-block-end: 18px;
+}
+
+.ol-agingchip {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+
+/* An empty bucket dims rather than vanishing, so the strip keeps its shape. */
+.ol-agingchip[data-empty] {
+  opacity: 0.48;
+}
+
+.ol-agingchip[data-late] {
+  border-color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.ol-agingchip__label {
+  display: block;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+}
+
+.ol-agingchip__amount {
+  display: block;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.018em;
+  margin-block-start: 5px;
+}
+
+.ol-agingchip__count {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--fg-subtle);
+  margin-block-start: 2px;
+}
+
+.ol-home-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 330px;
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 1023.98px) {
+  .ol-home-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.ol-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--fg);
+  text-align: start;
+  font-size: 13px;
+}
+
+.ol-row:hover {
+  border-color: var(--accent);
+}
+
+.ol-row__num {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--fg-subtle);
+  flex: none;
+}
+
+.ol-row__main {
+  flex: 1;
+  min-width: 0;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ol-row__meta {
+  flex: none;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--fg-subtle);
+}
+
+/* ----------------------------------------------------------- document rows */
+
+.ol-docrow {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  flex-wrap: wrap;
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  color: var(--fg);
+  text-align: start;
+}
+
+.ol-docrow:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-hover);
+}
+
+.ol-docrow__num {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--fg-subtle);
+  flex: none;
+}
+
+.ol-docrow__body {
+  flex: 1;
+  min-width: 140px;
+}
+
+.ol-docrow__title {
+  display: block;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: -0.015em;
+}
+
+.ol-docrow__client {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-subtle);
+  margin-block-start: 5px;
+}
+
+.ol-docrow__amount {
+  font-size: 14px;
+  font-weight: 700;
+  flex: none;
+  margin-inline-start: auto;
+}
+
+.ol-dochead {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  margin-block-end: 18px;
+}
+
+.ol-dochead__num {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--accent);
+  margin-block-end: 4px;
+}
+
+.ol-dochead__actions {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-inline-start: auto;
+}
+
+.ol-declined {
+  padding: 12px 14px;
+  border-radius: 11px;
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.55;
+  margin: 0 0 16px;
+}
+
+.ol-accepted {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 13px 15px;
+  border-radius: 12px;
+  background: var(--pos-soft);
+  color: var(--pos);
+  font-size: 13.5px;
+  font-weight: 700;
+  margin-block-start: 18px;
+}
+
+/* ---------------------------------------------------------------- projects */
+
+.ol-cardgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(212px, 1fr));
+  gap: 13px;
+}
+
+.ol-projtile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 15px;
+  box-shadow: var(--shadow);
+  color: var(--fg);
+  text-align: start;
+}
+
+.ol-projtile__name {
+  font-size: 13.5px;
+  font-weight: 800;
+  letter-spacing: -0.015em;
+  margin-block-start: 10px;
+}
+
+.ol-projtile__client {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-subtle);
+}
+
+.ol-projtile__foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-block-start: 10px;
+}
+
+.ol-ring {
+  position: relative;
+  width: 52px;
+  height: 52px;
+  flex: none;
+  display: grid;
+  place-items: center;
+}
+
+.ol-ring svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.ol-ring__label {
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.ol-deal-grid {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 1023.98px) {
+  .ol-deal-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.ol-milestones {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 9px;
+}
+
+.ol-milestone {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--fg-muted);
+}
+
+.ol-milestone[data-done] {
+  color: var(--pos);
+}
+
+.ol-milestone__mark {
+  width: 20px;
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+
+.ol-milestone__dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 2px solid var(--border-strong);
+}
+
+.ol-milestone__title {
+  flex: 1;
+  min-width: 0;
+}
+
+.ol-milestone__due {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--fg-subtle);
+  flex: none;
+}
+
+.ol-delgrid {
+  display: grid;
+  gap: 13px;
+}
+
+.ol-del {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.ol-del__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.ol-del__title {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 800;
+  letter-spacing: -0.015em;
+}
+
+.ol-del__note {
+  margin: 7px 0 0;
+  padding: 9px 11px;
+  border-radius: 9px;
+  background: var(--warn-soft);
+  color: var(--warn);
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.ol-del__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-block-start: 11px;
+}
+
+/* ------------------------------------------------------------ portal shell */
+
+.ol-portal {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.ol-portal__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 15px var(--gutter);
+  border-block-end: 1px solid var(--border);
+  background: var(--surface-header);
+  backdrop-filter: blur(12px);
+  position: sticky;
+  inset-block-start: 0;
+  z-index: var(--z-header);
+}
+
+.ol-portal__brand {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--fg);
+}
+
+.ol-portal__wordmark {
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.ol-portal__label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+}
+
+/* A centered column that simply narrows — no sidebar on this side, ever. */
+.ol-portal__body {
+  flex: 1;
+  width: 100%;
+  max-width: 760px;
+  margin-inline: auto;
+  padding: clamp(20px, 3vw, 34px) var(--gutter) 120px;
+}
+
+.ol-portal__foot {
+  padding: 20px var(--gutter) 28px;
+  border-block-start: 1px solid var(--border);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--fg-subtle);
+  text-align: center;
+  line-height: 1.6;
+}
+
+.ol-portal-head {
+  text-align: center;
+  margin-block-end: 20px;
+}
+
+.ol-portal-head .ol-ring {
+  margin-inline: auto;
+  margin-block-end: 12px;
+}
+
+.ol-portal-actions {
+  display: flex;
+  gap: 11px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-block-start: 22px;
+}
+
+.ol-portal-actions .ol-button {
+  min-width: 168px;
+}
+
+/* -------------------------------------------------------------------- gate */
+
+.ol-gate {
+  max-width: 440px;
+  margin-inline: auto;
+  text-align: center;
+  padding: 30px 24px 26px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: var(--shadow-md);
+}
+
+.ol-gate__mark {
+  width: 56px;
+  height: 56px;
+  border-radius: 17px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  display: grid;
+  place-items: center;
+  margin: 0 auto 14px;
+}
+
+.ol-gate__title {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.028em;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.ol-gate__sub {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg-subtle);
+  line-height: 1.55;
+  margin: 8px 0 0;
+}
+
+.ol-gate__form {
+  display: grid;
+  gap: 12px;
+  margin-block-start: 20px;
+  text-align: start;
+}
+
+.ol-gate__error {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.ol-gate__hints {
+  margin-block-start: 20px;
+  padding-block-start: 16px;
+  border-block-start: 1px dashed var(--border-strong);
+  text-align: start;
+}
+
+/* ------------------------------------------------------------------ pay bar */
+
+.ol-paybar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-block-start: 18px;
+  padding: 16px 18px;
+  border-radius: 15px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-md);
+}
+
+.ol-paybar__label {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+}
+
+.ol-paybar__value {
+  display: block;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  margin-block-start: 4px;
+}
+
+.ol-paybar .ol-button {
+  margin-inline-start: auto;
+}
+
+.ol-fineprint {
+  margin: 12px 0 0;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--fg-subtle);
+  text-align: center;
+}
+
+/* The verbatim demo callout on the pay sheet — never styled away. */
+.ol-callout {
+  margin: 12px 0 0;
+  padding: 11px 13px;
+  border-radius: 11px;
+  background: var(--info-soft);
+  color: var(--info);
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.ol-cardfields {
+  display: grid;
+  grid-template-columns: 1fr 84px 72px;
+  gap: 10px;
+  margin-block-start: 14px;
+}
+
+.ol-cardfields .ol-input {
+  opacity: 0.72;
+  cursor: default;
+}
+
+@media (max-width: 479.98px) {
+  .ol-cardfields {
+    grid-template-columns: 1fr 1fr;
+  }
+  .ol-cardfields .ol-field:first-child {
+    grid-column: 1 / -1;
+  }
+}
+
+/* --------------------------------------------------------------- timeline */
+
+.ol-tl-when {
+  display: block;
+  margin-block-start: 3px;
+}
