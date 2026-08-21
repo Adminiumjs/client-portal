@@ -10,7 +10,11 @@
     "build": "tsc -b && vite build",
     "build:demo": "tsc -b && vite build --base=/demo/client-portal/",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "demo:status": "node db/demo.mjs status",
+    "demo:import": "node db/demo.mjs import",
+    "demo:wipe": "node db/demo.mjs wipe",
+    "demo:reset": "node db/demo.mjs reset"
   },
   "dependencies": {
     "lucide-react": "^0.462.0",
@@ -25,6 +29,7 @@
     "@vitejs/plugin-react": "^4.3.4",
     "typescript": "^5.7.2",
     "vite": "^7.0.0",
-    "vitest": "^2.1.9"
+    "vitest": "^2.1.9",
+    "zod": "^4.4.3"
   }
 }
