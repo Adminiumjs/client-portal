@@ -72,7 +72,13 @@ describe("manifest.json passes the vendored validator, always", () => {
     for (const facet of manifest.categories) {
       expect(MANIFEST_CATEGORIES as readonly string[]).toContain(facet);
     }
-    for (const cap of manifest.capabilities ?? []) {
+    // Read through a cast, not off the import. `capabilities` is OPTIONAL in
+    // the schema, and TypeScript infers the JSON module's type from the file it
+    // finds — so on the two manifests that omit it, `manifest.capabilities` is
+    // not a property error but a COMPILE error, in a file synced to all
+    // fifteen. `?? []` does not help; the access itself is what fails.
+    const capabilities = (manifest as { capabilities?: readonly string[] }).capabilities ?? [];
+    for (const cap of capabilities) {
       expect(MANIFEST_CAPABILITIES as readonly string[]).toContain(cap);
     }
   });
