@@ -13,490 +13,490 @@
     "key": "mft.clients.desc",
     "fallback": "Proposals, projects and invoices your clients can act on — a studio portal and its invoicing records, backed by your own database."
   },
-  "categories": ["operations", "crm"],
-
+  "categories": [
+    "operations",
+    "crm"
+  ],
   "compatibility": {
     "minAdminiumVersion": "1.0.0",
-    "engines": ["postgres", "mysql", "sqlite"],
-    "requires": ["file-storage"]
+    "engines": [
+      "postgres",
+      "mysql",
+      "sqlite"
+    ],
+    "requires": [
+      "file-storage"
+    ]
   },
-
   "requiredSchema": {
     "tables": [
       {
         "ref": "clients",
-        "table": "clients",
-        "label": { "key": "mft.clients.tbl.clients", "fallback": "Clients" },
-        "primaryKey": ["id"],
         "columns": [
-          { "name": "id", "type": "int", "role": "pk" },
-          { "name": "company", "type": "text", "required": true, "display": "title" },
-          { "name": "contact_name", "type": "text", "required": true },
-          { "name": "email", "type": "email", "required": true, "unique": true },
-          { "name": "phone", "type": "text" },
-          { "name": "kind", "type": "text" },
-          { "name": "tint", "type": "text" },
-          { "name": "icon", "type": "text" },
-          { "name": "created_at", "type": "timestamp", "default": "now", "role": "created" }
+          {
+            "ref": "id",
+            "type": "int",
+            "role": "pk"
+          },
+          {
+            "ref": "company",
+            "type": "text"
+          },
+          {
+            "ref": "contact_name",
+            "type": "text"
+          },
+          {
+            "ref": "email",
+            "type": "text",
+            "semantic": "email"
+          },
+          {
+            "ref": "phone",
+            "type": "text"
+          },
+          {
+            "ref": "kind",
+            "type": "text"
+          },
+          {
+            "ref": "tint",
+            "type": "text"
+          },
+          {
+            "ref": "icon",
+            "type": "text"
+          },
+          {
+            "ref": "created_at",
+            "type": "timestamptz"
+          }
         ]
       },
       {
         "ref": "proposals",
-        "table": "proposals",
-        "label": { "key": "mft.clients.tbl.proposals", "fallback": "Proposals" },
-        "primaryKey": ["id"],
         "columns": [
-          { "name": "id", "type": "int", "role": "pk" },
-          { "name": "number", "type": "text", "required": true, "unique": true, "display": "title" },
-          { "name": "client_id", "type": "fk", "references": "clients", "required": true },
-          { "name": "title", "type": "text", "required": true },
           {
-            "name": "status",
-            "type": "enum",
-            "required": true,
-            "values": ["draft", "sent", "accepted", "declined"],
-            "default": "draft"
+            "ref": "id",
+            "type": "int",
+            "role": "pk"
           },
-          { "name": "valid_until", "type": "date", "required": true },
-          { "name": "tax_rate", "type": "decimal", "required": true, "default": 0 },
-          { "name": "scope", "type": "richtext" },
-          { "name": "decline_note", "type": "text" },
-          { "name": "created_at", "type": "timestamp", "default": "now", "role": "created" },
-          { "name": "sent_at", "type": "timestamp" },
-          { "name": "decided_at", "type": "timestamp" }
+          {
+            "ref": "number",
+            "type": "text"
+          },
+          {
+            "ref": "client_id",
+            "type": "fk",
+            "references": "clients"
+          },
+          {
+            "ref": "title",
+            "type": "text"
+          },
+          {
+            "ref": "status",
+            "type": "enum",
+            "enum": [
+              "draft",
+              "sent",
+              "accepted",
+              "declined"
+            ]
+          },
+          {
+            "ref": "valid_until",
+            "type": "date"
+          },
+          {
+            "ref": "tax_rate",
+            "type": "decimal"
+          },
+          {
+            "ref": "scope",
+            "type": "text"
+          },
+          {
+            "ref": "decline_note",
+            "type": "text"
+          },
+          {
+            "ref": "created_at",
+            "type": "timestamptz"
+          },
+          {
+            "ref": "sent_at",
+            "type": "timestamptz"
+          },
+          {
+            "ref": "decided_at",
+            "type": "timestamptz"
+          }
         ]
       },
       {
         "ref": "proposal_items",
-        "table": "proposal_items",
-        "label": { "key": "mft.clients.tbl.proposal_items", "fallback": "Proposal lines" },
-        "primaryKey": ["id"],
         "columns": [
-          { "name": "id", "type": "int", "role": "pk" },
-          { "name": "proposal_id", "type": "fk", "references": "proposals", "required": true },
-          { "name": "position", "type": "int", "default": 0 },
-          { "name": "description", "type": "text", "required": true, "display": "title" },
-          { "name": "qty", "type": "decimal", "required": true, "default": 1 },
-          { "name": "rate", "type": "money", "required": true },
-          { "name": "discount_pct", "type": "decimal", "default": 0 },
-          { "name": "line_total", "type": "money", "generated": true, "readOnly": true }
+          {
+            "ref": "id",
+            "type": "int",
+            "role": "pk"
+          },
+          {
+            "ref": "proposal_id",
+            "type": "fk",
+            "references": "proposals"
+          },
+          {
+            "ref": "position",
+            "type": "int"
+          },
+          {
+            "ref": "description",
+            "type": "text"
+          },
+          {
+            "ref": "qty",
+            "type": "decimal"
+          },
+          {
+            "ref": "rate",
+            "type": "money"
+          },
+          {
+            "ref": "discount_pct",
+            "type": "decimal"
+          },
+          {
+            "ref": "line_total",
+            "type": "money"
+          }
         ]
       },
       {
         "ref": "projects",
-        "table": "projects",
-        "label": { "key": "mft.clients.tbl.projects", "fallback": "Projects" },
-        "primaryKey": ["id"],
         "columns": [
-          { "name": "id", "type": "int", "role": "pk" },
-          { "name": "client_id", "type": "fk", "references": "clients", "required": true },
-          { "name": "proposal_id", "type": "fk", "references": "proposals", "unique": true },
-          { "name": "name", "type": "text", "required": true, "display": "title" },
           {
-            "name": "status",
-            "type": "enum",
-            "required": true,
-            "values": ["active", "paused", "done"],
-            "default": "active"
+            "ref": "id",
+            "type": "int",
+            "role": "pk"
           },
-          { "name": "due_on", "type": "date" }
+          {
+            "ref": "client_id",
+            "type": "fk",
+            "references": "clients"
+          },
+          {
+            "ref": "proposal_id",
+            "type": "fk",
+            "references": "proposals"
+          },
+          {
+            "ref": "name",
+            "type": "text"
+          },
+          {
+            "ref": "status",
+            "type": "enum",
+            "enum": [
+              "active",
+              "paused",
+              "done"
+            ]
+          },
+          {
+            "ref": "due_on",
+            "type": "date"
+          }
         ]
       },
       {
         "ref": "milestones",
-        "table": "milestones",
-        "label": { "key": "mft.clients.tbl.milestones", "fallback": "Milestones" },
-        "primaryKey": ["id"],
         "columns": [
-          { "name": "id", "type": "int", "role": "pk" },
-          { "name": "project_id", "type": "fk", "references": "projects", "required": true },
-          { "name": "title", "type": "text", "required": true, "display": "title" },
-          { "name": "due_on", "type": "date" },
-          { "name": "done", "type": "boolean", "default": false },
-          { "name": "position", "type": "int", "default": 0 }
+          {
+            "ref": "id",
+            "type": "int",
+            "role": "pk"
+          },
+          {
+            "ref": "project_id",
+            "type": "fk",
+            "references": "projects"
+          },
+          {
+            "ref": "title",
+            "type": "text"
+          },
+          {
+            "ref": "due_on",
+            "type": "date"
+          },
+          {
+            "ref": "done",
+            "type": "bool"
+          },
+          {
+            "ref": "position",
+            "type": "int"
+          }
         ]
       },
       {
         "ref": "deliverables",
-        "table": "deliverables",
-        "label": { "key": "mft.clients.tbl.deliverables", "fallback": "Deliverables" },
-        "primaryKey": ["id"],
         "columns": [
-          { "name": "id", "type": "int", "role": "pk" },
-          { "name": "milestone_id", "type": "fk", "references": "milestones", "required": true },
-          { "name": "title", "type": "text", "required": true, "display": "title" },
-          { "name": "file", "type": "image" },
-          { "name": "icon", "type": "text" },
           {
-            "name": "status",
-            "type": "enum",
-            "required": true,
-            "values": ["pending", "approved", "changes_requested"],
-            "default": "pending"
+            "ref": "id",
+            "type": "int",
+            "role": "pk"
           },
-          { "name": "note", "type": "text" }
+          {
+            "ref": "milestone_id",
+            "type": "fk",
+            "references": "milestones"
+          },
+          {
+            "ref": "title",
+            "type": "text"
+          },
+          {
+            "ref": "file",
+            "type": "text",
+            "semantic": "image"
+          },
+          {
+            "ref": "icon",
+            "type": "text"
+          },
+          {
+            "ref": "status",
+            "type": "enum",
+            "enum": [
+              "pending",
+              "approved",
+              "changes_requested"
+            ]
+          },
+          {
+            "ref": "note",
+            "type": "text"
+          }
         ]
       },
       {
         "ref": "invoices",
-        "table": "invoices",
-        "label": { "key": "mft.clients.tbl.invoices", "fallback": "Invoices" },
-        "primaryKey": ["id"],
         "columns": [
-          { "name": "id", "type": "int", "role": "pk" },
-          { "name": "number", "type": "text", "required": true, "unique": true, "display": "title" },
-          { "name": "client_id", "type": "fk", "references": "clients", "required": true },
-          { "name": "project_id", "type": "fk", "references": "projects" },
-          { "name": "title", "type": "text" },
           {
-            "name": "status",
-            "type": "enum",
-            "required": true,
-            "values": ["draft", "sent", "paid", "overdue"],
-            "default": "draft"
+            "ref": "id",
+            "type": "int",
+            "role": "pk"
           },
-          { "name": "issued_on", "type": "date", "required": true },
-          { "name": "due_on", "type": "date", "required": true },
-          { "name": "tax_rate", "type": "decimal", "required": true, "default": 0 },
-          { "name": "created_at", "type": "timestamp", "default": "now", "role": "created" }
+          {
+            "ref": "number",
+            "type": "text"
+          },
+          {
+            "ref": "client_id",
+            "type": "fk",
+            "references": "clients"
+          },
+          {
+            "ref": "project_id",
+            "type": "fk",
+            "references": "projects"
+          },
+          {
+            "ref": "title",
+            "type": "text"
+          },
+          {
+            "ref": "status",
+            "type": "enum",
+            "enum": [
+              "draft",
+              "sent",
+              "paid",
+              "overdue"
+            ]
+          },
+          {
+            "ref": "issued_on",
+            "type": "date"
+          },
+          {
+            "ref": "due_on",
+            "type": "date"
+          },
+          {
+            "ref": "tax_rate",
+            "type": "decimal"
+          },
+          {
+            "ref": "created_at",
+            "type": "timestamptz"
+          }
         ]
       },
       {
         "ref": "invoice_items",
-        "table": "invoice_items",
-        "label": { "key": "mft.clients.tbl.invoice_items", "fallback": "Invoice lines" },
-        "primaryKey": ["id"],
         "columns": [
-          { "name": "id", "type": "int", "role": "pk" },
-          { "name": "invoice_id", "type": "fk", "references": "invoices", "required": true },
-          { "name": "position", "type": "int", "default": 0 },
-          { "name": "description", "type": "text", "required": true, "display": "title" },
-          { "name": "qty", "type": "decimal", "required": true, "default": 1 },
-          { "name": "rate", "type": "money", "required": true },
-          { "name": "discount_pct", "type": "decimal", "default": 0 },
-          { "name": "line_total", "type": "money", "generated": true, "readOnly": true }
+          {
+            "ref": "id",
+            "type": "int",
+            "role": "pk"
+          },
+          {
+            "ref": "invoice_id",
+            "type": "fk",
+            "references": "invoices"
+          },
+          {
+            "ref": "position",
+            "type": "int"
+          },
+          {
+            "ref": "description",
+            "type": "text"
+          },
+          {
+            "ref": "qty",
+            "type": "decimal"
+          },
+          {
+            "ref": "rate",
+            "type": "money"
+          },
+          {
+            "ref": "discount_pct",
+            "type": "decimal"
+          },
+          {
+            "ref": "line_total",
+            "type": "money"
+          }
         ]
       },
       {
         "ref": "payments",
-        "table": "payments",
-        "label": { "key": "mft.clients.tbl.payments", "fallback": "Payments" },
-        "primaryKey": ["id"],
         "columns": [
-          { "name": "id", "type": "int", "role": "pk" },
-          { "name": "invoice_id", "type": "fk", "references": "invoices", "required": true },
-          { "name": "amount", "type": "money", "required": true },
           {
-            "name": "method",
-            "type": "enum",
-            "required": true,
-            "values": ["card", "transfer"],
-            "default": "transfer"
+            "ref": "id",
+            "type": "int",
+            "role": "pk"
           },
-          { "name": "paid_at", "type": "timestamp", "default": "now", "role": "created" }
+          {
+            "ref": "invoice_id",
+            "type": "fk",
+            "references": "invoices"
+          },
+          {
+            "ref": "amount",
+            "type": "money"
+          },
+          {
+            "ref": "method",
+            "type": "enum",
+            "enum": [
+              "card",
+              "transfer"
+            ]
+          },
+          {
+            "ref": "paid_at",
+            "type": "timestamptz"
+          }
         ]
       }
     ]
   },
-
   "pages": [
     {
-      "key": "clients-dashboard",
-      "title": { "key": "mft.clients.page.dashboard", "fallback": "Dashboard" },
-      "path": "/",
-      "type": "page-dashboard",
-      "icon": "layout-dashboard",
-      "nav": { "group": "manifest:clients", "order": 1 },
-      "blocks": [
-        {
-          "kind": "kpi-stat-card",
-          "key": "outstanding",
-          "label": { "key": "mft.clients.kpi.outstanding", "fallback": "Outstanding" },
-          "source": "invoice_items",
-          "metric": "sum",
-          "field": "line_total",
-          "format": "money",
-          "through": { "table": "invoices", "localKey": "invoice_id" },
-          "filter": { "invoices.status": ["sent"] }
-        },
-        {
-          "kind": "kpi-stat-card",
-          "key": "overdue",
-          "label": { "key": "mft.clients.kpi.overdue", "fallback": "Overdue" },
-          "source": "invoices",
-          "metric": "count",
-          "format": "number",
-          "filter": { "status": ["sent"], "due_on": { "before": "today" } }
-        },
-        {
-          "kind": "kpi-stat-card",
-          "key": "active-projects",
-          "label": { "key": "mft.clients.kpi.projects", "fallback": "Active projects" },
-          "source": "projects",
-          "metric": "count",
-          "format": "number",
-          "filter": { "status": ["active"] }
-        },
-        {
-          "kind": "chart-line-area",
-          "key": "invoiced-per-month",
-          "label": { "key": "mft.clients.chart.invoiced", "fallback": "Invoiced per month" },
-          "source": "invoice_items",
-          "chart": "line-area",
-          "through": { "table": "invoices", "localKey": "invoice_id" },
-          "x": { "field": "invoices.issued_on", "bucket": "month" },
-          "y": { "agg": "sum", "field": "line_total" },
-          "format": "money",
-          "filter": { "invoices.status": ["sent", "paid"] }
-        },
-        {
-          "kind": "mini-table",
-          "key": "aging",
-          "label": { "key": "mft.clients.block.aging", "fallback": "Aging" },
-          "source": "invoices",
-          "limit": 8,
-          "orderBy": { "field": "due_on", "dir": "asc" },
-          "columns": ["number", "client_id", "issued_on", "due_on", "status"],
-          "filter": { "status": ["sent"] }
-        },
-        {
-          "kind": "activity-feed",
-          "key": "recent-payments",
-          "label": { "key": "mft.clients.block.activity", "fallback": "Recent payments" },
-          "source": "payments",
-          "timestamp": "paid_at",
-          "limit": 10
-        }
-      ]
-    },
-    {
-      "key": "clients-book",
-      "title": { "key": "mft.clients.page.book", "fallback": "Clients" },
-      "path": "/clients",
-      "type": "page-master-detail",
-      "icon": "users",
-      "source": "clients",
-      "nav": { "group": "manifest:clients", "order": 2 },
-      "search": ["company", "contact_name", "email"],
-      "list": {
-        "view": "master-list",
-        "title": "company",
-        "subtitle": "contact_name",
-        "badge": "kind"
+      "ref": "clients-dashboard",
+      "template": "page-dashboard",
+      "title": {
+        "key": "mft.clients.page.dashboard",
+        "fallback": "Dashboard"
       },
-      "detail": {
-        "title": "company",
-        "fields": ["company", "contact_name", "email", "phone", "kind", "created_at"],
-        "edit": ["company", "contact_name", "email", "phone", "kind"],
-        "timeline": {
-          "view": "doc-timeline",
-          "sources": [
-            { "source": "proposals", "foreignKey": "client_id", "title": "number", "timestamp": "created_at", "badge": "status" },
-            { "source": "invoices", "foreignKey": "client_id", "title": "number", "timestamp": "issued_on", "badge": "status" },
-            { "source": "projects", "foreignKey": "client_id", "title": "name", "timestamp": "due_on", "badge": "status" }
-          ]
-        }
-      },
-      "children": [
-        {
-          "key": "proposals",
-          "label": { "key": "mft.clients.tab.proposals", "fallback": "Proposals" },
-          "source": "proposals",
-          "foreignKey": "client_id",
-          "columns": ["number", "title", "status", "valid_until", "decided_at"],
-          "orderBy": { "field": "created_at", "dir": "desc" }
-        },
-        {
-          "key": "invoices",
-          "label": { "key": "mft.clients.tab.invoices", "fallback": "Invoices" },
-          "source": "invoices",
-          "foreignKey": "client_id",
-          "columns": ["number", "title", "status", "issued_on", "due_on"],
-          "orderBy": { "field": "issued_on", "dir": "desc" }
-        }
-      ]
-    },
-    {
-      "key": "clients-proposals",
-      "title": { "key": "mft.clients.page.proposals", "fallback": "Proposals" },
-      "path": "/proposals",
-      "type": "page-crud",
-      "icon": "file-text",
-      "source": "proposals",
-      "nav": { "group": "manifest:clients", "order": 3 },
-      "columns": ["number", "client_id", "title", "status", "valid_until", "sent_at", "decided_at"],
-      "search": ["number", "title"],
-      "filters": ["status", "client_id"],
-      "filterControl": "filter-chip-bar",
-      "orderBy": { "field": "created_at", "dir": "desc" },
-      "children": [
-        {
-          "key": "lines",
-          "label": { "key": "mft.clients.tab.lines", "fallback": "Lines" },
-          "source": "proposal_items",
-          "foreignKey": "proposal_id",
-          "columns": ["position", "description", "qty", "rate", "discount_pct", "line_total"],
-          "orderBy": { "field": "position", "dir": "asc" }
-        }
-      ]
-    },
-    {
-      "key": "clients-invoices",
-      "title": { "key": "mft.clients.page.invoices", "fallback": "Invoices" },
-      "path": "/invoices",
-      "type": "page-crud",
-      "icon": "receipt-text",
-      "source": "invoices",
-      "nav": { "group": "manifest:clients", "order": 4 },
-      "columns": ["number", "client_id", "title", "status", "issued_on", "due_on", "tax_rate"],
-      "search": ["number", "title"],
-      "filters": ["status", "client_id", "project_id"],
-      "filterControl": "filter-chip-bar",
-      "orderBy": { "field": "issued_on", "dir": "desc" },
-      "children": [
-        {
-          "key": "lines",
-          "label": { "key": "mft.clients.tab.lines", "fallback": "Lines" },
-          "source": "invoice_items",
-          "foreignKey": "invoice_id",
-          "columns": ["position", "description", "qty", "rate", "discount_pct", "line_total"],
-          "orderBy": { "field": "position", "dir": "asc" }
-        },
-        {
-          "key": "payments",
-          "label": { "key": "mft.clients.tab.payments", "fallback": "Payments" },
-          "source": "payments",
-          "foreignKey": "invoice_id",
-          "columns": ["paid_at", "method", "amount"],
-          "orderBy": { "field": "paid_at", "dir": "asc" }
-        }
-      ]
-    },
-    {
-      "key": "clients-projects",
-      "title": { "key": "mft.clients.page.projects", "fallback": "Projects" },
-      "path": "/projects",
-      "type": "page-board",
-      "icon": "kanban",
-      "source": "projects",
-      "nav": { "group": "manifest:clients", "order": 5 },
-      "board": {
-        "view": "status-board",
-        "groupBy": "status",
-        "groups": ["active", "paused", "done"],
-        "card": { "title": "name", "subtitle": "client_id", "date": "due_on" }
-      },
-      "filters": ["client_id"],
-      "filterControl": "filter-chip-bar",
-      "children": [
-        {
-          "key": "milestones",
-          "label": { "key": "mft.clients.tab.milestones", "fallback": "Milestones" },
-          "source": "milestones",
-          "foreignKey": "project_id",
-          "columns": ["position", "title", "due_on", "done"],
-          "orderBy": { "field": "position", "dir": "asc" }
-        },
-        {
-          "key": "deliverables",
-          "label": { "key": "mft.clients.tab.deliverables", "fallback": "Deliverables" },
-          "source": "deliverables",
-          "through": { "table": "milestones", "foreignKey": "project_id", "localKey": "milestone_id" },
-          "columns": ["title", "file", "status", "note"]
-        }
-      ]
-    }
-  ],
-
-  "roles": [
-    {
-      "key": "studio-owner",
-      "name": { "key": "mft.clients.role.studio_owner", "fallback": "Studio owner" },
-      "description": {
-        "key": "mft.clients.role.studio_owner.desc",
-        "fallback": "Read and write every record in the studio — clients, proposals, projects, deliverables, invoices and payments. No access to settings or roles. Clients themselves are portal-side identities, not dashboard users: the portal finds them by e-mail address plus document number."
-      },
-      "permissions": [
-        { "resource": "clients", "actions": ["read", "create", "update", "delete"] },
-        { "resource": "proposals", "actions": ["read", "create", "update", "delete"] },
-        { "resource": "proposal_items", "actions": ["read", "create", "update", "delete"] },
-        { "resource": "projects", "actions": ["read", "create", "update", "delete"] },
-        { "resource": "milestones", "actions": ["read", "create", "update", "delete"] },
-        { "resource": "deliverables", "actions": ["read", "create", "update", "delete"] },
-        { "resource": "invoices", "actions": ["read", "create", "update", "delete"] },
-        { "resource": "invoice_items", "actions": ["read", "create", "update", "delete"] },
-        { "resource": "payments", "actions": ["read", "create", "update"] }
-      ]
-    }
-  ],
-
-  "settings": [
-    {
-      "key": "studio_name",
-      "type": "text",
-      "label": { "key": "mft.clients.set.studio_name", "fallback": "Studio name" },
-      "required": true
-    },
-    {
-      "key": "invoice_prefix",
-      "type": "text",
-      "label": { "key": "mft.clients.set.invoice_prefix", "fallback": "Invoice number prefix" },
-      "default": "INV-",
-      "required": true,
-      "help": {
-        "key": "mft.clients.set.invoice_prefix.help",
-        "fallback": "Prepended to the running number. Existing documents keep the prefix they were issued with."
+      "nav": {
+        "group": "manifest:clients",
+        "icon": "layout-dashboard",
+        "order": 1
       }
     },
     {
-      "key": "tax_rate",
-      "type": "number",
-      "label": { "key": "mft.clients.set.tax_rate", "fallback": "Default tax rate (%)" },
-      "min": 0,
-      "max": 100,
-      "step": 0.5,
-      "default": 8,
-      "help": {
-        "key": "mft.clients.set.tax_rate.help",
-        "fallback": "Copied onto a new document. Each proposal and invoice then carries its own rate, so an old document never changes when this one does."
+      "ref": "clients-book",
+      "template": "page-master-detail",
+      "title": {
+        "key": "mft.clients.page.book",
+        "fallback": "Clients"
+      },
+      "nav": {
+        "group": "manifest:clients",
+        "icon": "users",
+        "order": 2
       }
     },
     {
-      "key": "payment_terms_days",
-      "type": "number",
-      "label": { "key": "mft.clients.set.payment_terms", "fallback": "Payment terms (days)" },
-      "min": 0,
-      "max": 120,
-      "step": 1,
-      "default": 14
+      "ref": "clients-proposals",
+      "template": "page-crud",
+      "title": {
+        "key": "mft.clients.page.proposals",
+        "fallback": "Proposals"
+      },
+      "nav": {
+        "group": "manifest:clients",
+        "icon": "file-text",
+        "order": 3
+      }
     },
     {
-      "key": "currency",
-      "type": "enum",
-      "label": { "key": "mft.clients.set.currency", "fallback": "Currency" },
-      "options": ["USD", "EUR", "GBP", "AUD", "CAD"],
-      "default": "USD",
-      "required": true
+      "ref": "clients-invoices",
+      "template": "page-crud",
+      "title": {
+        "key": "mft.clients.page.invoices",
+        "fallback": "Invoices"
+      },
+      "nav": {
+        "group": "manifest:clients",
+        "icon": "receipt-text",
+        "order": 4
+      }
     },
     {
-      "key": "reply_to_email",
-      "type": "text",
-      "label": { "key": "mft.clients.set.reply_to", "fallback": "Reply-to address" },
-      "required": true
+      "ref": "clients-projects",
+      "template": "page-board",
+      "title": {
+        "key": "mft.clients.page.projects",
+        "fallback": "Projects"
+      },
+      "nav": {
+        "group": "manifest:clients",
+        "icon": "kanban",
+        "order": 5
+      }
     }
   ],
-
-  "capabilities": ["payments", "file-storage", "email-delivery"],
-
-  "frontend": {
-    "kind": "spa",
-    "root": ".",
-    "buildCommand": "npm run build",
-    "buildOutput": "dist",
-    "entry": "index.html",
-    "routes": {
-      "studio": "/",
-      "portal": "/"
+  "capabilities": [
+    "payments",
+    "file-storage",
+    "email-delivery"
+  ],
+  "kind": "app",
+  "frontends": [
+    {
+      "side": "staff",
+      "kind": "spa",
+      "entry": "index.html",
+      "routes": {
+        "studio": "/"
+      }
+    },
+    {
+      "side": "customer",
+      "kind": "spa",
+      "entry": "index.html",
+      "routes": {
+        "portal": "/"
+      }
     }
-  }
+  ]
 }
