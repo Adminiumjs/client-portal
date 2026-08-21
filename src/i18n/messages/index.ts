@@ -9,6 +9,7 @@
  * Keys must be unique across areas — a later area silently wins a collision,
  * so namespace them (`chrome.*`, `today.*`, `data.*`).
  */
+import type { Translated } from "../untranslated.ts";
 import { LOCALE_TAGS, type LocaleTag } from "../locales.ts";
 import { chrome } from "../strings/chrome.ts";
 import { screens } from "../strings/screens.ts";
@@ -22,7 +23,7 @@ import { data } from "../strings/data.ts";
  */
 type Area<EN extends Record<string, string>> = { "en-US": EN } & Record<
   Exclude<LocaleTag, "en-US">,
-  Record<keyof EN, string>
+  Translated<EN>
 >;
 
 const AREAS: [
