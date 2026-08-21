@@ -22,11 +22,19 @@ services:
       POSTGRES_USER: adminium
       POSTGRES_PASSWORD: adminium
       POSTGRES_DB: outline
+      # Load db/seed.sql on first boot? Set DEMO_DATA=0 in .env for an empty
+      # database with the same schema. `npm run demo:import` loads it later.
+      DEMO_DATA: ${DEMO_DATA:-1}
     volumes:
       - clients-db-data:/var/lib/postgresql/data
-      # Auto-applied in order on an empty data volume:
+      # Auto-applied in name order on an empty data volume:
       - ./db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
-      - ./db/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+      - ./db/demo-toolkit.sql:/docker-entrypoint-initdb.d/02-demo-toolkit.sql:ro
+      - ./db/init-demo.sh:/docker-entrypoint-initdb.d/03-demo-seed.sh:ro
+      # Deliberately NOT in initdb.d: 03-demo-seed.sh decides whether to load
+      # it (DEMO_DATA) and records what it inserted, so the demo rows can be
+      # removed later without touching the schema or anything you added.
+      - ./db/seed.sql:/demo/seed.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U adminium -d outline"]
       interval: 5s

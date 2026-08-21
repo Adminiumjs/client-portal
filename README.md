@@ -119,9 +119,9 @@ deploy the portal by itself, running on the bundled demo studio. No database,
 no dashboard — a fully static preview.
 
 **One command — the whole stack.**
-[`docker-compose.yml`](docker-compose.yml) stands up Postgres (seeded with the
-*same* clients, proposals, projects and invoices), an auto-generated Adminium
-dashboard that runs that real database, and the portal:
+[`docker-compose.yml`](docker-compose.yml) stands up Postgres (seeded by
+default with the *same* clients, proposals, projects and invoices), an
+auto-generated Adminium dashboard that runs that real database, and the portal:
 
 ```bash
 cp .env.example .env      # then set ADMINIUM_SECRET — e.g. openssl rand -hex 32
@@ -131,12 +131,13 @@ docker compose up
 - **Client portal** → http://localhost:8080
 - **Adminium dashboard** → http://localhost:4600
 
-On first boot, `clients-db` applies [`db/schema.sql`](db/schema.sql) then
-[`db/seed.sql`](db/seed.sql), and Adminium imports the studio database as its
-first source connection, introspects the schema, and generates the back
-office. Finish the ~1-minute first-run wizard at `:4600` — it's pre-pointed at
-the seeded studio DB. The install spec Adminium reads to configure itself is
-[`manifest.json`](manifest.json).
+On first boot, `clients-db` applies [`db/schema.sql`](db/schema.sql), installs
+the demo bookkeeping in [`db/demo-toolkit.sql`](db/demo-toolkit.sql), and then
+loads [`db/seed.sql`](db/seed.sql) unless you set `DEMO_DATA=0`. Adminium
+imports the studio database as its first source connection, introspects the
+schema, and generates the back office. Finish the ~1-minute first-run wizard
+at `:4600` — it's pre-pointed at the studio database. The install spec
+Adminium reads to configure itself is [`manifest.json`](manifest.json).
 
 The seed is the app's own fiction, not a second one: Drift & Fern is still
 waiting on round 3 of the logo, `INV-2037` is still 47 days late, and Low
@@ -145,6 +146,32 @@ the portal recognises every record.
 
 The manifest scaffolds 9 tables, 5 dashboard pages, 1 access preset
 (`studio-owner`) and 6 settings into your connected database.
+
+### Demo data
+
+The studio arrives seeded: Outline's clients, proposals, projects, invoices and
+payments are in the database the first time you open `:8080`. To start empty
+instead — the same full schema, no rows — set `DEMO_DATA=0` in `.env` before
+the first `docker compose up`. Neither choice is permanent; the demo rows go in
+and out again from four scripts:
+
+| Script | What it does |
+| --- | --- |
+| `npm run demo:status` | What is loaded right now, table by table. |
+| `npm run demo:import` | Load [`db/seed.sql`](db/seed.sql). |
+| `npm run demo:wipe` | Remove the demo rows — the schema and your own rows stay. |
+| `npm run demo:reset` | Wipe, then import a fresh copy. |
+
+A wipe deletes only the rows the seed added. A demo row your own data depends
+on is kept rather than force-deleted, and reported under `kept`; but
+`ON DELETE CASCADE` still applies, so a demo project takes its milestones with
+it and a demo invoice takes its payments — including rows you added yourself,
+which are counted separately as `cascaded`. `wipe` and `reset` ask before they
+do anything; pass `--yes` (`npm run demo:wipe -- --yes`) to skip the question,
+which is what a script needs — with no terminal to ask, the command stops. Set
+`DATABASE_URL` to run any of them against a Postgres elsewhere.
+[`db/README.md`](db/README.md) has the rest: how the wipe knows which rows are
+the demo's, and what it keeps.
 
 ## The split: the portal and the back office
 
@@ -187,6 +214,7 @@ src/
   styles/      tokens.css (canonical tokens + bronze accent), base.css,
                components.css, screens.css
 public/fonts/  self-hosted Manrope + JetBrains Mono (woff2)
+db/            schema.sql, seed.sql and the demo-data toolkit (db/README.md)
 ```
 
 ## License
