@@ -1,0 +1,142 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# The example apps' CI (28-T23).
+#
+# WHY THIS EXISTS. Every one of the fifteen marketplace repos had an EMPTY
+# `.github` directory. That is how thirteen of fifteen manifests came to be
+# invalid against the product's own validator — 18 to 415 issues each, in three
+# incompatible dialects — with nobody noticing: nothing ever ran.
+#
+# It is deliberately small. These are single-package Vite apps; a workflow that
+# tries to be clever about caching matrices is a workflow that rots. Three
+# things run, and each one catches a class of failure the audit actually found:
+#
+#   build      `tsc -b && vite build` — types AND bundle. point-of-sale shipped
+#              a bare `vite build` for months, so its type errors were invisible.
+#   test       the repo's own vitest suite.
+#   manifest   `node --test` over `manifest.test.mjs` when the repo has one.
+#
+# WHAT IT DOES NOT DO YET: validate `manifest.json` against `@adminiumjs/manifest`
+# from npm in all sixteen repos. The published version (0.2.1) predates the
+# `frontends[]` schema, so wiring THAT on would pin the fleet to a validator
+# that disagrees with the fleet; it is 28-T22 and it waits on a release.
+#
+# What it DOES do, since 2026-08-20, is check out the product and build
+# `packages/manifest` for the two repos whose suites load the real validator by
+# path — see the step below. That half was never blocked on a release; it was
+# simply skipping.
+#
+# SYNCED, NOT HAND-EDITED. `workplan/tools/app-ci.sh` copies this file into every
+# repo. Edit it here; a per-repo edit drifts and only `status` will notice.
+
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    name: build & test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # `npm ci` needs a lockfile; these repos have one committed. If a repo
+      # ever loses it the failure should be loud here rather than a silent
+      # `npm install` resolving something different from what ships.
+      - name: Install dependencies
+        run: npm ci
+
+      # Types and bundle together — the app's own `build` script, so CI cannot
+      # drift from what a developer runs locally.
+      - name: Build
+        run: npm run build
+
+      # ── THE REAL VALIDATOR, WHICH CI WAS NOT RUNNING (28-T26 follow-up) ───
+      #
+      # Two of the sixteen repos put `manifest.json` through the PRODUCT's own
+      # validator, loaded by path from a sibling checkout, and compare their
+      # vendored copy against it. Both blocks are `describe.skipIf(!available)`,
+      # so on a runner with no product beside them they SILENTLY SKIPPED — half
+      # the manifest gate, including the entire drift check, never executed
+      # anywhere automated, and the job was green. An adversarial pass measured
+      # it at 13 of 25 tests.
+      #
+      # The step DETECTS which repos need it rather than being configured per
+      # repo, because this file is synced to all sixteen and a per-repo edit
+      # drifts. In the fourteen that do not, every step below is skipped and
+      # nothing changes.
+      - name: Does this repo load the product's validator?
+        id: needs_product
+        run: |
+          if grep -rq ADMINIUM_REPO src 2>/dev/null; then
+            echo "value=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check out the Adminium product
+        if: steps.needs_product.outputs.value == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: MoSofi/Adminium
+          path: .adminium-product
+
+      # `@adminium/manifest` cannot be installed from npm at the version these
+      # repos need, which is why it is loaded by path. Only that package and its
+      # workspace dependencies are built; a full monorepo install is not needed.
+      #
+      # THE `...` SUFFIX IS ON BOTH COMMANDS, AND IT HAS TO BE. The first run of
+      # this workflow installed the dependency closure correctly and then built
+      # only `manifest`, which fails: `@adminium/add-on-contracts` is a workspace
+      # dependency resolved through its `dist/`, so with that unbuilt `tsc`
+      # reports `Cannot find module '@adminium/add-on-contracts'` and eight
+      # implicit-any errors cascading from it. `pkg...` means "pkg and its
+      # dependencies", so the build walks config, then add-on-contracts, then
+      # manifest, in that order.
+      - name: Build the product's validator, and move it out of the workspace
+        if: steps.needs_product.outputs.value == 'true'
+        run: |
+          cd "$GITHUB_WORKSPACE/.adminium-product"
+          corepack enable
+          pnpm install --frozen-lockfile --filter "@adminium/manifest..."
+          pnpm --filter "@adminium/manifest..." build
+          # AND OUT OF THE WORKSPACE IT GOES, which is not tidiness. `actions/
+          # checkout` can only write inside the workspace, and this repo's
+          # vitest collects `**/*.test.ts` from the repo root — so the product's
+          # OWN suite came along for the ride. The first run of this step ended
+          # in `packages/ui/src/components/icon/icon-core.test.ts` failing on a
+          # generator script that only makes sense inside the monorepo. Nothing
+          # here needs the product in the workspace; only its built `dist/` is
+          # read, by absolute path.
+          mv "$GITHUB_WORKSPACE/.adminium-product" "$RUNNER_TEMP/adminium-product"
+
+      # `ADMINIUM_REQUIRE_VALIDATOR` turns the skip into a failure. It is set in
+      # the same condition as the checkout, so a repo that does not need the
+      # product never sets it and a repo that does cannot quietly skip.
+      - name: Test
+        env:
+          ADMINIUM_REPO: ${{ steps.needs_product.outputs.value == 'true' && format('{0}/adminium-product', runner.temp) || '' }}
+          ADMINIUM_REQUIRE_VALIDATOR: ${{ steps.needs_product.outputs.value }}
+        run: npm test
+
+      # Only where one exists. `--if-present` would hide a repo that lost its
+      # suite; this is explicit about the file it looks for.
+      - name: Manifest checks
+        run: |
+          if [ -f manifest.test.mjs ]; then
+            node --test manifest.test.mjs
+          else
+            echo "no manifest.test.mjs in this repo — skipping"
+          fi
