@@ -5,12 +5,12 @@
 #   • Adminium admin   → http://localhost:4600  (auto-generated from the DB schema)
 #   • Postgres (clients-db)                     (seeded clients, documents, payments)
 #
-# On first boot, clients-db applies db/schema.sql then db/seed.sql, and
-# Adminium imports DATABASE_URL as its first source connection, introspects the
-# schema, and generates the back office. Finish the ~1-minute first-run wizard
-# at http://localhost:4600 — it's pre-pointed at the seeded studio DB. The
-# portal and the dashboard serve the SAME studio: the payment a client records
-# on :8080 is the payment the studio reconciles on :4600.
+# On first boot, clients-db applies db/schema.sql then db/seed.sql, and Adminium
+# connects ADMINIUM_SOURCE_URL, introspects the schema, and generates the back
+# office. Create your admin account in the ~1-minute first-run wizard at
+# http://localhost:4600 — the seeded studio DB is already connected. The portal
+# and the dashboard serve the SAME studio: the payment a client records on :8080
+# is the payment the studio reconciles on :4600.
 #
 # Copy .env.example to .env and set a real ADMINIUM_SECRET before any real use.
 
@@ -52,15 +52,24 @@ services:
       # !!! PRODUCTION MUST SET A REAL 32-BYTE HEX SECRET: `openssl rand -hex 32`.
       # The fallback below is a throwaway for the LOCAL DEMO ONLY — never ship it.
       ADMINIUM_SECRET: ${ADMINIUM_SECRET:-devsecret-change-me-0000000000000000000000000000000000000000000000000000}
-      # Adminium imports this as its first source connection on boot and
-      # auto-generates the admin dashboard from the introspected schema.
-      DATABASE_URL: postgres://adminium:adminium@clients-db:5432/outline
+      # Your database — the one the dashboard is generated FROM. On the first
+      # boot Adminium connects it, introspects the schema, and generates the
+      # pages; a bad DSN is reported and retried on the next boot instead of
+      # stopping it. It runs ONCE: a connection you delete later is not rebuilt.
+      ADMINIUM_SOURCE_URL: postgres://adminium:adminium@clients-db:5432/outline
       # Embedded SQLite meta store (settings, users) lives here — fine for the demo.
       ADMINIUM_DATA_DIR: /data
+      # Safe ONLY because this service publishes no ports (see below): every
+      # request arrives through this stack's own Caddy, so the forwarded client
+      # address is one Caddy wrote. Turn this on while 4600 is directly
+      # reachable and any caller can forge their source IP — out of the audit
+      # log and out of every per-IP limit.
+      ADMINIUM_TRUST_PROXY: "1"
     volumes:
       - adminium-data:/data
-    ports:
-      - "4600:4600"
+    # No `ports:` — 4600 is NOT published from this service. It is reachable
+    # only on the compose network, through the `web` container's Caddy, and
+    # that is the precondition for the ADMINIUM_TRUST_PROXY set above.
     restart: unless-stopped
 
   # --- Client portal: the static SPA built from this repo's Dockerfile ----
@@ -68,8 +77,24 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      # Connected mode (28-T28). Unset — which is the default — builds the demo
+      # exactly as before; Vite inlines these, so they are build args and not
+      # `environment:`, and changing either needs `--build` to take effect.
+      # Mint the key in Studio -> Public API against a scope covering these refs:
+      # clients, proposals, proposalItems, projects, milestones,
+      # deliverables, invoices, invoiceItems and payments. It MUST be a
+      # staff-side scope — see src/data/adminiumSource.ts.
+      args:
+        VITE_ADMINIUM_API_BASE_URL: ${VITE_ADMINIUM_API_BASE_URL:-}
+        VITE_ADMINIUM_PUBLISHABLE_KEY: ${VITE_ADMINIUM_PUBLISHABLE_KEY:-}
+    depends_on:
+      - adminium
     ports:
       - "8080:80"
+      # Adminium's back office, proxied by this container's Caddy (see
+      # ./Caddyfile). Upgrading an existing checkout? `docker compose up
+      # --build` — this port is served by an image built from that file.
+      - "4600:4600"
     restart: unless-stopped
 
 volumes:

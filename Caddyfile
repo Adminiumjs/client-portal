@@ -5,3 +5,17 @@
 	try_files {path} /index.html
 	file_server
 }
+
+# Adminium's back office, on the port it has always answered on. The `adminium`
+# service does NOT publish 4600 any more — this proxy is the only way in, and
+# that is what makes ADMINIUM_TRUST_PROXY=1 safe over there (28-public-surface
+# O8). Without a proxy in front, X-Forwarded-For is attacker-controlled and the
+# flag would let any caller mint a fresh rate-limit bucket per request.
+#
+# Caddy APPENDS the real peer to X-Forwarded-For and Adminium trusts exactly one
+# hop, so it reads the entry Caddy wrote and no client can forge it. Do not
+# "harden" this by overwriting the header — that would break the real client IP
+# for anyone who puts a load balancer in front of the whole stack.
+:4600 {
+	reverse_proxy adminium:4600
+}

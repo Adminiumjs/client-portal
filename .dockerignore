@@ -10,5 +10,10 @@ npm-debug.log
 .env
 .env.*
 docker-compose.yml
-db
+# `db` was excluded here, which is right for the static-site image (it needs
+# only dist/) and fatal for db/Dockerfile.migrate — an excluded path is not in
+# the build context at ALL, so the migration job's COPY would fail on a file
+# that plainly exists in the repo. Nothing COPYs db/ into the static image, so
+# including it costs a slightly larger context and no image bytes.
+
 manifest.json
