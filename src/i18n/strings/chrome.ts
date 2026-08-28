@@ -42,6 +42,13 @@ export const chrome = {
     "chrome.dock.collapse": "Hide the demo controls",
     "chrome.dock.expand": "Show the demo controls",
 
+    "chrome.utc.notice": "Dates shown in UTC",
+    "chrome.utc.why":
+      "This connection has no timezone set in Adminium, so dates render in UTC instead of the business's zone.",
+    "chrome.zone.notice": "Dates shown in {zone}",
+    "chrome.zone.why":
+      "This zone came from the server running Adminium, not from anyone here. Confirm it on the connection (Connections → this database) if it is the business's zone.",
+
     "chrome.footer.copy": "© 2026 Outline. A demo client portal shipped with Adminium.",
     "chrome.footer.chip": "adminium.dev/demo/client-portal",
 
@@ -125,6 +132,13 @@ export const chrome = {
     "chrome.dock.reset": "Demo zurücksetzen",
     "chrome.dock.collapse": "Demo-Steuerung ausblenden",
     "chrome.dock.expand": "Demo-Steuerung einblenden",
+
+    "chrome.utc.notice": "Datumsangaben in UTC",
+    "chrome.utc.why":
+      "Für diese Verbindung ist in Adminium keine Zeitzone hinterlegt; Datumsangaben erscheinen daher in UTC statt in der Zeitzone des Unternehmens.",
+    "chrome.zone.notice": "Datumsangaben in {zone}",
+    "chrome.zone.why":
+      "Diese Zeitzone stammt vom Server, auf dem Adminium läuft, und wurde hier von niemandem gewählt. Bestätigen Sie sie an der Verbindung (Verbindungen → diese Datenbank), wenn es die Zeitzone des Unternehmens ist.",
 
     "chrome.footer.copy": "© 2026 Outline. Ein Demo-Kundenportal, ausgeliefert mit Adminium.",
     "chrome.footer.chip": "adminium.dev/demo/client-portal",
@@ -210,6 +224,13 @@ export const chrome = {
     "chrome.dock.collapse": "Masquer les commandes",
     "chrome.dock.expand": "Afficher les commandes",
 
+    "chrome.utc.notice": "Dates affichées en UTC",
+    "chrome.utc.why":
+      "Aucun fuseau horaire n'est défini pour cette connexion dans Adminium ; les dates s'affichent donc en UTC plutôt que dans le fuseau de l'entreprise.",
+    "chrome.zone.notice": "Dates affichées en {zone}",
+    "chrome.zone.why":
+      "Ce fuseau vient du serveur qui exécute Adminium ; personne ne l'a choisi ici. Confirmez-le sur la connexion (Connexions → cette base de données) s'il s'agit du fuseau de l'entreprise.",
+
     "chrome.footer.copy": "© 2026 Outline. Un espace client de démonstration livré avec Adminium.",
     "chrome.footer.chip": "adminium.dev/demo/client-portal",
 
@@ -293,6 +314,13 @@ export const chrome = {
     "chrome.dock.reset": "Obnovit demo",
     "chrome.dock.collapse": "Skrýt ovládání dema",
     "chrome.dock.expand": "Zobrazit ovládání dema",
+
+    "chrome.utc.notice": "Data se zobrazují v UTC",
+    "chrome.utc.why":
+      "Toto připojení nemá v Adminiu nastavené časové pásmo, data se proto zobrazují v UTC místo v pásmu firmy.",
+    "chrome.zone.notice": "Data se zobrazují v {zone}",
+    "chrome.zone.why":
+      "Toto pásmo pochází ze serveru, na kterém běží Adminium, nikdo je zde nezvolil. Pokud jde o pásmo firmy, potvrďte je u připojení (Připojení → tato databáze).",
 
     "chrome.footer.copy": "© 2026 Outline. Ukázkový klientský portál dodávaný s Adminiem.",
     "chrome.footer.chip": "adminium.dev/demo/client-portal",
@@ -378,6 +406,13 @@ export const chrome = {
     "chrome.dock.collapse": "Skjul demostyringen",
     "chrome.dock.expand": "Vis demostyringen",
 
+    "chrome.utc.notice": "Datoer vises i UTC",
+    "chrome.utc.why":
+      "Denne forbindelse har ingen tidszone angivet i Adminium, så datoer vises i UTC i stedet for virksomhedens tidszone.",
+    "chrome.zone.notice": "Datoer vises i {zone}",
+    "chrome.zone.why":
+      "Denne tidszone kom fra serveren, der kører Adminium — ingen her har valgt den. Bekræft den på forbindelsen (Forbindelser → denne database), hvis det er virksomhedens tidszone.",
+
     "chrome.footer.copy": "© 2026 Outline. En demo-kundeportal leveret med Adminium.",
     "chrome.footer.chip": "adminium.dev/demo/client-portal",
 
@@ -461,6 +496,12 @@ export const chrome = {
     "chrome.dock.reset": "重置演示",
     "chrome.dock.collapse": "隐藏演示控制",
     "chrome.dock.expand": "显示演示控制",
+
+    "chrome.utc.notice": "日期以 UTC 显示",
+    "chrome.utc.why": "此连接在 Adminium 中未设置时区，日期因此以 UTC 显示，而非商家所在时区。",
+    "chrome.zone.notice": "日期以 {zone} 显示",
+    "chrome.zone.why":
+      "此时区来自运行 Adminium 的服务器，并非有人在此选择。若它确实是该商家的时区，请在连接上确认（连接 → 此数据库）。",
 
     "chrome.footer.copy": "© 2026 Outline。随 Adminium 提供的演示客户门户。",
     "chrome.footer.chip": "adminium.dev/demo/client-portal",
@@ -546,6 +587,12 @@ export const chrome = {
     "chrome.dock.collapse": "隱藏示範控制項",
     "chrome.dock.expand": "顯示示範控制項",
 
+    "chrome.utc.notice": "日期以 UTC 顯示",
+    "chrome.utc.why": "此連線在 Adminium 中未設定時區，日期因此以 UTC 顯示，而非商家所在時區。",
+    "chrome.zone.notice": "日期以 {zone} 顯示",
+    "chrome.zone.why":
+      "此時區來自執行 Adminium 的伺服器，並非有人在此選擇。若它確實是該商家的時區，請在連線上確認（連線 → 此資料庫）。",
+
     "chrome.footer.copy": "© 2026 Outline。隨 Adminium 提供的示範客戶入口。",
     "chrome.footer.chip": "adminium.dev/demo/client-portal",
 
@@ -629,6 +676,13 @@ export const chrome = {
     "chrome.dock.reset": "إعادة ضبط العرض",
     "chrome.dock.collapse": "إخفاء أدوات العرض",
     "chrome.dock.expand": "إظهار أدوات العرض",
+
+    "chrome.utc.notice": "التواريخ معروضة بتوقيت UTC",
+    "chrome.utc.why":
+      "لا توجد منطقة زمنية محدّدة لهذا الاتصال في Adminium، لذا تُعرض التواريخ بتوقيت UTC بدلاً من المنطقة الزمنية للنشاط التجاري.",
+    "chrome.zone.notice": "التواريخ معروضة بتوقيت {zone}",
+    "chrome.zone.why":
+      "جاءت هذه المنطقة الزمنية من الخادم الذي يشغّل Adminium ، ولم يخترها أحد هنا. أكّدها على الاتصال (الاتصالات → هذه قاعدة البيانات) إذا كانت منطقة النشاط التجاري.",
 
     "chrome.footer.copy": "© 2026 Outline. بوابة عملاء تجريبية تُشحن مع Adminium.",
     "chrome.footer.chip": "adminium.dev/demo/client-portal",

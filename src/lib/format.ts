@@ -11,7 +11,7 @@
  */
 
 import { serDate } from "../data/demo.ts";
-import { locale, number as ambientNumber, t, tOr } from "../i18n/ambient.ts";
+import { tenantCurrency, locale, number as ambientNumber, t, tOr } from "../i18n/ambient.ts";
 import type { MessageKey } from "../i18n/messages/index.ts";
 
 /** Resolve a seed field that stores an i18n key; pass literal text through. */
@@ -26,7 +26,7 @@ export function label(key: string): string {
  * rule, so `minimumFractionDigits` is pinned at 2 rather than left to the
  * locale's default.
  */
-export function money(cents: number, currency = "USD"): string {
+export function money(cents: number, currency = tenantCurrency()): string {
   return new Intl.NumberFormat(locale(), {
     style: "currency",
     currency,

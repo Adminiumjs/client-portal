@@ -24,6 +24,8 @@ import {
   type ReactNode,
 } from "react";
 
+import { tenantCurrency } from "./ambient.ts";
+
 import {
   DEFAULT_LOCALE,
   LOCALES,
@@ -67,7 +69,33 @@ interface I18nValue {
 
 const I18nContext = createContext<I18nValue | null>(null);
 
+/*
+ * THE HOST'S LOCALE, when there is a host (29-app-surfaces.md D11).
+ *
+ * Blended into the Adminium dashboard, this app must not have its own language
+ * control — the dashboard owns that axis and pushes it down over the bridge.
+ * Two controls for one setting is the drift bug 28-T44 already shipped once.
+ *
+ * Deliberately NOT persisted: the pushed value is the operator's dashboard
+ * preference, not a choice made in this app, and writing it to this app's
+ * storage key would make it stick after the app is opened standalone.
+ */
+let hostLocale: LocaleTag | null = null;
+let applyLocale: ((tag: LocaleTag) => void) | null = null;
+
+/**
+ * Set the locale from outside React. Safe to call BEFORE the provider mounts —
+ * which is the normal case, since the bridge handshake completes before the
+ * first render so the first paint is already in the right language.
+ */
+export function setHostLocale(tag: string): void {
+  if (!isLocaleTag(tag)) return; // an unknown tag leaves the app's own default
+  hostLocale = tag;
+  applyLocale?.(tag);
+}
+
 function initialLocale(): LocaleTag {
+  if (hostLocale !== null) return hostLocale;
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (isLocaleTag(stored)) return stored;
@@ -88,6 +116,15 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     el.setAttribute("lang", LOCALES[locale].tag);
     el.setAttribute("dir", dir);
   }, [locale, dir]);
+
+  // Register the un-persisted setter for `setHostLocale`, so a theme/language
+  // flip in the dashboard restyles this frame live rather than on next load.
+  useEffect(() => {
+    applyLocale = setLocaleState;
+    return () => {
+      applyLocale = null;
+    };
+  }, []);
 
   const setLocale = useCallback((next: LocaleTag) => {
     setLocaleState(next);
@@ -129,7 +166,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
       dir,
       setLocale,
       t,
-      money: (v, currency = "USD") =>
+      money: (v, currency = tenantCurrency()) =>
         new Intl.NumberFormat(locale, {
           style: "currency",
           currency,

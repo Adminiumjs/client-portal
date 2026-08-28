@@ -37,7 +37,7 @@ const fallbackT: TFunction = (key, params, count) => {
   );
 };
 
-const fallbackMoney: MoneyFn = (value, currency = "USD") =>
+const fallbackMoney: MoneyFn = (value, currency = activeCurrency) =>
   new Intl.NumberFormat(DEFAULT_LOCALE, {
     style: "currency",
     currency,
@@ -46,6 +46,61 @@ const fallbackMoney: MoneyFn = (value, currency = "USD") =>
 
 const fallbackNumber: NumberFn = (value, opts) =>
   new Intl.NumberFormat(DEFAULT_LOCALE, opts).format(value);
+
+/**
+ * The TENANT's currency — the business's, not the reader's and not a default.
+ *
+ * `money()` used to default to a hardcoded `"USD"`, so a tenant currency set on
+ * the connection (28-T34) reached exactly one place: the activity feed, which
+ * formats through `formatTenantMoney`. Every screen formatter ignored it and
+ * printed dollars — visible as `$6,338.40` above a `€1,200.00` on the same
+ * page, against a database configured for EUR.
+ *
+ * Held here for the same reason the locale is: `lib/format.ts` is a pure module
+ * called from the store and from `demo.ts`, where no hook can reach a provider.
+ *
+ * `USD` remains the value before anything sets one — a demo build has no tenant.
+ */
+let activeCurrency = "USD";
+
+/** Set once at boot from the connection's tenant config. */
+export function setTenantCurrency(code: string | null | undefined): void {
+  if (typeof code === "string" && code.length === 3) activeCurrency = code;
+}
+
+/** The tenant's ISO-4217 code, for formatters that take no explicit one. */
+export const tenantCurrency = (): string => activeCurrency;
+
+/**
+ * The zone every date on screen is rendered in, and who chose it.
+ *
+ * Held here for the same reason the currency is: it is a boot-time tenant
+ * fact, and the shell that shows the notice reads it outside any provider.
+ * `null` before anything sets it — a demo build has no tenant and the public
+ * API always carries a real zone on its scope, so only the hosted-staff
+ * session transport ever sets a source at all.
+ */
+let activeZone: { zone: string; source: 'operator' | 'host' | 'fallback' | null } | null = null;
+
+/** Set once at boot, from the snapshot (which carries the transport's claim). */
+export function setTimezoneClaim(
+  zone: string,
+  source: 'operator' | 'host' | 'fallback' | null,
+): void {
+  activeZone = { zone, source };
+}
+
+/**
+ * What the shells should say about the zone, or `null` to say nothing.
+ *
+ * Only the two UNCONFIRMED sources produce a notice. An `operator` zone is a
+ * decision and needs no announcement, and a missing source is no claim.
+ */
+export function timezoneNotice(): { zone: string; source: 'host' | 'fallback' } | null {
+  if (activeZone === null) return null;
+  const { zone, source } = activeZone;
+  return source === 'host' || source === 'fallback' ? { zone, source } : null;
+}
 
 let activeLocale: LocaleTag = DEFAULT_LOCALE;
 let activeT: TFunction = fallbackT;
