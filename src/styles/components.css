@@ -30,6 +30,28 @@
   margin-inline: auto;
 }
 
+/*
+ * The internal placement (29-app-surfaces.md D6): this app inside the Adminium
+ * dashboard's content outlet, in a same-origin iframe.
+ *
+ * The FRAME is the scroll container — the host's outlet is `overflow: hidden`
+ * — so this must be at least the frame's height and must not add a second
+ * scrollbar. `min-height: 100%` rather than `100vh`: inside an iframe those are
+ * the same until the host resizes, and then `100vh` is the stale one.
+ *
+ * The trailing 96px of `.ol-content` is for the app's own bottom chrome, which
+ * is not here, so it comes back to a normal gutter.
+ */
+.ol-embedded {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.ol-embedded .ol-content {
+  padding-bottom: clamp(18px, 2.4vw, 30px);
+}
+
 /* ----------------------------------------------------------------- sidebar */
 
 .ol-sidebar {
@@ -535,6 +557,14 @@
 
 .ol-chipbtn {
   cursor: pointer;
+}
+
+/* The embedded placement has no topbar to hang the UTC-fallback chip on, so
+   it sits in-flow at the top of the content column, kept to one quiet row. */
+.ol-utcnote {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 10px;
 }
 
 .ol-chipbtn[aria-pressed="true"] {
