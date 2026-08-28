@@ -13,7 +13,8 @@
  * `@adminium/add-on-contracts` package import becomes relative ones.
  */
 /**
- * Slot registry v1 — CLOSED (24-marketplace-wave-4.md §5.4, eleven slots).
+ * Slot registry v1 — CLOSED (24-marketplace-wave-4.md §5.4; eleven slots, plus
+ * one bought on 2026-08-28 and named at the end of the list).
  *
  * A slot is a named place in a host surface, its payload, and its fill rule.
  * The registry is closed for the same reason the widget-id vocabulary is: an
@@ -30,9 +31,16 @@
  * real `version` field on the contract pattern — an earlier revision of this
  * comment claimed a package bump was the mechanism, and it never was.
  *
- * Every slot here is filled by something built in wave 4. A slot nobody fills
- * is a guess about a future add-on, which is why an earlier draft's twelfth
- * (`job.timeline.entries`) is absent.
+ * Every slot in the original eleven is filled by something built in wave 4. A
+ * slot nobody fills is a guess about a future add-on, which is why an earlier
+ * draft's twelfth (`job.timeline.entries`) is absent.
+ *
+ * THAT RULE SURVIVED A PURCHASE RATHER THAN BEING WAIVED BY ONE. `record.actions`
+ * arrives unfilled and is not a guess: it carries seven exhibits with a file and
+ * a line each, and the entry itself sets out the difference at length so a
+ * reader does not have to take the distinction on trust. If a second slot ever
+ * lands here on weaker evidence than that, this paragraph is the thing it
+ * should be measured against.
  */
 
 import { z } from 'zod';
@@ -145,6 +153,83 @@ export const SLOT_REGISTRY = [
     fill: 'multi',
     payload: 'the table name, the record, and write handles',
     renders: "a panel inside the generated dashboard's record editor",
+  },
+  {
+    /*
+     * THE TWELFTH, BOUGHT ON 2026-08-28 (31-add-on-candidates.md O1).
+     *
+     * ── IT IS NOT THE TWELFTH THIS FILE'S HEADER REFUSES ────────────────────
+     *
+     * The header says a slot nobody fills is a guess about a future add-on, and
+     * names `job.timeline.entries` as the guess that was cut. A reader arriving
+     * here and finding a slot with no fill in this release is owed the
+     * difference, because on the face of it this is the same thing.
+     *
+     * A GUESS HAS NO EXHIBITS. `job.timeline.entries` was somebody's idea of
+     * what an add-on might one day want; nothing in any repo asked for it. This
+     * id arrives carrying seven, each a real screen in a shipped app with a
+     * file and a line against it, gathered by five independent surveys that
+     * were not looking for a slot — they were looking for what the apps lie
+     * about — and then held to an adversarial pass. They are written down in
+     * 31 Appendix A.1, which is the artifact this entry cites and which exists
+     * so the purchase can be audited rather than taken on trust:
+     *
+     *   1. the per-record document renders (invoice, folio, receipt, recall
+     *      letter, .ics) across five apps
+     *   2. the certificate render moment
+     *   3. every transactional send-this-record moment — twelve hosts
+     *   4. the wallet-pass render moment
+     *   5. click-to-call / log-a-call on a deal
+     *   6. the post-resolution satisfaction action
+     *   7. attach-a-room to a session record
+     *
+     * 25 §8.2 declined this same shape and said what would change its mind:
+     * two independent implementations' worth of evidence. That is the bar this
+     * cleared, and the ruling is recorded rather than inferred.
+     *
+     * ── WHAT IT IS FOR ──────────────────────────────────────────────────────
+     *
+     * One opening, on the screen where somebody is already looking at ONE
+     * record, to do a thing to it. Every exhibit above is that sentence. The
+     * eleven ids before it could not carry any of them: `order.line.actions`
+     * is a line inside an order rather than a record, `order.dispatch.actions`
+     * is the dispatch end of an outbound order specifically, and
+     * `record.editor.panel` is a PANEL inside the generated dashboard's editor
+     * — a different host, a different verb, and no example app has one.
+     *
+     * ── `both`, AND WHY NOT `staff` ─────────────────────────────────────────
+     *
+     * The dossier's own title says "staff/admin", and five of its seven
+     * exhibits are staff screens. Two are not: the certificate sheet is the
+     * STUDENT's own page (`learning-platform/src/screens/Certificate.tsx`
+     * opens "the student's completion sheet") and the wallet pass is the
+     * ticket-holder's. Ruling the id `staff` would have put the two exhibits
+     * everyone actually wants to demo outside the thing bought to carry them,
+     * and 31 §A.3 already records "neither the 11 nor A.1 covers a customer
+     * surface" as an open gap — which is the same observation from the other
+     * end.
+     *
+     * There is nothing in the payload that a customer looking at their own
+     * record makes dishonest: it is a record and a way to write back to it,
+     * and who is reading changes what the HOST mounts, not what the slot is.
+     * `nav.add-on.routes` is `both` for the same reason.
+     *
+     * ── THE ONE THING A READER SHOULD HOLD AGAINST IT ───────────────────────
+     *
+     * It ships in wave 6 with NO FILL. Its first consumer is `docs-paperwork`,
+     * which is wave 5 and unbuilt, and the wave-6 add-on that could have
+     * filled it honestly turned out not to need it: `holiday-calendars`'
+     * working-day counts are derived live from the merged calendar, so a
+     * "recompute this request" action would have been an invented reason to
+     * touch the slot rather than a thing an operator wants. Inventing one to
+     * make this entry look filled is precisely the dishonesty the registry is
+     * closed to prevent, so it is not filled, and this comment says so.
+     */
+    id: 'record.actions',
+    surface: 'both',
+    fill: 'multi',
+    payload: 'what kind of record it is, the record, and a way to write back',
+    renders: 'an action and the panel its result lands in',
   },
 ] as const satisfies readonly SlotDefinition[];
 
