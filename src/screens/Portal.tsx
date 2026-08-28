@@ -9,7 +9,7 @@
 
 import { Compass, KeyRound, ShieldCheck } from "lucide-react";
 
-import { PORTAL_HINTS, TODAY } from "../data/demo.ts";
+import { PORTAL_HINTS, TODAY } from "../data/live.ts";
 import { useI18n } from "../i18n/index.tsx";
 import { dateLong, label, money } from "../lib/format.ts";
 import { balance, docTotals, isOverdue, projectProgress } from "../lib/invoice.ts";

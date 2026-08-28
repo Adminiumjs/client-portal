@@ -16,7 +16,7 @@ import {
   Sparkles,
 } from "lucide-react";
 
-import { TODAY } from "../data/demo.ts";
+import { TODAY } from "../data/live.ts";
 import type {
   ActivityEntry,
   Invoice,

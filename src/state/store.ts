@@ -19,7 +19,7 @@ import {
   SEED_PROPOSALS,
   TAX_RATE,
   TODAY,
-} from "../data/demo.ts";
+} from "../data/live.ts";
 import type {
   ActivityEntry,
   DeliverableStatus,
@@ -83,6 +83,8 @@ interface State {
 
   initTheme: () => void;
   toggleTheme: () => void;
+  /** Adopt a theme pushed by the embedding dashboard; never persisted. */
+  setHostTheme: (theme: Theme) => void;
   setNavOpen: (open: boolean) => void;
   setDockOpen: (open: boolean) => void;
   setProposalFilter: (f: string) => void;
@@ -218,6 +220,21 @@ export const useStore = create<State>((set, get) => ({
       window.matchMedia("(prefers-color-scheme: dark)").matches;
     const theme: Theme =
       stored === "dark" || stored === "light" ? stored : prefersDark ? "dark" : "light";
+    document.documentElement.setAttribute("data-theme", theme);
+    set({ theme });
+  },
+
+  /*
+   * The host's theme (29-app-surfaces.md D11) — applied, never remembered.
+   *
+   * Embedded, the DASHBOARD owns the theme axis and pushes it over the bridge;
+   * this app grows no control of its own. Writing the pushed value to this
+   * app's storage key would make the operator's dashboard theme stick the next
+   * time someone opens the surface standalone, which is not a preference
+   * anyone expressed.
+   */
+  setHostTheme: (theme) => {
+    if (get().theme === theme) return;
     document.documentElement.setAttribute("data-theme", theme);
     set({ theme });
   },
