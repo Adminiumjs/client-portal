@@ -14,7 +14,8 @@
  */
 /**
  * Slot registry v1 — CLOSED (24-marketplace-wave-4.md §5.4; eleven slots, plus
- * one bought on 2026-08-28 and named at the end of the list).
+ * two bought since and named at the end of the list, in the order they were
+ * bought).
  *
  * A slot is a named place in a host surface, its payload, and its fill rule.
  * The registry is closed for the same reason the widget-id vocabulary is: an
@@ -41,6 +42,18 @@
  * reader does not have to take the distinction on trust. If a second slot ever
  * lands here on weaker evidence than that, this paragraph is the thing it
  * should be measured against.
+ *
+ * A SECOND SLOT DID, AND IT IS MEASURED AGAINST THIS PARAGRAPH IN ITS OWN
+ * ENTRY. `shell.overlay` (2026-09-01) carries FOUR exhibits, not seven, and one
+ * of the four is an absence. It is therefore the weaker dossier and its entry
+ * says so in those words rather than dressing four up as enough. What it has
+ * that `record.actions` did not is the thing the paragraph above the last one
+ * asks for: it ships WITH its fill, in the same wave, so the registry's founding
+ * rule — a slot nobody fills is a guess — is satisfied on the day it lands
+ * instead of being owed to a later wave. The two entries are the two ways a
+ * purchase can be honest, and neither is the template for a third: a third that
+ * has neither seven exhibits nor a fill in the same wave is the guess this
+ * registry is closed against.
  */
 
 import { z } from 'zod';
@@ -230,6 +243,87 @@ export const SLOT_REGISTRY = [
     fill: 'multi',
     payload: 'what kind of record it is, the record, and a way to write back',
     renders: 'an action and the panel its result lands in',
+  },
+  {
+    /*
+     * THE THIRTEENTH, BOUGHT ON 2026-09-01 (33-live-chat-add-on.md O1 → D17).
+     *
+     * The first slot on a CUSTOMER SHELL. Every other customer id in this list
+     * is a place inside a flow — a product being configured, a basket line, a
+     * checkout's delivery step, a dispatch being read. This one is the layer
+     * ABOVE the page: a floating affordance a visitor can reach from any screen
+     * in the app, and the panel it opens.
+     *
+     * ── ITS DOSSIER IS WEAKER THAN `record.actions`', AND SAYS SO ────────────
+     *
+     * Four exhibits, not seven, written down in 33 Appendix A (deposited into
+     * 31 Appendix A as A.4):
+     *
+     *   1. one shipped implementation — the help desk's chat panel, a
+     *      store-connected overlay mounted once at the shell and therefore
+     *      present on all 54 of its views, with SIX host entry points and a
+     *      hand-off into the host's own ticket model
+     *      (`support-desk/src/components/ChatWidget.tsx`, `app/App.tsx:320`)
+     *   2. the gap the previous purchase's own review recorded — 31 A.3,
+     *      "neither the 11 nor A.1 covers a customer surface"
+     *   3. a dead affordance in the flagship — the storefront footer's
+     *      "Contact", wired to a demo toast (`Footer.tsx:107-110`)
+     *   4. ABSENCE, MEASURED: ten customer-side repos grepped for any way to
+     *      reach the operator from the shell; zero hits outside the help desk
+     *
+     * Exhibit 4 is an absence, and an absence is the weakest kind of evidence
+     * there is — it says nobody built this, which is equally consistent with
+     * nobody wanting it. It is in the list because it is the honest state of
+     * the fleet and not because it carries the purchase. What carries the
+     * purchase is exhibit 1 plus the condition below.
+     *
+     * ── WHAT IT HAS THAT THE TWELFTH DID NOT: IT SHIPS WITH ITS FILL ────────
+     *
+     * `record.actions` arrives unfilled and its entry spends four paragraphs
+     * on why that is not a guess. This id needs none of them: `live-chat` fills
+     * it in the same wave, from the same plan, and the help desk's own widget
+     * is what becomes the fill. The registry's founding rule is therefore met
+     * on the day the id lands rather than owed to a later one — which is the
+     * whole of the difference, and the reason a four-exhibit dossier was
+     * accepted here and would not have been for the twelfth.
+     *
+     * ── `customer`, AND WHY NOT `both` ──────────────────────────────────────
+     *
+     * The temptation is `both`: a staff app could hang a floating panel in its
+     * corner too. Nothing in the fleet does, and ruling it `both` on that
+     * reasoning would be buying a second surface on no exhibits at all — the
+     * mistake this entry has just spent forty lines refusing. A staff overlay
+     * can be bought the day a staff screen wants one, on its own evidence.
+     * `record.actions` went the other way on exhibits, not on symmetry: two of
+     * its seven were a reader's own record, so `staff` would have excluded
+     * them.
+     *
+     * ── THE ALTERNATIVE THAT WAS REJECTED, AND IS STILL ON FILE ─────────────
+     *
+     * Adminium injecting a script into every hosted customer surface, with no
+     * slot at all. Rejected for v1 (D3): demo mode needs the seam regardless —
+     * an example app running on fixtures has no Adminium to inject anything —
+     * and a second mount mechanism is the duplication this layer exists to
+     * prevent. It stays on file as the way to reach OPERATOR-BUILT customer
+     * pages, which have no seam to mount into (33 D22).
+     *
+     * ── THE ONE THING A READER SHOULD HOLD AGAINST IT ───────────────────────
+     *
+     * `fill: 'multi'` promises stacked overlays and there has never been more
+     * than one. A second overlay add-on would want to open A PARTICULAR fill
+     * from a host entry point, and the payload's `openRequest` is a bare
+     * counter that opens every one of them. That is recorded as un-purchased
+     * standing evidence (33 D16) rather than pre-solved with a `target` field
+     * nothing would pass: `multi` is right because two overlays must coexist
+     * without one of them winning, and the day a second one exists the request
+     * widens. Until then a host with one fill gets the behaviour it wants.
+     */
+    id: 'shell.overlay',
+    surface: 'customer',
+    fill: 'multi',
+    payload:
+      'the host shell: brand, screen, locale, clock, what it knows of the visitor, an open request, and the environment handles (token, storage, public client, suggest, handoff)',
+    renders: 'a floating affordance and its panel, stacked at the inline-end corner',
   },
 ] as const satisfies readonly SlotDefinition[];
 

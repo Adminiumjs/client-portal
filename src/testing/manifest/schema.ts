@@ -497,6 +497,11 @@ export const manifestSchema = z.preprocess(
 
 export type AppManifest = z.infer<typeof appManifestSchema>;
 export type AddOnManifest = z.infer<typeof addOnManifestSchema>;
+
+/** One table an add-on declares under `requiredSchema` (26 §3). */
+export type RequiredTable = z.infer<typeof requiredTableSchema>;
+/** One column of a {@link RequiredTable}. */
+export type RequiredColumn = z.infer<typeof requiredColumnSchema>;
 export type Manifest = AppManifest | AddOnManifest;
 
 export type { AddOnBlock };
