@@ -94,16 +94,43 @@ try {
   console.log(`  integrity: ${integrity}`);
 
   if (dryRun) {
+    // NOT `process.exit(0)`: exiting here would skip the `finally` below and
+    // leak the staging directory on every dry run (it did, three times, before
+    // 2026-09-12). Fall through and let the block unwind normally instead.
     console.log('\n--dry-run: nothing published.');
-    process.exit(0);
-  }
+  } else {
+    // A dead npm session reports the publish as `404 Not Found - PUT`, because
+    // the registry answers 404 rather than 401 for a scope you cannot write to
+    // so that it does not leak whether the package exists. That error names the
+    // package and says "or you do not have permission", which reads as "the
+    // name is wrong" and sends you looking in entirely the wrong place. Ask
+    // first, and say the true thing.
+    //
+    // Skipped under Actions: there is no logged-in session there, npm mints
+    // credentials from the OIDC token at publish time, and `whoami` does not
+    // describe that.
+    if (process.env.GITHUB_ACTIONS === undefined) {
+      try {
+        execFileSync('npm', ['whoami'], { stdio: 'pipe' });
+      } catch {
+        throw new Error(
+          'not logged in to npm — run `npm login` first.\n' +
+            '  A stale ~/.npmrc token fails this way too: it is present, so npm tries,\n' +
+            '  and the publish comes back as a 404 on the package name rather than a 401.',
+        );
+      }
+    }
 
-  // No NODE_AUTH_TOKEN: npm authenticates with the workflow's OIDC token and
-  // generates provenance automatically on that path.
-  execFileSync('npm', ['publish', join(staging, packed), '--access', 'public'], { stdio: 'inherit' });
+    // No NODE_AUTH_TOKEN: npm authenticates with the workflow's OIDC token and
+    // generates provenance automatically on that path.
+    execFileSync('npm', ['publish', join(staging, packed), '--access', 'public'], { stdio: 'inherit' });
+  }
 } finally {
   rmSync(staging, { recursive: true, force: true });
 }
+
+// The ledger records real publishes only.
+if (dryRun) process.exit(0);
 
 const ledgerPath = join(root, 'RELEASES.json');
 const ledger = existsSync(ledgerPath)
