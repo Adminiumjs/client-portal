@@ -2,7 +2,7 @@
   "manifestVersion": 1,
   "key": "clients",
   "name": "Client Portal",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "publisher": {
     "id": "adminium",
     "name": "Adminium",
