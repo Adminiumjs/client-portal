@@ -28,9 +28,14 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to release, without the v (e.g. 1.0.1). Must already be in manifest.json.'
+        description: 'Version to release, without the v (e.g. 0.1.1). Must already be in manifest.json.'
         required: true
         type: string
+      allow_version_jump:
+        description: 'Allow a major/minor bump. Leave OFF — releases are patch-only by owner policy.'
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: release-${{ github.workflow }}
@@ -91,6 +96,7 @@ jobs:
       - name: Assert the manifest is at the requested version
         env:
           VERSION: ${{ inputs.version }}
+          ALLOW_JUMP: ${{ inputs.allow_version_jump }}
         run: |
           set -euo pipefail
           node -e '
@@ -102,6 +108,48 @@ jobs:
               process.exit(1);
             }
             console.log(`${man.key} at ${want}`);
+
+            // PATCH-ONLY (owner policy, 2026-09-12): every release is a patch —
+            // 0.1.0 -> 0.1.1 -> 0.1.2 — and major/minor never move until the
+            // owner says so. Enforced here rather than written down because npm
+            // versions are IMMUTABLE: a mistaken `1.0.0` cannot be taken back,
+            // only unpublished, and the number is then burned forever.
+            //
+            // Compared against the release ledger, which is the record of what
+            // was actually published, not against tags (deletable) or the npm
+            // dist-tags (a network call this step should not need).
+            const prior = (() => {
+              try {
+                const l = JSON.parse(readFileSync("RELEASES.json", "utf8"));
+                return (l.releases ?? [])
+                  .map((r) => r.version)
+                  .sort((a, b) => {
+                    const A = a.split(/[.-]/).map(Number);
+                    const B = b.split(/[.-]/).map(Number);
+                    return A[0] - B[0] || A[1] - B[1] || A[2] - B[2];
+                  })
+                  .pop();
+              } catch {
+                return undefined;   // first release — nothing to compare
+              }
+            })();
+
+            if (prior !== undefined && process.env.ALLOW_JUMP !== "true") {
+              const [pMaj, pMin, pPat] = prior.split(/[.-]/).map(Number);
+              const [wMaj, wMin, wPat] = want.split(/[.-]/).map(Number);
+              if (wMaj !== pMaj || wMin !== pMin) {
+                console.error(
+                  `::error::${want} is a major/minor bump from ${prior}. Releases are ` +
+                    `patch-only: the next one is ${pMaj}.${pMin}.${pPat + 1}. To bump ` +
+                    `deliberately, re-run with allow_version_jump enabled.`,
+                );
+                process.exit(1);
+              }
+              if (wPat <= pPat) {
+                console.error(`::error::${want} does not advance on ${prior}`);
+                process.exit(1);
+              }
+            }
           '
 
       - name: Build the surfaces
