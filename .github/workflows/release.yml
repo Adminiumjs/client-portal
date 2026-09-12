@@ -1,0 +1,134 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# VENDORED. The canonical copy is `workplan/tools/app-release/release.yml` in the
+# Adminium monorepo; `app-release.sh sync` copies it into every app repo. Edit it
+# there, never here.
+#
+# THE FILENAME OF THIS FILE IS LOAD-BEARING. The published package names this
+# repository AND `release.yml` as its trusted publisher on npmjs.com. Renaming
+# the file breaks publishing until it is repointed by hand.
+#
+# DISPATCH-TRIGGERED, NOT TAG-TRIGGERED, and for the same reason the add-ons
+# release is: the ledger wants `{name, version, integrity}` computed from the
+# tarball that was actually published, committed, and INSIDE the tag. A
+# tag-triggered run cannot commit into the tag that started it. So this job
+# publishes, writes the ledger, commits it, and cuts the tag last — and restates
+# the guards `on: push: tags` would have given for free.
+#
+# BEFORE THE FIRST RUN EVER SUCCEEDS: `@adminiumjs/app-<key>` must already exist
+# on the registry with this repository and this filename registered as its
+# trusted publisher. npm cannot attach a trusted publisher to a name that has
+# never been published and there is no scope-level inheritance, so this package
+# needs a ONE-TIME manual 2FA bootstrap by the account holder from a `--dry-run`
+# tarball, then `npm trust github Adminiumjs/<this-repo> --file release.yml`.
+
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release, without the v (e.g. 1.0.1). Must already be in manifest.json.'
+        required: true
+        type: string
+
+concurrency:
+  group: release-${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: release
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write # commit the ledger, push the tag
+      id-token: write # the OIDC token npm exchanges for its publish credential.
+        # WITHOUT THIS npm silently falls back to token auth, finds none, and
+        # fails with an error that does not mention OIDC.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Refuse anything but main, and any tag that already exists
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+            echo "::error::'$VERSION' is not a semver version"; exit 1
+          fi
+          if git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then
+            echo "::error::tag v$VERSION already exists — npm versions are immutable, pick a new one"; exit 1
+          fi
+          echo "Releasing $VERSION from $(git rev-parse --short HEAD)"
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          registry-url: https://registry.npmjs.org
+
+      # Trusted publishing needs npm >= 11.5.1. Node 22 bundles npm 10.9.x,
+      # which has NO OIDC support: it ignores the id-token, falls back to an
+      # auth token that is not set, and fails misleadingly. This step is what
+      # makes the job work; it is not housekeeping.
+      - name: Upgrade npm for trusted publishing
+        run: |
+          npm install -g 'npm@^11.5.1'
+          npm --version
+
+      - name: Install
+        run: npm ci
+
+      # The manifest on disk is what ships: publish-app.mjs reads its own
+      # version and never looks at this input. Assert they agree BEFORE anything
+      # is uploaded — npm has no undo.
+      - name: Assert the manifest is at the requested version
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          node -e '
+            const { readFileSync } = require("fs");
+            const want = process.env.VERSION;
+            const man = JSON.parse(readFileSync("manifest.json", "utf8"));
+            if (man.version !== want) {
+              console.error(`::error::manifest.json is ${man.version}, expected ${want}`);
+              process.exit(1);
+            }
+            console.log(`${man.key} at ${want}`);
+          '
+
+      - name: Build the surfaces
+        run: npm run build:surface
+
+      # Pack + X-ray before uploading anything. A published version is
+      # immutable, so a defect found after the upload is on the registry forever.
+      - name: Pack and X-ray the tarball
+        run: node scripts/publish-app.mjs --dry-run
+
+      - name: Publish and write the release ledger
+        run: node scripts/publish-app.mjs
+
+      # The ledger is what the marketplace feed cross-checks against, so it has
+      # to be readable at a pinned SHA rather than left as a build artifact.
+      - name: Commit the ledger and cut the tag
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          git config user.name  'Mohamed Sofi'
+          git config user.email 'designsuniverse@gmail.com'
+          git add RELEASES.json
+          if git diff --cached --quiet; then
+            echo "::error::RELEASES.json did not change — the publish step wrote no ledger"; exit 1
+          fi
+          git commit -m "chore(release): ledger for v$VERSION"
+          git tag -a "v$VERSION" -m "v$VERSION"
+          git push origin HEAD:main
+          git push origin "v$VERSION"
