@@ -28,6 +28,8 @@
 // Usage:
 //   node scripts/publish-app.mjs --dry-run   pack + X-ray; publishes nothing
 //   node scripts/publish-app.mjs             publish, then write RELEASES.json
+//   node scripts/publish-app.mjs --tag next  publish under a dist-tag other than
+//                                            `latest` (only needed to retract)
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
@@ -36,6 +38,26 @@ import { join, resolve } from 'node:path';
 
 const dryRun = process.argv.includes('--dry-run');
 const root = resolve('.');
+
+// `--tag <name>` passes npm's dist-tag through. Normal releases never need it:
+// each version is higher than the last, so npm applies `latest` implicitly.
+//
+// It exists for the one case where that implicit step is REFUSED — publishing a
+// version LOWER than one already on the registry. npm stops with "Cannot
+// implicitly apply the latest tag because previously published version X is
+// higher", which is a guard against silently moving `latest` backwards, and it
+// wants the intent stated. That happens when a release is being retracted:
+// the replacement has to go up before the old version can come down (see
+// `app-release.sh bootstrap` and 47 §5), and the replacement is the lower one.
+//
+// Publish it under a throwaway tag, unpublish the old version, then repoint
+// `latest`. `npm dist-tag rm latest` is disallowed, so `latest` is MOVED with
+// `npm dist-tag add <pkg>@<version> latest`, never removed.
+const tagAt = process.argv.indexOf('--tag');
+const distTag = tagAt === -1 ? undefined : process.argv[tagAt + 1];
+if (tagAt !== -1 && (distTag === undefined || distTag.startsWith('--'))) {
+  throw new Error('--tag needs a value, e.g. `--tag next`');
+}
 
 const manifest = JSON.parse(readFileSync(join(root, 'manifest.json'), 'utf8'));
 const { key, version, kind } = manifest;
@@ -123,7 +145,17 @@ try {
 
     // No NODE_AUTH_TOKEN: npm authenticates with the workflow's OIDC token and
     // generates provenance automatically on that path.
-    execFileSync('npm', ['publish', join(staging, packed), '--access', 'public'], { stdio: 'inherit' });
+    execFileSync(
+      'npm',
+      [
+        'publish',
+        join(staging, packed),
+        '--access',
+        'public',
+        ...(distTag === undefined ? [] : ['--tag', distTag]),
+      ],
+      { stdio: 'inherit' },
+    );
   }
 } finally {
   rmSync(staging, { recursive: true, force: true });
