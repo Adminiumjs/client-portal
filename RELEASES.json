@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "releases": [
+    {
+      "name": "@adminiumjs/app-clients",
+      "version": "0.1.0",
+      "integrity": "sha512-pUIns9ngjFv1GC30q1FegK2YOA75Khmx+6ZrJsyavJzgt6kP3a+klpjSBLhYHNzpM1Sa+CXtTBfbe2P7a/Wqug==",
+      "publishedAt": "2026-09-13T09:32:42.067Z"
+    }
+  ]
+}
