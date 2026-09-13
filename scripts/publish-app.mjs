@@ -30,13 +30,17 @@
 //   node scripts/publish-app.mjs             publish, then write RELEASES.json
 //   node scripts/publish-app.mjs --tag next  publish under a dist-tag other than
 //                                            `latest` (only needed to retract)
+//   node scripts/publish-app.mjs --record    publish NOTHING; confirm the registry
+//                                            serves this build's exact bytes, then
+//                                            write the ledger (recovery, see below)
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
 const dryRun = process.argv.includes('--dry-run');
+const recordOnly = process.argv.includes('--record');
 const root = resolve('.');
 
 // `--tag <name>` passes npm's dist-tag through. Normal releases never need it:
@@ -68,6 +72,51 @@ const built = join(root, 'dist-surface', key);
 const sides = ['staff', 'customer'].filter((side) => existsSync(join(built, side, 'index.html')));
 if (sides.length === 0) {
   throw new Error(`no built surface under ${built} — run \`npm run build:surface\` first`);
+}
+
+// ─── The build must BE the committed source ──────────────────────────────────
+//
+// A published version is immutable, so the one thing this script must never do
+// is pack a build that is not the code in git. It did: `app-clinic@0.1.0` went
+// out from a dist-surface built on Aug 28 while 54 shipped files (+9,580 lines)
+// had been committed since, because nothing here compared the two — the build
+// merely had to EXIST. Two refusals close that:
+//
+//   DIRTY — uncommitted changes to anything that can reach the bundle mean the
+//           build may contain code no commit holds.
+//   STALE — a build older than the newest commit touching those paths is, by
+//           construction, not that commit.
+//
+// The path filter is an EXCLUSION list on purpose. Leaving out a path that
+// does not ship only costs a needless rebuild; leaving out one that DOES ship
+// is the clinic bug again. So everything counts except what provably cannot
+// reach the bundle. Under Actions both pass on their own: the checkout is
+// clean and the workflow builds after it. `--record` skips this — it proves
+// the local build matches the registry byte for byte instead.
+const NOT_SHIPPED = [
+  ':!RELEASES.json', ':!.github', ':!.claude', ':!*.md', ':!scripts',
+  ':!src/testing', ':!**/*.test.ts', ':!**/*.test.tsx', ':!dist-surface', ':!dist',
+];
+if (!recordOnly) {
+  const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
+  const dirty = git('status', '--porcelain', '--', '.', ...NOT_SHIPPED);
+  if (dirty !== '') {
+    throw new Error(
+      `uncommitted changes can reach the bundle — commit them, rebuild, then publish:\n${dirty
+        .split('\n')
+        .map((l) => `  ${l}`)
+        .join('\n')}`,
+    );
+  }
+  const lastCommit = Number(git('log', '-1', '--format=%ct', '--', '.', ...NOT_SHIPPED) || '0');
+  const oldestSide = Math.min(...sides.map((side) => statSync(join(built, side, 'index.html')).mtimeMs / 1000));
+  if (oldestSide < lastCommit) {
+    const hours = Math.round((lastCommit - oldestSide) / 3600);
+    throw new Error(
+      `the build is STALE: dist-surface predates the last shipped-path commit by ~${hours}h.\n` +
+        '  Run `npm run build:surface`, then publish.',
+    );
+  }
 }
 
 const name = `@adminiumjs/app-${key}`;
@@ -120,6 +169,8 @@ try {
     // leak the staging directory on every dry run (it did, three times, before
     // 2026-09-12). Fall through and let the block unwind normally instead.
     console.log('\n--dry-run: nothing published.');
+  } else if (recordOnly) {
+    console.log('\n--record: publishing nothing — asking the registry what it serves.');
   } else {
     // A dead npm session reports the publish as `404 Not Found - PUT`, because
     // the registry answers 404 rather than 401 for a scope you cannot write to
@@ -164,13 +215,70 @@ try {
 // The ledger records real publishes only.
 if (dryRun) process.exit(0);
 
+// ─── The registry is the only receipt ────────────────────────────────────────
+//
+// `npm publish` exiting 0 does NOT mean the version exists. With an account
+// under npm's 2FA-token restriction the registry can accept the upload into a
+// STAGED state pending approval and still exit 0 — which is how `app-clinic`'s
+// ledger was written two minutes before 0.1.0 was installable, and how every
+// retry after that failed three different ways against a version that already
+// existed. So no ledger row is written until the registry itself serves this
+// version with THIS build's integrity: that is the same cross-check the
+// marketplace feed runs, performed before the row exists instead of after.
+//
+// Polls because the read path lags the write (135 s and 210 s measured on
+// first publishes). Plain fetch rather than `npm view`, which would write a
+// debug log per poll and rotate out the one log that explains a failure.
+// `publishedAt` is the registry's own `time[version]`, not the local clock —
+// the local clock is when the upload was ACCEPTED, which staging proved can be
+// minutes before the version was real.
+const WAIT_MS = 8 * 60 * 1000;
+const served = await (async () => {
+  const url = `https://registry.npmjs.org/${name.replace('/', '%2f')}`;
+  const deadline = Date.now() + WAIT_MS;
+  for (;;) {
+    let doc;
+    try {
+      const res = await fetch(url, { headers: { accept: 'application/json', 'cache-control': 'no-cache' } });
+      if (res.ok) doc = await res.json();
+    } catch {
+      // a network blip is not an answer; keep asking until the deadline
+    }
+    const got = doc?.versions?.[version]?.dist?.integrity;
+    if (got !== undefined) {
+      if (got !== integrity) {
+        throw new Error(
+          `the registry serves ${name}@${version} as ${got},\n  but this build packs to ${integrity}.\n` +
+            '  Refusing to write a ledger row for bytes that differ from what is published.',
+        );
+      }
+      return { publishedAt: doc.time?.[version] ?? new Date().toISOString() };
+    }
+    if (Date.now() >= deadline) {
+      throw new Error(
+        recordOnly
+          ? `the registry does not serve ${name}@${version} — nothing to record.`
+          : `npm accepted the upload, but ${name}@${version} is not live after ${WAIT_MS / 60000} min.\n` +
+              `  It is probably STAGED pending 2FA approval — approve it at https://www.npmjs.com/package/${name}\n` +
+              '  (or propagation is unusually slow). Once `npm view` shows it, run:\n' +
+              '    node scripts/publish-app.mjs --record\n' +
+              '  Do NOT re-run a plain publish: the version number is taken either way.',
+      );
+    }
+    console.log(`  waiting for the registry to serve ${version}…`);
+    await new Promise((r) => setTimeout(r, 15_000));
+  }
+})();
+console.log(`\nregistry serves ${name}@${version} with this build's integrity (published ${served.publishedAt})`);
+
 const ledgerPath = join(root, 'RELEASES.json');
 const ledger = existsSync(ledgerPath)
   ? JSON.parse(readFileSync(ledgerPath, 'utf8'))
   : { schemaVersion: 1, releases: [] };
 ledger.releases = [
   ...ledger.releases.filter((r) => r.version !== version),
-  { name, version, integrity, publishedAt: new Date().toISOString() },
-].sort((a, b) => a.version.localeCompare(b.version));
+  { name, version, integrity, publishedAt: served.publishedAt },
+  // NUMERIC: a plain localeCompare is lexical and files 0.1.10 before 0.1.9.
+].sort((a, b) => a.version.localeCompare(b.version, undefined, { numeric: true }));
 writeFileSync(ledgerPath, `${JSON.stringify(ledger, null, 2)}\n`);
-console.log(`\nledger updated: ${ledgerPath}`);
+console.log(`ledger updated: ${ledgerPath}`);
