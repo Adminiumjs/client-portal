@@ -103,8 +103,24 @@ export const identitySchema = z
 /**
  * Keys no app or add-on may ever take, because they would shadow a storefront
  * route or a data file (D17). Apps and add-ons share one key namespace.
+ *
+ * `dashboard` joined them for a different reason (34 O10/D23): it is the HOST
+ * KEY a stock Adminium deployment attaches an add-on under, so an add-on
+ * `attaches: [{app: '*'}]` resolves against it and the consent dialog has
+ * something to enable and disable. Treating an empty `attachTo` as "the
+ * dashboard" was the alternative and leaves nothing to switch off. Reserving
+ * the literal means no app can also be called `dashboard` and make an
+ * attachment ambiguous.
  */
-export const RESERVED_KEYS = ['apps', 'add-on', 'add-ons', 'demo', 'index', 'search'] as const;
+export const RESERVED_KEYS = [
+  'apps',
+  'add-on',
+  'add-ons',
+  'dashboard',
+  'demo',
+  'index',
+  'search',
+] as const;
 
 // ── §2.11 capabilities ───────────────────────────────────────────────────────
 
@@ -273,6 +289,14 @@ const settingBase = {
   required: z.boolean().optional(),
   secret: z.boolean().optional(),
   label: i18nMessageSchema.optional(),
+  /*
+   * The sentence UNDER the field, where a label alone cannot carry the answer
+   * (34 §7.9, Appendix C). Every variant below is `.strict()`, so a manifest
+   * that wrote `help` without this line was rejected rather than ignored —
+   * which is why it rides the same release as `RESERVED_KEYS` above rather
+   * than waiting for a settings form to need it.
+   */
+  help: i18nMessageSchema.optional(),
 };
 
 export const settingSchema = z.discriminatedUnion('type', [
