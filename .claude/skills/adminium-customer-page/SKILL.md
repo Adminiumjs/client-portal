@@ -2,7 +2,7 @@
 name: adminium-customer-page
 description: Add a customer-facing or staff-facing page to an Adminium micro-SaaS app, wired to the scoped public API rather than to demo data. Use when someone wants to build, add, or connect a page in one of the Adminium marketplace apps (point-of-sale, clinic-desk, booking-scheduler, ecommerce-storefront and the rest), or asks how to let their customers book, order, track or submit something against their own database.
 license: AGPL-3.0-only
-allowed-tools: Bash(${CLAUDE_SKILL_DIR}/scripts/compile-surface.mjs), Bash(${CLAUDE_SKILL_DIR}/scripts/verify.sh)
+allowed-tools: Bash(${CLAUDE_SKILL_DIR}/scripts/compile-surface.mjs), Bash(${CLAUDE_SKILL_DIR}/scripts/compile-surface.mjs *), Bash(${CLAUDE_SKILL_DIR}/scripts/verify.sh)
 ---
 
 # Adminium customer page
@@ -13,6 +13,17 @@ An Adminium micro-SaaS has up to three sides. The **dashboard** is mandatory and
 build it — it comes from Adminium introspecting the database. The **staff** and **customer**
 sides live in the app repo, and at least one must exist. This skill adds a page to one of
 those two.
+
+## Requires Adminium 0.2.3 or later
+
+Check with `adminium --version`, or read `version` from `GET /api/v1/public/config`.
+
+The scoped public API first shipped in **0.2.2**, but this skill describes the surface as it
+exists from **0.2.3**: the practice's timezone reaches the browser on `/public/config`, which
+is what makes an opening time render correctly for a visitor in another zone. On 0.2.2 that
+field is absent and every time this skill tells you to render is the server's, silently.
+
+**On an older instance, stop and say so.** The page would look right and be wrong by hours.
 
 ## Before anything else
 
@@ -27,9 +38,12 @@ may use. If the manifest does not validate, **stop and say so** — every line y
 after that point is a guess about a schema you have not seen. Fixing the manifest is the
 task; the page is not.
 
-Two of the fifteen repos (`factory-ops`, `hotel-reservations`) have contract manifests with
-no `pages` block. There the compiler will tell you what is missing, and authoring it is the
-job before this one.
+Some repos ship a **contract manifest** — `requiredSchema` and design notes, but no `pages`
+block — because authoring their pages is product work nobody has done yet. There the compiler
+names exactly what is missing, and supplying it is the job before this one.
+
+**Which repos those are changes over time, so do not carry a list in your head — run the
+compiler.** It reads the manifest in front of you; a remembered list does not.
 
 ## What to ask
 

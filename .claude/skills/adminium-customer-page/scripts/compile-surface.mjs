@@ -41,11 +41,15 @@ try {
 /*
  * The real validator when it can be reached, a structural check when it cannot.
  *
- * `@adminiumjs/manifest` on npm currently predates the `frontends[]` schema, so
- * a version check is not enough — resolve it only if the caller has it, and
+ * Resolve `@adminiumjs/manifest` only if the caller already has it, and
  * otherwise assert the shape this skill depends on. Being explicit about which
  * of the two ran matters: a structural pass is weaker and should not read as a
  * full validation.
+ *
+ * (Until 0.2.2 the published package predated the `frontends[]` schema, which is
+ * why this never gated on a version number. It has carried `frontends[]` since
+ * 0.2.2 — but a scratch install still has no package at all, so the fallback is
+ * the normal path for a non-cloner, not the exception.)
  */
 let validate = null;
 try {
@@ -98,6 +102,18 @@ const TYPE_TO_TS = {
 
 console.log(`\n${manifest.name ?? manifest.key}  (${manifest.key})`);
 console.log('─'.repeat(64));
+/*
+ * Say which check ran on the PASS path too, not only when it fails. A scratch
+ * install has no `@adminiumjs/manifest`, so the structural check is the normal
+ * path for a non-cloner — and a clean pass they are told nothing about reads as
+ * a full validation, which is exactly the impression this script exists to deny.
+ */
+console.log(
+  validate === null
+    ? 'structural check only — `@adminiumjs/manifest` is not installed here, so this is\n'
+      + 'weaker than a full validation. Install it for the real one.'
+    : 'validated with `@adminiumjs/manifest`.',
+);
 
 console.log('\nSIDES');
 for (const f of manifest.frontends) {
