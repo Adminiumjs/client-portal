@@ -120,6 +120,28 @@ if (!recordOnly) {
 }
 
 const name = `@adminiumjs/app-${key}`;
+
+// ─── `repository` must name THIS GitHub repo, exactly ────────────────────────
+//
+// npm's trusted publishing refuses a package whose `repository.url` does not
+// match the repository the OIDC token was minted for ("must exactly match your
+// GitHub repository", docs.npmjs.com/trusted-publishers), because that match is
+// what the provenance attestation vouches for. The staged package.json is
+// generated below, and it carried no `repository` at all — so the first release
+// through the workflow would have failed at the publish step. No Adminiumjs
+// package had ever published over OIDC when this was found (2026-09-13).
+//
+// Under Actions, GITHUB_REPOSITORY IS the repo the token names, so it is used
+// verbatim. Locally it is read from `origin`, which is what a hand publish
+// should record. The `git+https://…git` spelling is the one the org's add-on
+// packages already carry.
+const repoSlug = (() => {
+  if (process.env.GITHUB_REPOSITORY) return process.env.GITHUB_REPOSITORY;
+  const origin = execFileSync('git', ['remote', 'get-url', 'origin'], { cwd: root, encoding: 'utf8' }).trim();
+  const m = origin.match(/github\.com[/:]([^/]+\/[^/]+?)(?:\.git)?$/);
+  if (m === null) throw new Error(`origin is not a GitHub repository (${origin}) — trusted publishing needs one`);
+  return m[1];
+})();
 const staging = mkdtempSync(join(tmpdir(), `app-publish-${key}-`));
 let integrity;
 try {
@@ -131,6 +153,7 @@ try {
         version,
         description: manifest.description?.fallback ?? `Built surfaces for the ${key} app.`,
         license: manifest.license ?? 'AGPL-3.0-only',
+        repository: { type: 'git', url: `git+https://github.com/${repoSlug}.git` },
         files: ['manifest.json', ...sides],
       },
       null,
