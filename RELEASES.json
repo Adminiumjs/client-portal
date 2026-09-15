@@ -6,6 +6,12 @@
       "version": "0.1.0",
       "integrity": "sha512-pUIns9ngjFv1GC30q1FegK2YOA75Khmx+6ZrJsyavJzgt6kP3a+klpjSBLhYHNzpM1Sa+CXtTBfbe2P7a/Wqug==",
       "publishedAt": "2026-09-13T09:32:42.067Z"
+    },
+    {
+      "name": "@adminiumjs/app-clients",
+      "version": "0.1.1",
+      "integrity": "sha512-Ue4jZiTNUHVJBjSITnWdv9+wGaqCwVIcrZ0MA1eUjJf7tl/34U366ijyarKooRdlQd8ZgClppdcKTxcfAWiWWw==",
+      "publishedAt": "2026-09-15T20:54:11.000Z"
     }
   ]
 }
