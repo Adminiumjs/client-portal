@@ -4,23 +4,23 @@
 # Adminium monorepo; `app-release.sh sync` copies it into every app repo. Edit it
 # there, never here.
 #
-# THE FILENAME OF THIS FILE IS LOAD-BEARING. The published package names this
-# repository AND `release.yml` as its trusted publisher on npmjs.com. Renaming
-# the file breaks publishing until it is repointed by hand.
+# WHERE A RELEASE GOES (48-self-hosted-downloads.md D1/D6). The packed file is
+# uploaded to the Adminiumjs downloads bucket, read back from
+# https://downloads.adminium.dev, and only then recorded in RELEASES.json. Apps
+# are not published to npm.
 #
 # DISPATCH-TRIGGERED, NOT TAG-TRIGGERED, and for the same reason the add-ons
 # release is: the ledger wants `{name, version, integrity}` computed from the
-# tarball that was actually published, committed, and INSIDE the tag. A
+# file that was actually released, committed, and INSIDE the tag. A
 # tag-triggered run cannot commit into the tag that started it. So this job
-# publishes, writes the ledger, commits it, and cuts the tag last — and restates
+# uploads, writes the ledger, commits it, and cuts the tag last — and restates
 # the guards `on: push: tags` would have given for free.
 #
-# BEFORE THE FIRST RUN EVER SUCCEEDS: `@adminiumjs/app-<key>` must already exist
-# on the registry with this repository and this filename registered as its
-# trusted publisher. npm cannot attach a trusted publisher to a name that has
-# never been published and there is no scope-level inheritance, so this package
-# needs a ONE-TIME manual 2FA bootstrap by the account holder from a `--dry-run`
-# tarball, then `npm trust github Adminiumjs/<this-repo> --file release.yml`.
+# BEFORE THE FIRST RUN: this repository must be granted the Adminiumjs
+# organization's variables R2_ACCOUNT_ID + R2_BUCKET and secrets
+# R2_ACCESS_KEY_ID + R2_SECRET_ACCESS_KEY (48 §3 gate 1.7). The secret key is
+# an Object Read & Write token scoped to the bucket: it can add a version and
+# can never replace or delete one (D2).
 
 name: release
 
@@ -48,9 +48,6 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: write # commit the ledger, push the tag
-      id-token: write # the OIDC token npm exchanges for its publish credential.
-        # WITHOUT THIS npm silently falls back to token auth, finds none, and
-        # fails with an error that does not mention OIDC.
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -67,32 +64,41 @@ jobs:
             echo "::error::'$VERSION' is not a semver version"; exit 1
           fi
           if git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then
-            echo "::error::tag v$VERSION already exists — npm versions are immutable, pick a new one"; exit 1
+            echo "::error::tag v$VERSION already exists — released files are immutable, pick a new version"; exit 1
           fi
           echo "Releasing $VERSION from $(git rev-parse --short HEAD)"
+
+      # Before anything is built: a repo that was never granted the bucket
+      # credentials should find out in seconds, not after a build.
+      - name: Refuse to start without the bucket credentials
+        env:
+          R2_ACCOUNT_ID: ${{ vars.R2_ACCOUNT_ID }}
+          R2_BUCKET: ${{ vars.R2_BUCKET }}
+          HAS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID != '' }}
+          HAS_SECRET: ${{ secrets.R2_SECRET_ACCESS_KEY != '' }}
+        run: |
+          set -euo pipefail
+          missing=()
+          [ -n "$R2_ACCOUNT_ID" ] || missing+=('variable R2_ACCOUNT_ID')
+          [ -n "$R2_BUCKET" ] || missing+=('variable R2_BUCKET')
+          [ "$HAS_KEY_ID" = true ] || missing+=('secret R2_ACCESS_KEY_ID')
+          [ "$HAS_SECRET" = true ] || missing+=('secret R2_SECRET_ACCESS_KEY')
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::error::not granted to this repository: ${missing[*]} (Adminiumjs organization settings)"; exit 1
+          fi
 
       - name: Set up Node 22
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-          registry-url: https://registry.npmjs.org
-
-      # Trusted publishing needs npm >= 11.5.1. Node 22 bundles npm 10.9.x,
-      # which has NO OIDC support: it ignores the id-token, falls back to an
-      # auth token that is not set, and fails misleadingly. This step is what
-      # makes the job work; it is not housekeeping.
-      - name: Upgrade npm for trusted publishing
-        run: |
-          npm install -g 'npm@^11.5.1'
-          npm --version
 
       - name: Install
         run: npm ci
 
       # The manifest on disk is what ships: publish-app.mjs reads its own
       # version and never looks at this input. Assert they agree BEFORE anything
-      # is uploaded — npm has no undo.
+      # is uploaded — the bucket has no undo.
       - name: Assert the manifest is at the requested version
         env:
           VERSION: ${{ inputs.version }}
@@ -111,13 +117,13 @@ jobs:
 
             // PATCH-ONLY (owner policy, 2026-09-12): every release is a patch —
             // 0.1.0 -> 0.1.1 -> 0.1.2 — and major/minor never move until the
-            // owner says so. Enforced here rather than written down because npm
-            // versions are IMMUTABLE: a mistaken `1.0.0` cannot be taken back,
-            // only unpublished, and the number is then burned forever.
+            // owner says so. Enforced here rather than written down because a
+            // released file is IMMUTABLE: the bucket lock keeps a mistaken
+            // `1.0.0` forever, and its number can never be used again.
             //
             // Compared against the release ledger, which is the record of what
-            // was actually published, not against tags (deletable) or the npm
-            // dist-tags (a network call this step should not need).
+            // was actually released, not against tags (deletable) or the bucket
+            // (a network call this step should not need).
             const prior = (() => {
               try {
                 const l = JSON.parse(readFileSync("RELEASES.json", "utf8"));
@@ -155,16 +161,26 @@ jobs:
       - name: Build the surfaces
         run: npm run build:surface
 
-      # Pack + X-ray before uploading anything. A published version is
-      # immutable, so a defect found after the upload is on the registry forever.
+      # Pack + X-ray before uploading anything. A released version is
+      # immutable, so a defect found after the upload is in the bucket forever.
       - name: Pack and X-ray the tarball
         run: node scripts/publish-app.mjs --dry-run
 
-      - name: Publish and write the release ledger
+      # The only step that sees the bucket credentials. It uploads, then reads
+      # the file back from downloads.adminium.dev, and writes the ledger row
+      # only once the served bytes hash to this build. Re-dispatching the same
+      # version after a failure here is safe: identical bytes already in the
+      # bucket are accepted, different ones are refused.
+      - name: Upload, read back, and write the release ledger
+        env:
+          R2_ACCOUNT_ID: ${{ vars.R2_ACCOUNT_ID }}
+          R2_BUCKET: ${{ vars.R2_BUCKET }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
         run: node scripts/publish-app.mjs
 
-      # The ledger is what the marketplace feed cross-checks against, so it has
-      # to be readable at a pinned SHA rather than left as a build artifact.
+      # The ledger is what the marketplace catalog carries to every server, so
+      # it has to be readable at a pinned SHA rather than left as a build artifact.
       - name: Commit the ledger and cut the tag
         env:
           VERSION: ${{ inputs.version }}
@@ -174,7 +190,7 @@ jobs:
           git config user.email 'designsuniverse@gmail.com'
           git add RELEASES.json
           if git diff --cached --quiet; then
-            echo "::error::RELEASES.json did not change — the publish step wrote no ledger"; exit 1
+            echo "::error::RELEASES.json did not change — the upload step wrote no ledger"; exit 1
           fi
           git commit -m "chore(release): ledger for v$VERSION"
           git tag -a "v$VERSION" -m "v$VERSION"

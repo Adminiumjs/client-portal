@@ -1,72 +1,77 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //
-// publish-app.mjs — publish this app's built surfaces as `@adminiumjs/app-<key>`
-// and record what was published (47-app-installation.md §5, 4c).
+// publish-app.mjs — put this app's built surfaces in the downloads bucket and
+// record what was released (48-self-hosted-downloads.md D5/D6; 47-app-installation.md §5, 4c).
 //
 // VENDORED. The canonical copy is `workplan/tools/app-release/publish-app.mjs`
-// in the Adminium monorepo; `app-release.sh sync` copies it into every app repo.
-// Edit it there, never here.
+// in the Adminium monorepo; `app-release.sh sync` copies it into every app repo
+// beside `r2.mjs`. Edit them there, never here.
 //
-// ─── Why the package is staged rather than published from the repo root ──────
+// ─── Why the package is staged rather than packed from the repo root ─────────
 //
 // This repo's root is its SOURCE — src/, db/, node_modules, the demo seed. What
 // Adminium installs is `manifest.json` plus the built `dist-surface/<key>/<side>`
 // directories, which the install path expects to find at `staff/` and
-// `customer/` once npm's `package/` prefix is stripped. Staging produces exactly
-// that and nothing else, so the published tarball cannot drift from what the
+// `customer/` once the archive's `package/` prefix is stripped. Staging produces
+// exactly that and nothing else, so the released file cannot drift from what the
 // server unpacks, and no `files` field here has to stay in step with a layout it
 // does not own.
 //
 // ─── The ledger is the point of the second half ──────────────────────────────
 //
-// `RELEASES.json` records `{name, version, integrity}` for every publish. The
-// marketplace feed cross-checks its rows against BOTH this ledger and the
-// registry and fails its build on any disagreement, so a feed can never
-// advertise bytes npm does not serve. The ledger therefore has to be committed
-// and tagged — readable at a pinned SHA — rather than left as a build artifact.
+// `RELEASES.json` records `{name, version, integrity, publishedAt}` for every
+// release. The marketplace catalog carries that integrity to every server, and a
+// server keeps a download only if its bytes hash to it (48 D3) — so a row may
+// exist only for bytes the public address really serves. It is committed and
+// tagged, readable at a pinned SHA, rather than left as a build artifact.
 //
 // Usage:
-//   node scripts/publish-app.mjs --dry-run   pack + X-ray; publishes nothing
-//   node scripts/publish-app.mjs             publish, then write RELEASES.json
-//   node scripts/publish-app.mjs --tag next  publish under a dist-tag other than
-//                                            `latest` (only needed to retract)
-//   node scripts/publish-app.mjs --record    publish NOTHING; confirm the registry
-//                                            serves this build's exact bytes, then
-//                                            write the ledger (recovery, see below)
+//   node scripts/publish-app.mjs --dry-run   pack + X-ray; uploads nothing, needs no credentials
+//   node scripts/publish-app.mjs             upload, read back, then write RELEASES.json
+//
+// Both read the newest published @adminiumjs/adminium from the npm registry
+// first, and refuse a manifest whose compatibility.minAdminiumVersion is newer.
+//
+// A real run needs R2_ACCOUNT_ID, R2_BUCKET, R2_ACCESS_KEY_ID and
+// R2_SECRET_ACCESS_KEY; release.yml maps them from the Adminiumjs organization.
+//
+// RE-RUNNING IS THE RECOVERY. The bucket never replaces a file. A rerun that
+// packs the same bytes finds them already there and finishes the read-back and
+// the ledger; a rerun that packs DIFFERENT bytes stops, because that version
+// number is burned — release the next patch. There is no retraction either: a
+// released file stays in the bucket for good, and the next patch supersedes it.
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
-const dryRun = process.argv.includes('--dry-run');
-const recordOnly = process.argv.includes('--record');
-const root = resolve('.');
+import { assertMinimumReleased, newestAdminium, objectKeyFor, publishObject, r2ConfigFromEnv } from './r2.mjs';
 
-// `--tag <name>` passes npm's dist-tag through. Normal releases never need it:
-// each version is higher than the last, so npm applies `latest` implicitly.
-//
-// It exists for the one case where that implicit step is REFUSED — publishing a
-// version LOWER than one already on the registry. npm stops with "Cannot
-// implicitly apply the latest tag because previously published version X is
-// higher", which is a guard against silently moving `latest` backwards, and it
-// wants the intent stated. That happens when a release is being retracted:
-// the replacement has to go up before the old version can come down (see
-// `app-release.sh bootstrap` and 47 §5), and the replacement is the lower one.
-//
-// Publish it under a throwaway tag, unpublish the old version, then repoint
-// `latest`. `npm dist-tag rm latest` is disallowed, so `latest` is MOVED with
-// `npm dist-tag add <pkg>@<version> latest`, never removed.
-const tagAt = process.argv.indexOf('--tag');
-const distTag = tagAt === -1 ? undefined : process.argv[tagAt + 1];
-if (tagAt !== -1 && (distTag === undefined || distTag.startsWith('--'))) {
-  throw new Error('--tag needs a value, e.g. `--tag next`');
+const known = new Set(['--dry-run']);
+const unknown = process.argv.slice(2).filter((arg) => !known.has(arg));
+if (unknown.length > 0) {
+  // `--tag` and `--record` belonged to the npm pipeline. Refuse them by name
+  // rather than ignore them: an ignored flag reads as one that took effect.
+  throw new Error(`unknown argument(s): ${unknown.join(' ')} — the only flag is --dry-run`);
 }
+const dryRun = process.argv.includes('--dry-run');
+const root = resolve('.');
 
 const manifest = JSON.parse(readFileSync(join(root, 'manifest.json'), 'utf8'));
 const { key, version, kind } = manifest;
-if (kind !== 'app') throw new Error(`manifest.json declares kind "${String(kind)}" — this publishes apps`);
+if (kind !== 'app') throw new Error(`manifest.json declares kind "${String(kind)}" — this releases apps`);
 if (typeof key !== 'string' || typeof version !== 'string') throw new Error('manifest.json has no key/version');
+// Before any packing: a missing credential should cost nothing, and a bad key or
+// version must not get as far as a bucket path.
+const objectKey = objectKeyFor({ kind: 'app', key, version });
+const config = dryRun ? undefined : r2ConfigFromEnv(process.env);
+if (config?.test) console.log(`TEST ENDPOINTS — bucket ${config.endpoint}, read-back ${config.publicBase}`);
+// A minimum no published Adminium meets would sit in the released file forever
+// (48 A17). Checked in a dry run too, so a rehearsal says what the release would.
+const newest = await newestAdminium();
+const minimum = assertMinimumReleased(manifest, newest);
+console.log(`${key}@${version} needs Adminium ${minimum}; the newest published is ${newest}`);
 
 const built = join(root, 'dist-surface', key);
 const sides = ['staff', 'customer'].filter((side) => existsSync(join(built, side, 'index.html')));
@@ -76,7 +81,7 @@ if (sides.length === 0) {
 
 // ─── The build must BE the committed source ──────────────────────────────────
 //
-// A published version is immutable, so the one thing this script must never do
+// A released version is immutable, so the one thing this script must never do
 // is pack a build that is not the code in git. It did: `app-clinic@0.1.0` went
 // out from a dist-surface built on Aug 28 while 54 shipped files (+9,580 lines)
 // had been committed since, because nothing here compared the two — the build
@@ -91,58 +96,47 @@ if (sides.length === 0) {
 // does not ship only costs a needless rebuild; leaving out one that DOES ship
 // is the clinic bug again. So everything counts except what provably cannot
 // reach the bundle. Under Actions both pass on their own: the checkout is
-// clean and the workflow builds after it. `--record` skips this — it proves
-// the local build matches the registry byte for byte instead.
+// clean and the workflow builds after it.
 const NOT_SHIPPED = [
   ':!RELEASES.json', ':!.github', ':!.claude', ':!*.md', ':!scripts',
   ':!src/testing', ':!**/*.test.ts', ':!**/*.test.tsx', ':!dist-surface', ':!dist',
 ];
-if (!recordOnly) {
-  const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
-  const dirty = git('status', '--porcelain', '--', '.', ...NOT_SHIPPED);
-  if (dirty !== '') {
-    throw new Error(
-      `uncommitted changes can reach the bundle — commit them, rebuild, then publish:\n${dirty
-        .split('\n')
-        .map((l) => `  ${l}`)
-        .join('\n')}`,
-    );
-  }
-  const lastCommit = Number(git('log', '-1', '--format=%ct', '--', '.', ...NOT_SHIPPED) || '0');
-  const oldestSide = Math.min(...sides.map((side) => statSync(join(built, side, 'index.html')).mtimeMs / 1000));
-  if (oldestSide < lastCommit) {
-    const hours = Math.round((lastCommit - oldestSide) / 3600);
-    throw new Error(
-      `the build is STALE: dist-surface predates the last shipped-path commit by ~${hours}h.\n` +
-        '  Run `npm run build:surface`, then publish.',
-    );
-  }
+const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
+const dirty = git('status', '--porcelain', '--', '.', ...NOT_SHIPPED);
+if (dirty !== '') {
+  throw new Error(
+    `uncommitted changes can reach the bundle — commit them, rebuild, then release:\n${dirty
+      .split('\n')
+      .map((l) => `  ${l}`)
+      .join('\n')}`,
+  );
+}
+const lastCommit = Number(git('log', '-1', '--format=%ct', '--', '.', ...NOT_SHIPPED) || '0');
+const oldestSide = Math.min(...sides.map((side) => statSync(join(built, side, 'index.html')).mtimeMs / 1000));
+if (oldestSide < lastCommit) {
+  const hours = Math.round((lastCommit - oldestSide) / 3600);
+  throw new Error(
+    `the build is STALE: dist-surface predates the last shipped-path commit by ~${hours}h.\n` +
+      '  Run `npm run build:surface`, then release.',
+  );
 }
 
+// The name is npm-shaped because `npm pack` needs one and the files copied from
+// npm carry it (48 D8). Nothing resolves it on a registry any more; the ledger
+// and the tarball's own package.json keep it so every row reads the same way.
 const name = `@adminiumjs/app-${key}`;
 
-// ─── `repository` must name THIS GitHub repo, exactly ────────────────────────
-//
-// npm's trusted publishing refuses a package whose `repository.url` does not
-// match the repository the OIDC token was minted for ("must exactly match your
-// GitHub repository", docs.npmjs.com/trusted-publishers), because that match is
-// what the provenance attestation vouches for. The staged package.json is
-// generated below, and it carried no `repository` at all — so the first release
-// through the workflow would have failed at the publish step. No Adminiumjs
-// package had ever published over OIDC when this was found (2026-09-13).
-//
-// Under Actions, GITHUB_REPOSITORY IS the repo the token names, so it is used
-// verbatim. Locally it is read from `origin`, which is what a hand publish
-// should record. The `git+https://…git` spelling is the one the org's add-on
-// packages already carry.
+// `repository` records where the file was built from. Under Actions,
+// GITHUB_REPOSITORY is that repo; locally it is read from `origin`.
 const repoSlug = (() => {
   if (process.env.GITHUB_REPOSITORY) return process.env.GITHUB_REPOSITORY;
-  const origin = execFileSync('git', ['remote', 'get-url', 'origin'], { cwd: root, encoding: 'utf8' }).trim();
+  const origin = git('remote', 'get-url', 'origin');
   const m = origin.match(/github\.com[/:]([^/]+\/[^/]+?)(?:\.git)?$/);
-  if (m === null) throw new Error(`origin is not a GitHub repository (${origin}) — trusted publishing needs one`);
+  if (m === null) throw new Error(`origin is not a GitHub repository (${origin})`);
   return m[1];
 })();
-const staging = mkdtempSync(join(tmpdir(), `app-publish-${key}-`));
+const staging = mkdtempSync(join(tmpdir(), `app-release-${key}-`));
+let released;
 let integrity;
 try {
   writeFileSync(
@@ -163,8 +157,10 @@ try {
   cpSync(join(root, 'manifest.json'), join(staging, 'manifest.json'));
   for (const side of sides) cpSync(join(built, side), join(staging, side), { recursive: true });
 
-  // X-RAY BEFORE UPLOADING ANYTHING. A published version is immutable, so a
-  // defect found after the upload is on the registry forever.
+  // X-RAY BEFORE UPLOADING ANYTHING. A released version is immutable, so a
+  // defect found after the upload is in the bucket forever. `npm pack` is only
+  // the local packer (48 D5): `archive.ts` reads exactly its tar shape, and
+  // macOS `tar` output was already refused there.
   execFileSync('npm', ['pack', '--pack-destination', staging], { cwd: staging, stdio: 'pipe' });
   const packed = readdirSync(staging).find((f) => f.endsWith('.tgz'));
   if (packed === undefined) throw new Error('npm pack produced no tarball');
@@ -186,113 +182,36 @@ try {
   console.log(`  entries:   ${listed.length}`);
   console.log(`  bytes:     ${bytes.length}`);
   console.log(`  integrity: ${integrity}`);
+  console.log(`  object:    ${objectKey}`);
 
   if (dryRun) {
     // NOT `process.exit(0)`: exiting here would skip the `finally` below and
     // leak the staging directory on every dry run (it did, three times, before
     // 2026-09-12). Fall through and let the block unwind normally instead.
-    console.log('\n--dry-run: nothing published.');
-  } else if (recordOnly) {
-    console.log('\n--record: publishing nothing — asking the registry what it serves.');
+    console.log('\n--dry-run: nothing uploaded.');
   } else {
-    // A dead npm session reports the publish as `404 Not Found - PUT`, because
-    // the registry answers 404 rather than 401 for a scope you cannot write to
-    // so that it does not leak whether the package exists. That error names the
-    // package and says "or you do not have permission", which reads as "the
-    // name is wrong" and sends you looking in entirely the wrong place. Ask
-    // first, and say the true thing.
-    //
-    // Skipped under Actions: there is no logged-in session there, npm mints
-    // credentials from the OIDC token at publish time, and `whoami` does not
-    // describe that.
-    if (process.env.GITHUB_ACTIONS === undefined) {
-      try {
-        execFileSync('npm', ['whoami'], { stdio: 'pipe' });
-      } catch {
-        throw new Error(
-          'not logged in to npm — run `npm login` first.\n' +
-            '  A stale ~/.npmrc token fails this way too: it is present, so npm tries,\n' +
-            '  and the publish comes back as a 404 on the package name rather than a 401.',
-        );
-      }
-    }
-
-    // No NODE_AUTH_TOKEN: npm authenticates with the workflow's OIDC token and
-    // generates provenance automatically on that path.
-    execFileSync(
-      'npm',
-      [
-        'publish',
-        join(staging, packed),
-        '--access',
-        'public',
-        ...(distTag === undefined ? [] : ['--tag', distTag]),
-      ],
-      { stdio: 'inherit' },
-    );
+    released = await publishObject({
+      config,
+      kind: 'app',
+      key,
+      version,
+      bytes,
+      log: (line) => console.log(`  ${line}`),
+    });
   }
 } finally {
   rmSync(staging, { recursive: true, force: true });
 }
 
-// The ledger records real publishes only.
+// The ledger records real releases only.
 if (dryRun) process.exit(0);
 
-// ─── The registry is the only receipt ────────────────────────────────────────
-//
-// `npm publish` exiting 0 does NOT mean the version exists. With an account
-// under npm's 2FA-token restriction the registry can accept the upload into a
-// STAGED state pending approval and still exit 0 — which is how `app-clinic`'s
-// ledger was written two minutes before 0.1.0 was installable, and how every
-// retry after that failed three different ways against a version that already
-// existed. So no ledger row is written until the registry itself serves this
-// version with THIS build's integrity: that is the same cross-check the
-// marketplace feed runs, performed before the row exists instead of after.
-//
-// Polls because the read path lags the write (135 s and 210 s measured on
-// first publishes). Plain fetch rather than `npm view`, which would write a
-// debug log per poll and rotate out the one log that explains a failure.
-// `publishedAt` is the registry's own `time[version]`, not the local clock —
-// the local clock is when the upload was ACCEPTED, which staging proved can be
-// minutes before the version was real.
-const WAIT_MS = 8 * 60 * 1000;
-const served = await (async () => {
-  const url = `https://registry.npmjs.org/${name.replace('/', '%2f')}`;
-  const deadline = Date.now() + WAIT_MS;
-  for (;;) {
-    let doc;
-    try {
-      const res = await fetch(url, { headers: { accept: 'application/json', 'cache-control': 'no-cache' } });
-      if (res.ok) doc = await res.json();
-    } catch {
-      // a network blip is not an answer; keep asking until the deadline
-    }
-    const got = doc?.versions?.[version]?.dist?.integrity;
-    if (got !== undefined) {
-      if (got !== integrity) {
-        throw new Error(
-          `the registry serves ${name}@${version} as ${got},\n  but this build packs to ${integrity}.\n` +
-            '  Refusing to write a ledger row for bytes that differ from what is published.',
-        );
-      }
-      return { publishedAt: doc.time?.[version] ?? new Date().toISOString() };
-    }
-    if (Date.now() >= deadline) {
-      throw new Error(
-        recordOnly
-          ? `the registry does not serve ${name}@${version} — nothing to record.`
-          : `npm accepted the upload, but ${name}@${version} is not live after ${WAIT_MS / 60000} min.\n` +
-              `  It is probably STAGED pending 2FA approval — approve it at https://www.npmjs.com/package/${name}\n` +
-              '  (or propagation is unusually slow). Once `npm view` shows it, run:\n' +
-              '    node scripts/publish-app.mjs --record\n' +
-              '  Do NOT re-run a plain publish: the version number is taken either way.',
-      );
-    }
-    console.log(`  waiting for the registry to serve ${version}…`);
-    await new Promise((r) => setTimeout(r, 15_000));
-  }
-})();
-console.log(`\nregistry serves ${name}@${version} with this build's integrity (published ${served.publishedAt})`);
+// `publishedAt` is the public host's own Last-Modified for the object, not the
+// local clock: on a rerun that found the file already there, it is still the
+// moment the file was first written.
+const lastModified = released.lastModified === null ? Number.NaN : Date.parse(released.lastModified);
+const publishedAt = Number.isNaN(lastModified) ? new Date().toISOString() : new Date(lastModified).toISOString();
+console.log(`\n${released.url} serves this build (written ${publishedAt})`);
 
 const ledgerPath = join(root, 'RELEASES.json');
 const ledger = existsSync(ledgerPath)
@@ -300,7 +219,7 @@ const ledger = existsSync(ledgerPath)
   : { schemaVersion: 1, releases: [] };
 ledger.releases = [
   ...ledger.releases.filter((r) => r.version !== version),
-  { name, version, integrity, publishedAt: served.publishedAt },
+  { name, version, integrity, publishedAt },
   // NUMERIC: a plain localeCompare is lexical and files 0.1.10 before 0.1.9.
 ].sort((a, b) => a.version.localeCompare(b.version, undefined, { numeric: true }));
 writeFileSync(ledgerPath, `${JSON.stringify(ledger, null, 2)}\n`);
