@@ -94,7 +94,28 @@ describe("discovery", () => {
     expect((await port.config()).timezone).toBe("Europe/Lisbon");
   });
 
-  it("falls back to UTC and FLAGS it when the connection has no timezone", async () => {
+  it("falls back to ADMINIUM's zone, flagged as host, when the connection has none", async () => {
+    /*
+     * The zone a surface renders in when nobody configured one. It used to be
+     * UTC, decided in the browser — so a Berlin deployment drew its own
+     * business's evenings an hour early and captioned them "UTC". The server
+     * knows where it is; it now says so, and this takes that answer.
+     *
+     * `host`, not `fallback`: a real zone that nobody CONFIRMED is a different
+     * state from having no zone at all, and it is the same claim Adminium makes
+     * for a connection it seeded itself.
+     */
+    const { fetchImpl } = harness(
+      {},
+      { conns: [{ id: "conn-1", serverTimezone: "Europe/Berlin" }] },
+    );
+    const port = sessionPort({ tableOfRef: MAP, fetchImpl });
+    const config = await port.config();
+    expect(config.timezone).toBe("Europe/Berlin");
+    expect(config.timezoneSource).toBe("host");
+  });
+
+  it("falls back to UTC when the server is too old to send its own zone", async () => {
     /*
      * This asserted a `NO_TIMEZONE` refusal until a real operator hit it: an
      * unset zone made the whole surface unreachable. Rendering an hour off is

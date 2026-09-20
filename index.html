@@ -6,12 +6,81 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="Client Portal — a demo client portal and invoicing app shipped with Adminium."
+      content="Client Portal — a client portal and invoicing app for Adminium."
     />
     <title>Client Portal</title>
+    <style>
+      /*
+        THE BOOT INDICATOR — the only thing on screen until React mounts.
+
+        `boot()` in src/main.tsx awaits the bound connection, then the
+        transport, then the whole snapshot before it calls `createRoot`. On a
+        hosted staff surface that is three network round-trips, and #root was
+        empty for every one of them: a signed-in operator saw a blank white
+        page with no way to tell a slow server from a broken app.
+
+        It lives in the HTML, inline, rather than in a React boot screen,
+        because it has to paint BEFORE the bundle has downloaded and parsed —
+        the part of the wait that no amount of React can cover. Both exits
+        clear it: `createRoot().render()` replaces the container's children,
+        and `showStartupFailure()` empties #root before writing its own message.
+
+        NO TEXT, deliberately. This markup ships before the i18n bundle exists,
+        so any word here would be English for every operator in every locale —
+        and this app ships in eight. A spinner says "working" in all of them.
+        The screen-reader label is the one English string, and it is preferable
+        to announcing nothing at all.
+      */
+      .boot {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .boot__spinner {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        /* Neutral grey on purpose: this paints before any theme or token
+           stylesheet, so it has to be legible on both a white and a dark
+           background without knowing which one it is about to get. */
+        border: 3px solid rgba(128, 128, 128, 0.25);
+        border-top-color: rgba(128, 128, 128, 0.9);
+        animation: boot-spin 0.7s linear infinite;
+      }
+      @keyframes boot-spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      /* A spinner is motion, and motion is the thing this setting turns off.
+         The element stays — it is the only indication anything is happening —
+         and simply holds still. */
+      @media (prefers-reduced-motion: reduce) {
+        .boot__spinner {
+          animation: none;
+        }
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="boot" role="status">
+        <div class="boot__spinner"></div>
+        <span
+          style="
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            overflow: hidden;
+            clip-path: inset(50%);
+            white-space: nowrap;
+          "
+          >Loading…</span
+        >
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

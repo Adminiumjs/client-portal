@@ -23,7 +23,8 @@ import {
 
 import type { View } from "../data/types.ts";
 import { isEmbedded } from "../embed.ts";
-import { timezoneNotice } from "../i18n/ambient.ts";
+import { DEMO } from "../surface.ts";
+import { appName } from "../i18n/ambient.ts";
 import { useI18n } from "../i18n/index.tsx";
 import { label, money } from "../lib/format.ts";
 import { balance } from "../lib/invoice.ts";
@@ -74,7 +75,25 @@ function NavList({ onPick }: { onPick?: () => void }) {
   );
 }
 
+/**
+ * What this app is CALLED on screen.
+ *
+ * The operator's name from Adminium when they set one, else the name this
+ * build ships with. One helper rather than a `??` at each of the three render
+ * sites: a sidebar, a wordmark and a dialog label that disagree about the name
+ * of the app is a worse bug than any of them being wrong alone.
+ *
+ * Not localized, deliberately — an operator types one business name and it is
+ * not Adminium's to translate. `chrome.brand` still is, for the apps that keep
+ * the shipped one.
+ */
+function useBrand(): string {
+  const { t } = useI18n();
+  return appName() ?? t("chrome.brand");
+}
+
 function Brand() {
+  const brand = useBrand();
   const { t } = useI18n();
   return (
     <div className="ol-sidebar__brand">
@@ -82,7 +101,7 @@ function Brand() {
         <FileText size={18} />
       </span>
       <span>
-        <span className="ol-sidebar__name">{t("chrome.brand")}</span>
+        <span className="ol-sidebar__name">{brand}</span>
         <span className="ol-sidebar__sub" style={{ display: "block" }}>
           {t("chrome.brand.studio")}
         </span>
@@ -91,8 +110,24 @@ function Brand() {
   );
 }
 
+/**
+ * The demo's own footer — and ONLY the demo's.
+ *
+ * It reads "A demo client portal shipped with Adminium" beside an
+ * `adminium.dev/demo/client-portal` chip. True of the marketplace demo; a
+ * falsehood on an operator's own deployment, where it told their staff and
+ * their clients that the thing they were working in was a sample. It shipped
+ * that way in all eight locales, inside the hosted staff and customer bundles
+ * both.
+ *
+ * `DEMO` folds to a literal at build time (`surface.ts`), so in every other
+ * build this component and its strings are eliminated from the bundle rather
+ * than merely skipped — the same rule D24 applied to the demo dock, which this
+ * footer was simply missed by.
+ */
 function Footer() {
   const { t } = useI18n();
+  if (!DEMO) return null;
   return (
     <div className="ol-sidebar__foot">
       {t("chrome.footer.copy")}
@@ -197,37 +232,23 @@ function DocumentSearch() {
   );
 }
 
-/**
- * The one VISIBLE trace of a zone nobody confirmed (data/sessionSource.ts).
+/*
+ * THE ZONE CHIP IS GONE, and the warning it carried now lives in Adminium.
  *
- * Two states, one chip. `fallback` — no zone on the connection at all, so every
- * date renders in UTC. `host` — a real zone, but the one Adminium took from the
- * machine it runs on, which is plausible and unverified and therefore the more
- * dangerous of the two: UTC announces itself, a wrong city does not.
+ * It rendered "Dates shown in UTC" — or a city nobody confirmed — permanently,
+ * in the header of every screen, for everyone. But an unset timezone is the
+ * OPERATOR's to fix, on the connection, in Adminium; staff and customers
+ * reading this app can do nothing about it and were shown it on every page
+ * anyway. Studio's Connections card now names the zone dates actually render
+ * in whenever a connection has none, which is both where the fix is and the
+ * only audience that can apply it.
  *
- * A chip and not a banner because the state is degraded, not broken; the fix
- * lives in the tooltip. Renders nothing for an operator-set zone, which is what
- * nearly every boot should be.
+ * `timezoneNotice()` stays in `i18n/ambient.ts`: the claim is still worth
+ * carrying and still logged at boot. Nothing renders it.
  */
-function ZoneNotice({ block = false }: { block?: boolean }) {
-  const { t } = useI18n();
-  const notice = timezoneNotice();
-  if (notice === null) return null;
-  const chip =
-    notice.source === "fallback" ? (
-      <span className="ol-chip" title={t("chrome.utc.why")}>
-        {t("chrome.utc.notice")}
-      </span>
-    ) : (
-      <span className="ol-chip" title={t("chrome.zone.why", { zone: notice.zone })}>
-        {t("chrome.zone.notice", { zone: notice.zone })}
-      </span>
-    );
-  return block ? <div className="ol-utcnote">{chip}</div> : chip;
-}
-
 /** The studio's internal chrome. */
 function StudioShell({ children }: { children: React.ReactNode }) {
+  const brand = useBrand();
   const { t } = useI18n();
   const navOpen = useStore((s) => s.navOpen);
   const setNavOpen = useStore((s) => s.setNavOpen);
@@ -250,7 +271,7 @@ function StudioShell({ children }: { children: React.ReactNode }) {
             aria-label={t("chrome.menu.close")}
             onClick={() => setNavOpen(false)}
           />
-          <div className="ol-sheet" role="dialog" aria-modal="true" aria-label={t("chrome.brand")}>
+          <div className="ol-sheet" role="dialog" aria-modal="true" aria-label={brand}>
             <div style={{ display: "flex", alignItems: "center" }}>
               <Brand />
               <button
@@ -283,8 +304,6 @@ function StudioShell({ children }: { children: React.ReactNode }) {
           <DocumentSearch />
           <div className="ol-topbar__spacer" />
 
-          <ZoneNotice />
-
           <button
             type="button"
             className="ol-iconbtn ol-btn"
@@ -309,6 +328,7 @@ function StudioShell({ children }: { children: React.ReactNode }) {
  * were sent and nothing about the studio's other work.
  */
 function PortalShell({ children }: { children: React.ReactNode }) {
+  const brand = useBrand();
   const { t } = useI18n();
   const theme = useStore((s) => s.theme);
   const toggleTheme = useStore((s) => s.toggleTheme);
@@ -324,7 +344,7 @@ function PortalShell({ children }: { children: React.ReactNode }) {
           className="ol-portal__brand"
           onClick={leavePortal}
         >
-          <span className="ol-portal__wordmark">{t("chrome.brand")}</span>
+          <span className="ol-portal__wordmark">{brand}</span>
           <span className="ol-portal__label">{t("chrome.brand.portal")}</span>
         </button>
 
@@ -350,10 +370,14 @@ function PortalShell({ children }: { children: React.ReactNode }) {
         {children}
       </main>
 
-      <footer className="ol-portal__foot">
-        {t("chrome.footer.copy")}
-        <span className="ol-sidebar__chip ol-mono">{t("chrome.footer.chip")}</span>
-      </footer>
+      {/* Same demo-only rule as the sidebar's <Footer/>, inlined here because
+          the portal's footer carries the portal's own class. */}
+      {DEMO && (
+        <footer className="ol-portal__foot">
+          {t("chrome.footer.copy")}
+          <span className="ol-sidebar__chip ol-mono">{t("chrome.footer.chip")}</span>
+        </footer>
+      )}
     </div>
   );
 }
@@ -380,9 +404,6 @@ function EmbeddedShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="ol-embedded">
       <main className="ol-content" id="main">
-        {/* In-flow, not chrome: D6's "no chrome" bans the duplicated shell,
-            not a data-state notice the host has no way to show. */}
-        <ZoneNotice block />
         {children}
       </main>
     </div>

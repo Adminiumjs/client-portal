@@ -7,6 +7,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
+import { appName, setAppName } from "./i18n/ambient.ts";
 import { configBase, resolveStaffConnectionId } from "./staffConnection.ts";
 
 const ok = (doc: unknown) =>
@@ -23,6 +24,28 @@ describe("resolveStaffConnectionId", () => {
     expect(
       await resolveStaffConnectionId({ hostedStaff: true, base: "/apps/clients/staff/", fetchImpl }),
     ).toBe("con_42");
+  });
+
+  it("takes the operator's name for the app off the same document", async () => {
+    /*
+     * The name an operator set in Adminium reaches the app's own chrome. It
+     * rides the config document rather than a second request, because the app
+     * already fetches this one before it renders anything — a separate call
+     * would be a second chance to paint the wrong name first.
+     */
+    setAppName(null);
+    const fetchImpl = ok({ connectionId: "con_42", appName: "Acme Client Hub" });
+    await resolveStaffConnectionId({ hostedStaff: true, base: "/apps/clients/staff/", fetchImpl });
+    expect(appName()).toBe("Acme Client Hub");
+  });
+
+  it("leaves the app's own name in place when the operator set none", async () => {
+    // Null means "keep yours". Nothing here invents a name, and the shell's
+    // fallback to `chrome.brand` is what renders.
+    setAppName(null);
+    const fetchImpl = ok({ connectionId: "con_42", appName: null });
+    await resolveStaffConnectionId({ hostedStaff: true, base: "/apps/clients/staff/", fetchImpl });
+    expect(appName()).toBeNull();
   });
 
   it("returns null for an UNBOUND surface — a complete answer, not a failure", async () => {

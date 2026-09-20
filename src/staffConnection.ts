@@ -28,6 +28,7 @@
  * blocks boot.
  */
 
+import { setAppName } from "./i18n/ambient.ts";
 import { HOSTED, SURFACE_SIDE } from "./surface.ts";
 
 /**
@@ -104,6 +105,10 @@ export async function resolveStaffConnectionId(
     if (!res.ok) return null;
     const doc: unknown = await res.json();
     if (doc === null || typeof doc !== "object") return null;
+    // The same document carries what the operator called this app. Set here
+    // rather than returned, because it has nothing to do with this function's
+    // question and every caller would otherwise have to thread it through.
+    setAppName((doc as { appName?: unknown }).appName as string | null | undefined);
     const id = (doc as { connectionId?: unknown }).connectionId;
     return typeof id === "string" && id !== "" ? id : null;
   } catch {

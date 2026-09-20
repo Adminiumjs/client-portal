@@ -64,6 +64,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const REPO = resolve(__dirname, "..", "..");
 const DOCK = join(REPO, "src", "components", "DemoDock.tsx");
+const SHELL = join(REPO, "src", "components", "Shell.tsx");
 const DEMO_DATA = join(REPO, "src", "data", "demo.ts");
 
 /** Every `.js` byte of a build, concatenated. */
@@ -116,6 +117,39 @@ function dockMarkers(): string[] {
     throw new Error(
       `no dock class names found in ${DOCK} — this gate cannot see the dock, ` +
         `so it cannot prove the dock is absent. Fix the pattern, do not delete the test.`,
+    );
+  }
+  return [...found];
+}
+
+/**
+ * Class names lifted out of the demo footer, the same way and for the same
+ * reason as the dock's.
+ *
+ * The footer read "A demo client portal shipped with Adminium" beside an
+ * `adminium.dev/demo/client-portal` chip, and it shipped inside the hosted
+ * staff and customer bundles — telling an operator's own staff and clients
+ * that the thing they were working in was a sample. The dock was gated on
+ * `DEMO` by D24; the footer was simply missed, and nothing here noticed for
+ * two waves.
+ *
+ * MARKED BY CLASS, NOT BY STRING. The English copy stays in the bundle no
+ * matter what: it is one entry in a message table, which is data, and Rollup
+ * cannot tree-shake a single key out of an object. What must be absent is the
+ * markup that would RENDER it — and the class names are the only part of that
+ * markup to survive minification.
+ */
+function footerMarkers(): string[] {
+  const src = readFileSync(SHELL, "utf8");
+  const found = new Set<string>();
+  for (const m of src.matchAll(/className="([a-z]{2,4}-[a-z_]*foot[a-z_-]*)/g)) {
+    const cls = m[1];
+    if (cls !== undefined) found.add(cls.split(" ")[0] ?? cls);
+  }
+  if (found.size === 0) {
+    throw new Error(
+      `no footer class names found in ${SHELL} — this gate cannot see the footer, ` +
+        `so it cannot prove the footer is absent. Fix the pattern, do not delete the test.`,
     );
   }
   return [...found];
@@ -189,6 +223,21 @@ describe("rule 1 + 3 — a flag folds, so the dock is ABSENT and not merely hidd
     expect({
       staff: present(staff, dockMarkers()),
       customer: present(customer, dockMarkers()),
+    }).toEqual({ staff: [], customer: [] });
+  });
+});
+
+describe("the demo footer is demo-only, and absent from every surface build", () => {
+  it("the demo build contains the footer", () => {
+    // The control, for the same reason the dock has one: absence proves
+    // nothing when the marker itself has gone stale.
+    expect(present(demo, footerMarkers())).not.toEqual([]);
+  });
+
+  it("no surface build can render the footer", () => {
+    expect({
+      staff: present(staff, footerMarkers()),
+      customer: present(customer, footerMarkers()),
     }).toEqual({ staff: [], customer: [] });
   });
 });

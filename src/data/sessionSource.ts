@@ -114,6 +114,18 @@ interface ConnectionRow {
    * absent must mean "no claim" rather than "guessed".
    */
   timezoneSource?: string | null;
+  /**
+   * ADMINIUM's OWN zone, reported on every connection and stored on none.
+   *
+   * The fallback when `timezone` is null. This app used to substitute `"UTC"`
+   * here, which was a guess made in the browser: on a server that is not in
+   * UTC it rendered the business's own day in the wrong hours and captioned it
+   * "UTC" on a badge. The server knows its zone, so it says it.
+   *
+   * Optional because an Adminium older than this field does not send one, and
+   * UTC remains the last resort when it is absent.
+   */
+  serverTimezone?: string | null;
   currency?: string | null;
   /**
    * Paused by an operator (Adminium meta wave 0019). Adminium opens no
@@ -184,6 +196,8 @@ function buildTransport(opts: SessionPortOptions): SessionTransport {
   const doFetch = opts.fetchImpl ?? globalThis.fetch.bind(globalThis);
   let csrfToken: string | null = null;
   let connectionId: string | null = opts.connectionId ?? null;
+  /** Adminium's own zone, for the fallback below. Null on an older Adminium. */
+  let serverTimezone: string | null = null;
   let tenantTimezone: string | null = opts.timezone ?? null;
   /**
    * Where the zone above came from — see {@link TimezoneSource}. A build that
@@ -276,6 +290,7 @@ function buildTransport(opts: SessionPortOptions): SessionTransport {
         }
         tenantTimezone = opts.timezone ?? pinned.timezone ?? null;
         tenantTimezoneSource = sourceOf(opts.timezone, pinned);
+        serverTimezone = pinned.serverTimezone ?? null;
         tenantCurrency = opts.currency ?? pinned.currency ?? null;
       }
       return connectionId;
@@ -323,6 +338,7 @@ function buildTransport(opts: SessionPortOptions): SessionTransport {
     // API gives a scope over its connection, for the same reason.
     tenantTimezone = opts.timezone ?? row.timezone ?? null;
     tenantTimezoneSource = sourceOf(opts.timezone, row);
+    serverTimezone = row.serverTimezone ?? null;
     tenantCurrency = opts.currency ?? row.currency ?? null;
     connectionId = row.id;
     return connectionId;
@@ -363,17 +379,26 @@ function buildTransport(opts: SessionPortOptions): SessionTransport {
          * Almost every screen here needs no zone at all, and the ones that do
          * are off by an hour at worst.
          *
-         * The original concern stands and is met a different way: the value we
-         * fall back to is UTC, never the READER's zone. `Intl…resolvedOptions()`
-         * would silently render a Lisbon studio in a Berlin viewer's hours and
-         * look like data. UTC is visibly a default, and the `fallback` source
-         * below lets the app say so rather than pretend.
+         * WHAT WE FALL BACK TO IS THE SERVER'S ZONE, not UTC and never the
+         * READER's. `Intl…resolvedOptions()` in the browser would render a
+         * Lisbon studio in a Berlin viewer's hours and look like data, and two
+         * people would see different times for one appointment. Adminium's own
+         * zone is a single value for the tenant, it is the machine the operator
+         * deliberately deployed on, and it is what Adminium already seeds a new
+         * connection with — so this agrees with what a configured connection
+         * would have said instead of contradicting it.
+         *
+         * Reported as `host`: a real zone that nobody confirmed. UTC survives
+         * only as the last resort for an Adminium too old to send its own.
          */
-        tenantTimezone = "UTC";
-        tenantTimezoneSource = "fallback";
+        tenantTimezone = serverTimezone ?? "UTC";
+        tenantTimezoneSource = serverTimezone === null ? "fallback" : "host";
         console.warn(
-          "[adminium] this connection has no timezone; dates render in UTC. " +
-            "Set one on the connection in Adminium so they render in the business's zone.",
+          `[adminium] this connection has no timezone; dates render in ${tenantTimezone}` +
+            // Only true when the server actually told us — otherwise UTC is
+            // this app's last resort and must not be attributed to anyone.
+            (serverTimezone === null ? "" : ", the zone of the server running Adminium") +
+            ". Set one on the connection in Adminium so they render in the business's zone.",
         );
       } else if (tenantTimezoneSource === "host") {
         /*
