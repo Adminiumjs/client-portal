@@ -105,13 +105,37 @@ jobs:
       # implicit-any errors cascading from it. `pkg...` means "pkg and its
       # dependencies", so the build walks config, then add-on-contracts, then
       # manifest, in that order.
+      # ── AND THE ENGINE, WHERE A REPO CHECKS ITS PAGES ─────────────────────
+      #
+      # `src/manifest-pages.test.ts` runs the product's `checkManifestPages`
+      # over this manifest: every declared page bound to a declared table that
+      # can back its template. That needs `@adminium/engine` (and the widget
+      # registry under it), which is a much bigger build than the validator —
+      # so it is built ONLY where that test exists. A repo without it builds
+      # exactly what it built before.
+      - name: Does this repo check its pages against its tables?
+        id: checks_pages
+        run: |
+          if [ -f src/manifest-pages.test.ts ]; then
+            echo "value=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Build the product's validator, and move it out of the workspace
         if: steps.needs_product.outputs.value == 'true'
+        env:
+          CHECKS_PAGES: ${{ steps.checks_pages.outputs.value }}
         run: |
           cd "$GITHUB_WORKSPACE/.adminium-product"
           corepack enable
-          pnpm install --frozen-lockfile --filter "@adminium/manifest..."
-          pnpm --filter "@adminium/manifest..." build
+          if [ "$CHECKS_PAGES" = "true" ]; then
+            pnpm install --frozen-lockfile --filter "@adminium/manifest..." --filter "@adminium/engine..."
+            pnpm --filter "@adminium/manifest..." --filter "@adminium/engine..." build
+          else
+            pnpm install --frozen-lockfile --filter "@adminium/manifest..."
+            pnpm --filter "@adminium/manifest..." build
+          fi
           # AND OUT OF THE WORKSPACE IT GOES, which is not tidiness. `actions/
           # checkout` can only write inside the workspace, and this repo's
           # vitest collects `**/*.test.ts` from the repo root — so the product's
