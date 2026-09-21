@@ -424,7 +424,7 @@
     },
     {
       "ref": "clients-book",
-      "template": "page-master-detail",
+      "template": "page-crud",
       "title": {
         "key": "mft.clients.page.book",
         "fallback": "Clients"
@@ -433,6 +433,9 @@
         "group": "manifest:clients",
         "icon": "users",
         "order": 2
+      },
+      "bindings": {
+        "rows": "clients"
       }
     },
     {
@@ -446,6 +449,9 @@
         "group": "manifest:clients",
         "icon": "file-text",
         "order": 3
+      },
+      "bindings": {
+        "rows": "proposals"
       }
     },
     {
@@ -459,6 +465,9 @@
         "group": "manifest:clients",
         "icon": "receipt-text",
         "order": 4
+      },
+      "bindings": {
+        "rows": "invoices"
       }
     },
     {
@@ -472,6 +481,9 @@
         "group": "manifest:clients",
         "icon": "kanban",
         "order": 5
+      },
+      "bindings": {
+        "rows": "projects"
       }
     }
   ],
