@@ -14,6 +14,7 @@
  * (amounts, tax, totals) is Adminium's, worked out when the lines are saved.
  */
 import type { Day, Id, Milestone, Person, ProposalSplit, Rate, RunningCost, Settings, TermsVersion, TimeEntry } from "../data/types.ts";
+import { latinDigits } from "../lib/typed.ts";
 import { addDays } from "../data/venueTime.ts";
 import { today } from "../lib/clock.ts";
 import { saveProposal, type LineInput, type ProposalDraft } from "./actions.ts";
@@ -105,7 +106,7 @@ export const SPLIT_SHARES: Readonly<Record<ProposalSplit, readonly number[]>> = 
 };
 
 const num = (text: string | null | undefined): number => {
-  const n = Number((text ?? "").trim().replace(",", "."));
+  const n = Number(latinDigits(text ?? "").trim().replace(",", "."));
   return Number.isFinite(n) ? n : 0;
 };
 const cents = (n: number): number => Math.round(n * 100) / 100;

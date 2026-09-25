@@ -13,6 +13,7 @@
  * proposal's subtotal for the "Start the project" sheet.
  */
 import type { Decimal } from "../../data/types.ts";
+import { latinDigits } from "../../lib/typed.ts";
 
 /** A decimal as an exact fraction: `num / 10^places`. */
 interface Exact {
@@ -31,7 +32,7 @@ const pow10 = (n: number): bigint => TEN ** BigInt(n);
  */
 export function readAmount(typed: string | null | undefined): Decimal | null {
   if (typed === null || typed === undefined) return null;
-  let text = typed.replace(/[\s  ]/g, "").replace(/[^\d.,-]/g, "");
+  let text = latinDigits(typed).replace(/[\s  ]/g, "").replace(/[^\d.,-]/g, "");
   if (text === "") return null;
   const commas = (text.match(/,/g) ?? []).length;
   const dots = (text.match(/\./g) ?? []).length;

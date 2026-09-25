@@ -11,6 +11,7 @@
  * and quantities, so every stored amount is Adminium's.
  */
 import type { Client, Decimal, Id, Person, ProposalSplit, Rate, Settings } from "../../data/types.ts";
+import { latinDigits } from "../../lib/typed.ts";
 import type { MessageKey } from "../../i18n/messages/index.ts";
 import type { PastStage, Worksheet, WorksheetFigures } from "../../state/scoping.ts";
 
@@ -25,7 +26,7 @@ export const CHIP_LIMIT = 8;
 
 const num = (text: string | number | null | undefined): number => {
   if (typeof text === "number") return Number.isFinite(text) ? text : 0;
-  const n = Number((text ?? "").trim().replace(",", "."));
+  const n = Number(latinDigits(text ?? "").trim().replace(",", "."));
   return Number.isFinite(n) ? n : 0;
 };
 const round = (n: number, places: number): number => Math.round(n * 10 ** places) / 10 ** places;
@@ -34,7 +35,7 @@ const round = (n: number, places: number): number => Math.round(n * 10 ** places
 
 /** A number as typed: digits and one decimal point (a comma read as one), at most `places` after it. */
 export function typedNumber(text: string, places: number): string {
-  const cleaned = text.replace(/,/g, ".").replace(/[^0-9.]/g, "");
+  const cleaned = latinDigits(text).replace(/,/g, ".").replace(/[^0-9.]/g, "");
   const at = cleaned.indexOf(".");
   if (at < 0) return cleaned;
   return `${cleaned.slice(0, at + 1)}${cleaned.slice(at + 1).replace(/\./g, "").slice(0, places)}`;

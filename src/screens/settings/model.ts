@@ -9,6 +9,7 @@
  * person typed, and only what changed.
  */
 import type { ClientTerms, Decimal, Person, Settings } from "../../data/types.ts";
+import { latinDigits } from "../../lib/typed.ts";
 import { decimalValue } from "../../lib/money.ts";
 
 // ── the studio card ─────────────────────────────────────────────────────────
@@ -107,7 +108,7 @@ export function hourlyRate(firstRate: Decimal | null | undefined, hoursPerDay: n
 
 /** An amount as typed on the rate card: a positive decimal with at most two places, else null. */
 export function rateAmount(typed: string): string | null {
-  const text = typed.trim().replace(/,/g, "");
+  const text = latinDigits(typed).trim().replace(/,/g, "");
   if (!/^\d+(\.\d{1,2})?$/.test(text) || Number(text) <= 0) return null;
   return Number(text).toFixed(2);
 }

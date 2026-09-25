@@ -4,6 +4,7 @@
  * makes before anything is sent (a value the person must fix first).
  */
 import type { RowValues } from "../data/ports.ts";
+import { latinDigits } from "../lib/typed.ts";
 import { newRun, SinkError } from "../data/sink.ts";
 import type { Id, TableRef, Tables } from "../data/types.ts";
 import { deskWrites, drop, upsert, useDesk } from "./desk.ts";
@@ -46,7 +47,7 @@ export function invalid<T>(code: string, field: string): Outcome<T> {
 /** Typed decimal text, trimmed (a comma read as the point); null when empty. */
 export function decimalText(value: string | null | undefined): string | null {
   if (value === null || value === undefined) return null;
-  const text = value.trim().replace(",", ".");
+  const text = latinDigits(value).trim().replace(",", ".");
   return text === "" ? null : text;
 }
 

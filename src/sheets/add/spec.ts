@@ -16,6 +16,7 @@
  * person would want told before a round trip, and Adminium decides the rest.
  */
 import type { ClientTerms, Day, Id } from "../../data/types.ts";
+import { latinDigits } from "../../lib/typed.ts";
 import { addDays } from "../../data/venueTime.ts";
 import type { MessageKey } from "../../i18n/messages/index.ts";
 import { today } from "../../lib/clock.ts";
@@ -41,7 +42,7 @@ const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 /** A positive decimal as typed, else null. */
 export function positive(text: string, places: number): string | null {
-  const t = text.replace(/,/g, "");
+  const t = latinDigits(text).replace(/,/g, "");
   const re = new RegExp(`^\\d+(\\.\\d{1,${String(places)}})?$`);
   return re.test(t) && Number(t) > 0 ? t : null;
 }
