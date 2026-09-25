@@ -678,6 +678,19 @@ export function createEngine(opts: EngineOptions): Engine {
       if (lockedNow(ref, stored)) refuse(409, "DELETE_REFUSED", `This ${ref} row is ${state}, so it cannot be deleted.`, { state, numbered: false });
     }
     judgeParents(ref, { now: null, was: stored }, writer);
+    // A row another row points at stays: the database's foreign key refuses the delete
+    // (a time entry an invoice line carries, a supplier a purchase names).
+    if (writer.origin !== "history") {
+      for (const [table, links] of Object.entries(DEMO_RULES.references)) {
+        for (const [column, target] of Object.entries(links)) {
+          if (target !== ref) continue;
+          if (rows[table as TableRef].some((r) => r !== stored && String(r[column]) === String(stored.id))) {
+            // Adminium's own refusal, which names the constraint, never a column to write in.
+            refuse(409, "FK_VIOLATION", "The change violates a foreign-key constraint.", { constraint: null, detail: `${table}.${column}` });
+          }
+        }
+      }
+    }
     rows[ref].splice(at, 1);
     settle();
     opts.announce(ref, "record.delete", stored.id);

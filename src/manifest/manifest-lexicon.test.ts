@@ -30,8 +30,8 @@ function strings(value: Json, tag: string | null, out: { tag: string | null; tex
 
 const manifest = buildManifest();
 const all: { tag: string | null; text: string }[] = [];
-// Only what a person reads: labels, titles, names, emails — not refs, icons or rules.
-for (const part of ["requiredSchema", "pages", "navGroups", "emailTemplates", "description"] as const) strings(manifest[part], null, all);
+// Only what a person reads: labels, titles, names, emails, why an add-on is asked for — not refs, icons or rules.
+for (const part of ["requiredSchema", "pages", "navGroups", "emailTemplates", "description", "addOns"] as const) strings(manifest[part], null, all);
 const readable = all.filter(({ text }) => /\s/.test(text) || /[A-Z]/.test(text.charAt(0)) || /[^\x00-\x7F]/.test(text));
 
 describe("the manifest's words pass the release sweep's word list", () => {

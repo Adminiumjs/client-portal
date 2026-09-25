@@ -44,10 +44,15 @@ export const TABLE_REFS = [
   "deliverable_notes",
   "briefs",
   "brief_answers",
+  "suppliers",
+  "expenses",
+  "time_entries",
   "invoices",
   "invoice_lines",
   "payments",
   "messages",
+  "running_costs",
+  "events",
 ] as const;
 
 export type TableRef = (typeof TABLE_REFS)[number];
@@ -371,6 +376,56 @@ export interface BriefAnswer {
   client_key: string | null;
 }
 
+export type SupplierKind = "print" | "paper" | "signage" | "courier" | "fonts" | "finishing" | "photography" | "software" | "other";
+/** A row of `suppliers`. */
+export interface Supplier {
+  id: Id;
+  number_seq: number | null;
+  number: string | null;
+  name: string;
+  kind: SupplierKind;
+  contact: string | null;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  lead_time: string | null;
+  typical_cost: string | null;
+  note: string | null;
+  would_use_again: boolean;
+  client_key: string | null;
+}
+
+/** A row of `expenses`. */
+export interface Expense {
+  id: Id;
+  number_seq: number | null;
+  number: string | null;
+  date: Day;
+  what: string;
+  amount: Decimal;
+  client_id: Id | null;
+  project_id: Id | null;
+  supplier_id: Id | null;
+  rebill: boolean;
+  receipt: string | null;
+  client_key: string | null;
+}
+
+/** A row of `time_entries`. */
+export interface TimeEntry {
+  id: Id;
+  project_id: Id;
+  client_id: Id | null;
+  milestone_id: Id | null;
+  person_id: Id;
+  date: Day;
+  hours: Decimal | null;
+  note: string | null;
+  running_for: Id | null;
+  started_at: Instant | null;
+  client_key: string | null;
+}
+
 export type InvoiceStatus = "draft" | "sent" | "void";
 export type InvoiceTerms = "net7" | "net14" | "net30" | "on-receipt";
 export type InvoiceLadder = "gentle" | "standard" | "firm";
@@ -427,6 +482,8 @@ export interface InvoiceLine {
   share_pct: Decimal | null;
   amount: Decimal | null;
   client_id: Id | null;
+  time_entry_id: Id | null;
+  expense_id: Id | null;
   client_key: string | null;
 }
 
@@ -452,7 +509,7 @@ export interface Payment {
   client_key: string | null;
 }
 
-export type MessageKind = "proposal-sent" | "proposal-reminder" | "new-work" | "handover" | "enquiry-reply" | "ask-to-sign" | "accepted-and-signed" | "declined" | "changes-requested" | "approved" | "client-says-paid" | "brief-sent" | "asked-for-a-new-price" | "new-note" | "invoice-sent" | "invoice-rung-1" | "invoice-rung-2" | "invoice-rung-3" | "payment-receipt";
+export type MessageKind = "proposal-sent" | "proposal-reminder" | "new-work" | "handover" | "enquiry-reply" | "ask-to-sign" | "accepted-and-signed" | "declined" | "changes-requested" | "approved" | "client-says-paid" | "brief-sent" | "asked-for-a-new-price" | "new-note" | "new-enquiry" | "invoice-sent" | "invoice-rung-1" | "invoice-rung-2" | "invoice-rung-3" | "payment-receipt";
 export type MessageStatus = "held" | "queued" | "sent" | "failed" | "skipped";
 export type MessageSkipReason = "overtaken" | "paid" | "void" | "no-longer-needed" | "by-hand";
 /** A row of `messages`. */
@@ -482,6 +539,26 @@ export interface Message {
   client_key: string | null;
 }
 
+/** A row of `running_costs`. */
+export interface RunningCost {
+  id: Id;
+  label: string;
+  monthly_amount: Decimal;
+  position: number;
+}
+
+export type StudioEventKind = "call" | "press" | "away";
+/** A row of `events`. */
+export interface StudioEvent {
+  id: Id;
+  date: Day;
+  to_date: Day | null;
+  title: string;
+  kind: StudioEventKind;
+  person_id: Id | null;
+  client_key: string | null;
+}
+
 /** Each table's row type, by short name. */
 export interface Tables {
   settings: Settings;
@@ -504,10 +581,15 @@ export interface Tables {
   deliverable_notes: DeliverableNote;
   briefs: Brief;
   brief_answers: BriefAnswer;
+  suppliers: Supplier;
+  expenses: Expense;
+  time_entries: TimeEntry;
   invoices: Invoice;
   invoice_lines: InvoiceLine;
   payments: Payment;
   messages: Message;
+  running_costs: RunningCost;
+  events: StudioEvent;
 }
 
 /** Every column that is not plain text, per table: what `rows.ts` normalises. */
@@ -532,10 +614,15 @@ export const COLUMN_KINDS = {
   deliverable_notes: { id: "int", deliverable_id: "int", client_id: "int", version_id: "int", pin_x: "decimal", pin_y: "decimal", at: "instant" },
   briefs: { id: "int", project_id: "int", client_id: "int", sent_at: "instant" },
   brief_answers: { id: "int", brief_id: "int", client_id: "int" },
+  suppliers: { id: "int", number_seq: "int", would_use_again: "bool" },
+  expenses: { id: "int", number_seq: "int", date: "day", amount: "decimal", client_id: "int", project_id: "int", supplier_id: "int", rebill: "bool" },
+  time_entries: { id: "int", project_id: "int", client_id: "int", milestone_id: "int", person_id: "int", date: "day", hours: "decimal", running_for: "int", started_at: "instant" },
   invoices: { id: "int", number_seq: "int", issued_on: "day", due_on: "day", tax_rate: "decimal", subtotal: "decimal", tax: "decimal", total: "decimal", paid: "decimal", balance: "decimal", sent_at: "instant", voided_at: "instant", from_quote_id: "int", share_pct: "decimal", client_id: "int", project_id: "int", proposal_id: "int", client_paid_amount: "decimal", client_paid_on: "day", client_paid: "bool", client_paid_at: "instant" },
-  invoice_lines: { id: "int", document_id: "int", position: "int", qty: "decimal", rate: "decimal", discount: "decimal", quote_id: "int", share_pct: "decimal", amount: "decimal", client_id: "int" },
+  invoice_lines: { id: "int", document_id: "int", position: "int", qty: "decimal", rate: "decimal", discount: "decimal", quote_id: "int", share_pct: "decimal", amount: "decimal", client_id: "int", time_entry_id: "int", expense_id: "int" },
   payments: { id: "int", document_id: "int", number_seq: "int", amount: "decimal", paid_on: "day", recorded_at: "instant", voided: "bool", voided_at: "instant", client_id: "int" },
   messages: { id: "int", created_at: "instant", client_id: "int", proposal_id: "int", invoice_id: "int", payment_id: "int", project_id: "int", deliverable_id: "int", enquiry_id: "int", due: "instant", sent_at: "instant", effect_at: "instant" },
+  running_costs: { id: "int", monthly_amount: "decimal", position: "int" },
+  events: { id: "int", date: "day", to_date: "day", person_id: "int" },
 } as const satisfies Record<TableRef, Record<string, "int" | "decimal" | "bool" | "day" | "instant">>;
 
 /** The columns a row may leave empty, per table. */
@@ -560,8 +647,13 @@ export const NULLABLE: Readonly<Record<TableRef, readonly string[]>> = {
   deliverable_notes: ["client_id", "version_id", "side", "author", "pin_x", "pin_y", "at", "client_key"],
   briefs: ["client_id", "sent_at"],
   brief_answers: ["client_id", "answer", "first_answer", "client_key"],
+  suppliers: ["number_seq", "number", "contact", "email", "phone", "address", "lead_time", "typical_cost", "note", "client_key"],
+  expenses: ["number_seq", "number", "client_id", "project_id", "supplier_id", "receipt", "client_key"],
+  time_entries: ["client_id", "milestone_id", "hours", "note", "running_for", "started_at", "client_key"],
   invoices: ["number_seq", "number", "issued_on", "terms", "due_on", "currency", "tax_name", "tax_rate", "subtotal", "tax", "total", "paid", "balance", "ladder", "sent_at", "void_reason", "voided_at", "voided_by", "from_quote_id", "share_pct", "project_id", "proposal_id", "stage", "title", "client_paid_note", "client_paid_amount", "client_paid_on", "client_paid", "client_paid_at", "client_key"],
-  invoice_lines: ["description", "rate", "discount", "currency", "quote_id", "share_pct", "amount", "client_id", "client_key"],
+  invoice_lines: ["description", "rate", "discount", "currency", "quote_id", "share_pct", "amount", "client_id", "time_entry_id", "expense_id", "client_key"],
   payments: ["number_seq", "number", "currency", "method_note", "recorded_by", "recorded_at", "void_reason", "voided_by", "voided_at", "client_id", "client_key"],
   messages: ["created_at", "skip_reason", "to", "language", "client_id", "proposal_id", "invoice_id", "payment_id", "project_id", "deliverable_id", "enquiry_id", "subject_override", "body_override", "approved_by", "due", "sent_at", "error", "effect_at", "effect_error", "client_key"],
+  running_costs: [],
+  events: ["to_date", "person_id", "client_key"],
 };

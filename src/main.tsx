@@ -35,6 +35,16 @@ import "./styles/terms.css";
 import "./styles/settings.css";
 import "./styles/sheets.css";
 import "./styles/client.css";
+import "./styles/time.css";
+import "./styles/expenses.css";
+import "./styles/suppliers.css";
+import "./styles/scoping.css";
+import "./styles/schedule.css";
+import "./styles/capacity.css";
+import "./styles/money.css";
+import "./styles/archive.css";
+import "./styles/emails.css";
+import "./styles/enquire.css";
 
 import { I18nProvider, initialLocale, setHostLocale } from "./i18n/index.tsx";
 import { appName, setTenantCurrency, setTimezoneClaim } from "./i18n/ambient.ts";

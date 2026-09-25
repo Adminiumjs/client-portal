@@ -107,6 +107,40 @@
           "zh-TW": "提案、發票、收據和付款提醒由此外掛產生。"
         }
       }
+    ],
+    "suggests": [
+      {
+        "key": "holiday-calendars",
+        "range": ">=1.0.3",
+        "reason": {
+          "en-US": "Leave public holidays out of the working days Capacity counts.",
+          "de-DE": "Feiertage aus den Arbeitstagen nehmen, die die Kapazität zählt.",
+          "fr-FR": "Retirer les jours fériés des jours ouvrés que compte la capacité.",
+          "da-DK": "Træk helligdage fra de arbejdsdage, kapaciteten tæller.",
+          "cs-CZ": "Vynechat svátky z pracovních dnů, které počítá kapacita.",
+          "ar-EG": "استبعاد العطلات الرسمية من أيام العمل التي تحسبها السعة.",
+          "zh-CN": "从容量统计的工作日中去掉公共假日。",
+          "zh-TW": "從容量統計的工作日中扣除國定假日。"
+        }
+      }
+    ],
+    "features": [
+      {
+        "id": "capacity-holidays",
+        "label": {
+          "en-US": "Public holidays in Capacity",
+          "de-DE": "Feiertage in der Kapazität",
+          "fr-FR": "Jours fériés dans la capacité",
+          "da-DK": "Helligdage i kapaciteten",
+          "cs-CZ": "Svátky v kapacitě",
+          "ar-EG": "العطلات الرسمية في السعة",
+          "zh-CN": "容量中的公共假日",
+          "zh-TW": "容量中的國定假日"
+        },
+        "requires": [
+          "holiday-calendars"
+        ]
+      }
     ]
   },
   "documents": [
@@ -5623,6 +5657,814 @@
         ]
       },
       {
+        "ref": "suppliers",
+        "label": {
+          "en-US": "Supplier",
+          "de-DE": "Lieferant",
+          "fr-FR": "Fournisseur",
+          "da-DK": "Leverandør",
+          "cs-CZ": "Dodavatel",
+          "ar-EG": "المورّد",
+          "zh-CN": "供应商",
+          "zh-TW": "供應商"
+        },
+        "labelPlural": {
+          "en-US": "Suppliers",
+          "de-DE": "Lieferanten",
+          "fr-FR": "Fournisseurs",
+          "da-DK": "Leverandører",
+          "cs-CZ": "Dodavatelé",
+          "ar-EG": "المورّدون",
+          "zh-CN": "供应商",
+          "zh-TW": "供應商"
+        },
+        "keyField": "name",
+        "columns": [
+          {
+            "ref": "id",
+            "type": "int",
+            "role": "pk"
+          },
+          {
+            "ref": "number_seq",
+            "type": "int",
+            "label": {
+              "en-US": "Number in the series",
+              "de-DE": "Laufende Nummer",
+              "fr-FR": "Numéro dans la série",
+              "da-DK": "Nummer i rækken",
+              "cs-CZ": "Pořadové číslo",
+              "ar-EG": "الرقم في السلسلة",
+              "zh-CN": "序列号",
+              "zh-TW": "序號"
+            },
+            "nullable": true,
+            "rules": {
+              "sequence": {
+                "gapless": true
+              }
+            }
+          },
+          {
+            "ref": "number",
+            "type": "text",
+            "maxLength": 24,
+            "label": {
+              "en-US": "Number",
+              "de-DE": "Nummer",
+              "fr-FR": "Numéro",
+              "da-DK": "Nummer",
+              "cs-CZ": "Číslo",
+              "ar-EG": "الرقم",
+              "zh-CN": "编号",
+              "zh-TW": "編號"
+            },
+            "nullable": true,
+            "unique": true,
+            "rules": {
+              "format": {
+                "from": "number_seq",
+                "prefix": "SUP-",
+                "pad": 2
+              }
+            }
+          },
+          {
+            "ref": "name",
+            "type": "text",
+            "maxLength": 160,
+            "label": {
+              "en-US": "Name",
+              "de-DE": "Name",
+              "fr-FR": "Nom",
+              "da-DK": "Navn",
+              "cs-CZ": "Jméno",
+              "ar-EG": "الاسم",
+              "zh-CN": "名称",
+              "zh-TW": "名稱"
+            },
+            "semantic": "name"
+          },
+          {
+            "ref": "kind",
+            "type": "enum",
+            "enum": [
+              "print",
+              "paper",
+              "signage",
+              "courier",
+              "fonts",
+              "finishing",
+              "photography",
+              "software",
+              "other"
+            ],
+            "label": {
+              "en-US": "What for",
+              "de-DE": "Wofür",
+              "fr-FR": "Pour quoi",
+              "da-DK": "Til hvad",
+              "cs-CZ": "Na co",
+              "ar-EG": "لأي غرض",
+              "zh-CN": "用途",
+              "zh-TW": "用途"
+            },
+            "default": "other",
+            "rules": {
+              "enumLabels": {
+                "labels": {
+                  "print": {
+                    "en-US": "Print",
+                    "de-DE": "Druck",
+                    "fr-FR": "Impression",
+                    "da-DK": "Tryk",
+                    "cs-CZ": "Tisk",
+                    "ar-EG": "الطباعة",
+                    "zh-CN": "印刷",
+                    "zh-TW": "印刷"
+                  },
+                  "paper": {
+                    "en-US": "Paper",
+                    "de-DE": "Papier",
+                    "fr-FR": "Papier",
+                    "da-DK": "Papir",
+                    "cs-CZ": "Papír",
+                    "ar-EG": "الورق",
+                    "zh-CN": "纸张",
+                    "zh-TW": "紙張"
+                  },
+                  "signage": {
+                    "en-US": "Signage",
+                    "de-DE": "Beschilderung",
+                    "fr-FR": "Signalétique",
+                    "da-DK": "Skilte",
+                    "cs-CZ": "Značení",
+                    "ar-EG": "اللافتات",
+                    "zh-CN": "标识",
+                    "zh-TW": "標識"
+                  },
+                  "courier": {
+                    "en-US": "Courier",
+                    "de-DE": "Kurier",
+                    "fr-FR": "Coursier",
+                    "da-DK": "Kurér",
+                    "cs-CZ": "Kurýr",
+                    "ar-EG": "البريد السريع",
+                    "zh-CN": "快递",
+                    "zh-TW": "快遞"
+                  },
+                  "fonts": {
+                    "en-US": "Fonts",
+                    "de-DE": "Schriften",
+                    "fr-FR": "Polices",
+                    "da-DK": "Skrifttyper",
+                    "cs-CZ": "Písma",
+                    "ar-EG": "الخطوط",
+                    "zh-CN": "字体",
+                    "zh-TW": "字型"
+                  },
+                  "finishing": {
+                    "en-US": "Finishing",
+                    "de-DE": "Veredelung",
+                    "fr-FR": "Finition",
+                    "da-DK": "Efterbehandling",
+                    "cs-CZ": "Dokončovací práce",
+                    "ar-EG": "التشطيب",
+                    "zh-CN": "后道工艺",
+                    "zh-TW": "後加工"
+                  },
+                  "photography": {
+                    "en-US": "Photography",
+                    "de-DE": "Fotografie",
+                    "fr-FR": "Photographie",
+                    "da-DK": "Fotografi",
+                    "cs-CZ": "Fotografie",
+                    "ar-EG": "التصوير",
+                    "zh-CN": "摄影",
+                    "zh-TW": "攝影"
+                  },
+                  "software": {
+                    "en-US": "Software",
+                    "de-DE": "Software",
+                    "fr-FR": "Logiciels",
+                    "da-DK": "Software",
+                    "cs-CZ": "Software",
+                    "ar-EG": "البرمجيات",
+                    "zh-CN": "软件",
+                    "zh-TW": "軟體"
+                  },
+                  "other": {
+                    "en-US": "Other",
+                    "de-DE": "Andere",
+                    "fr-FR": "Autre",
+                    "da-DK": "Andet",
+                    "cs-CZ": "Jiné",
+                    "ar-EG": "أخرى",
+                    "zh-CN": "其他",
+                    "zh-TW": "其他"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "ref": "contact",
+            "type": "text",
+            "maxLength": 120,
+            "label": {
+              "en-US": "Ask for",
+              "de-DE": "Ansprechperson",
+              "fr-FR": "Qui demander",
+              "da-DK": "Spørg efter",
+              "cs-CZ": "Ptát se na",
+              "ar-EG": "مَن نسأل",
+              "zh-CN": "找谁",
+              "zh-TW": "找誰"
+            },
+            "nullable": true
+          },
+          {
+            "ref": "email",
+            "type": "text",
+            "maxLength": 254,
+            "label": {
+              "en-US": "Email",
+              "de-DE": "E-Mail",
+              "fr-FR": "E-mail",
+              "da-DK": "E-mail",
+              "cs-CZ": "E-mail",
+              "ar-EG": "البريد الإلكتروني",
+              "zh-CN": "邮箱",
+              "zh-TW": "電子郵件"
+            },
+            "nullable": true,
+            "semantic": "email",
+            "rules": {
+              "normalize": "email",
+              "validation": {
+                "format": "email"
+              }
+            }
+          },
+          {
+            "ref": "phone",
+            "type": "text",
+            "maxLength": 40,
+            "label": {
+              "en-US": "Phone",
+              "de-DE": "Telefon",
+              "fr-FR": "Téléphone",
+              "da-DK": "Telefon",
+              "cs-CZ": "Telefon",
+              "ar-EG": "الهاتف",
+              "zh-CN": "电话",
+              "zh-TW": "電話"
+            },
+            "nullable": true
+          },
+          {
+            "ref": "address",
+            "type": "text",
+            "maxLength": 500,
+            "label": {
+              "en-US": "Address",
+              "de-DE": "Adresse",
+              "fr-FR": "Adresse",
+              "da-DK": "Adresse",
+              "cs-CZ": "Adresa",
+              "ar-EG": "العنوان",
+              "zh-CN": "地址",
+              "zh-TW": "地址"
+            },
+            "nullable": true
+          },
+          {
+            "ref": "lead_time",
+            "type": "text",
+            "maxLength": 120,
+            "label": {
+              "en-US": "Lead time",
+              "de-DE": "Lieferzeit",
+              "fr-FR": "Délai",
+              "da-DK": "Leveringstid",
+              "cs-CZ": "Dodací lhůta",
+              "ar-EG": "مدة التسليم",
+              "zh-CN": "交货周期",
+              "zh-TW": "交貨週期"
+            },
+            "nullable": true
+          },
+          {
+            "ref": "typical_cost",
+            "type": "text",
+            "maxLength": 160,
+            "label": {
+              "en-US": "What it costs",
+              "de-DE": "Was es kostet",
+              "fr-FR": "Ce que ça coûte",
+              "da-DK": "Hvad det koster",
+              "cs-CZ": "Kolik to stojí",
+              "ar-EG": "كم يكلّف",
+              "zh-CN": "大致价格",
+              "zh-TW": "大致價格"
+            },
+            "nullable": true
+          },
+          {
+            "ref": "note",
+            "type": "text",
+            "maxLength": 1000,
+            "label": {
+              "en-US": "What to remember",
+              "de-DE": "Was man wissen sollte",
+              "fr-FR": "À retenir",
+              "da-DK": "Værd at huske",
+              "cs-CZ": "Co si pamatovat",
+              "ar-EG": "ما يجب تذكّره",
+              "zh-CN": "注意事项",
+              "zh-TW": "注意事項"
+            },
+            "nullable": true
+          },
+          {
+            "ref": "would_use_again",
+            "type": "bool",
+            "default": true,
+            "label": {
+              "en-US": "Would use again",
+              "de-DE": "Wieder beauftragen",
+              "fr-FR": "On y retournerait",
+              "da-DK": "Ville bruge igen",
+              "cs-CZ": "Znovu bychom využili",
+              "ar-EG": "سنتعامل معه مجددًا",
+              "zh-CN": "还会再用",
+              "zh-TW": "還會再用"
+            }
+          },
+          {
+            "ref": "client_key",
+            "type": "text",
+            "maxLength": 36,
+            "nullable": true,
+            "unique": true,
+            "label": {
+              "en-US": "Action key",
+              "de-DE": "Aktionsschlüssel",
+              "fr-FR": "Clé d’action",
+              "da-DK": "Handlingsnøgle",
+              "cs-CZ": "Klíč akce",
+              "ar-EG": "مفتاح الإجراء",
+              "zh-CN": "操作键",
+              "zh-TW": "操作鍵"
+            }
+          }
+        ]
+      },
+      {
+        "ref": "expenses",
+        "label": {
+          "en-US": "Purchase",
+          "de-DE": "Einkauf",
+          "fr-FR": "Achat",
+          "da-DK": "Indkøb",
+          "cs-CZ": "Nákup",
+          "ar-EG": "مشترى",
+          "zh-CN": "采购",
+          "zh-TW": "採購"
+        },
+        "labelPlural": {
+          "en-US": "Expenses",
+          "de-DE": "Ausgaben",
+          "fr-FR": "Dépenses",
+          "da-DK": "Udgifter",
+          "cs-CZ": "Výdaje",
+          "ar-EG": "المصروفات",
+          "zh-CN": "支出",
+          "zh-TW": "支出"
+        },
+        "keyField": "number",
+        "columns": [
+          {
+            "ref": "id",
+            "type": "int",
+            "role": "pk"
+          },
+          {
+            "ref": "number_seq",
+            "type": "int",
+            "label": {
+              "en-US": "Number in the series",
+              "de-DE": "Laufende Nummer",
+              "fr-FR": "Numéro dans la série",
+              "da-DK": "Nummer i rækken",
+              "cs-CZ": "Pořadové číslo",
+              "ar-EG": "الرقم في السلسلة",
+              "zh-CN": "序列号",
+              "zh-TW": "序號"
+            },
+            "nullable": true,
+            "rules": {
+              "sequence": {
+                "gapless": true
+              }
+            }
+          },
+          {
+            "ref": "number",
+            "type": "text",
+            "maxLength": 24,
+            "label": {
+              "en-US": "Number",
+              "de-DE": "Nummer",
+              "fr-FR": "Numéro",
+              "da-DK": "Nummer",
+              "cs-CZ": "Číslo",
+              "ar-EG": "الرقم",
+              "zh-CN": "编号",
+              "zh-TW": "編號"
+            },
+            "nullable": true,
+            "unique": true,
+            "rules": {
+              "format": {
+                "from": "number_seq",
+                "prefix": "EX-",
+                "pad": 3
+              }
+            }
+          },
+          {
+            "ref": "date",
+            "type": "date",
+            "label": {
+              "en-US": "Bought on",
+              "de-DE": "Gekauft am",
+              "fr-FR": "Acheté le",
+              "da-DK": "Købt den",
+              "cs-CZ": "Koupeno dne",
+              "ar-EG": "تاريخ الشراء",
+              "zh-CN": "购买日期",
+              "zh-TW": "購買日期"
+            },
+            "rules": {
+              "notAfter": "today"
+            }
+          },
+          {
+            "ref": "what",
+            "type": "text",
+            "maxLength": 300,
+            "label": {
+              "en-US": "What it was",
+              "de-DE": "Was es war",
+              "fr-FR": "Ce que c’était",
+              "da-DK": "Hvad det var",
+              "cs-CZ": "Co to bylo",
+              "ar-EG": "ما الذي اشتُري",
+              "zh-CN": "买了什么",
+              "zh-TW": "買了什麼"
+            }
+          },
+          {
+            "ref": "amount",
+            "type": "decimal",
+            "scale": "currency",
+            "label": {
+              "en-US": "Cost",
+              "de-DE": "Kosten",
+              "fr-FR": "Coût",
+              "da-DK": "Pris",
+              "cs-CZ": "Cena",
+              "ar-EG": "التكلفة",
+              "zh-CN": "费用",
+              "zh-TW": "費用"
+            },
+            "semantic": "money",
+            "rules": {
+              "validation": {
+                "min": 0.01
+              }
+            }
+          },
+          {
+            "ref": "client_id",
+            "type": "fk",
+            "references": "clients",
+            "label": {
+              "en-US": "Client",
+              "de-DE": "Kunde",
+              "fr-FR": "Client",
+              "da-DK": "Kunde",
+              "cs-CZ": "Klient",
+              "ar-EG": "العميل",
+              "zh-CN": "客户",
+              "zh-TW": "客戶"
+            },
+            "nullable": true,
+            "rules": {
+              "copy": {
+                "via": "project_id",
+                "from": "client_id",
+                "mode": "always"
+              }
+            }
+          },
+          {
+            "ref": "project_id",
+            "type": "fk",
+            "references": "projects",
+            "label": {
+              "en-US": "Project",
+              "de-DE": "Projekt",
+              "fr-FR": "Projet",
+              "da-DK": "Projekt",
+              "cs-CZ": "Projekt",
+              "ar-EG": "المشروع",
+              "zh-CN": "项目",
+              "zh-TW": "專案"
+            },
+            "nullable": true
+          },
+          {
+            "ref": "supplier_id",
+            "type": "fk",
+            "references": "suppliers",
+            "label": {
+              "en-US": "Supplier",
+              "de-DE": "Lieferant",
+              "fr-FR": "Fournisseur",
+              "da-DK": "Leverandør",
+              "cs-CZ": "Dodavatel",
+              "ar-EG": "المورّد",
+              "zh-CN": "供应商",
+              "zh-TW": "供應商"
+            },
+            "nullable": true
+          },
+          {
+            "ref": "rebill",
+            "type": "bool",
+            "default": false,
+            "label": {
+              "en-US": "Pass on at cost",
+              "de-DE": "Zum Einkaufspreis weitergeben",
+              "fr-FR": "Répercuter au prix coûtant",
+              "da-DK": "Videregiv til kostpris",
+              "cs-CZ": "Přeúčtovat za nákupní cenu",
+              "ar-EG": "تحميله على العميل بسعر التكلفة",
+              "zh-CN": "按成本转给客户",
+              "zh-TW": "按成本轉給客戶"
+            }
+          },
+          {
+            "ref": "receipt",
+            "type": "text",
+            "maxLength": 255,
+            "label": {
+              "en-US": "Purchase receipt",
+              "de-DE": "Beleg",
+              "fr-FR": "Justificatif d’achat",
+              "da-DK": "Kvittering for købet",
+              "cs-CZ": "Účtenka",
+              "ar-EG": "إيصال الشراء",
+              "zh-CN": "购物凭证",
+              "zh-TW": "購物憑證"
+            },
+            "nullable": true
+          },
+          {
+            "ref": "client_key",
+            "type": "text",
+            "maxLength": 36,
+            "nullable": true,
+            "unique": true,
+            "label": {
+              "en-US": "Action key",
+              "de-DE": "Aktionsschlüssel",
+              "fr-FR": "Clé d’action",
+              "da-DK": "Handlingsnøgle",
+              "cs-CZ": "Klíč akce",
+              "ar-EG": "مفتاح الإجراء",
+              "zh-CN": "操作键",
+              "zh-TW": "操作鍵"
+            }
+          }
+        ]
+      },
+      {
+        "ref": "time_entries",
+        "label": {
+          "en-US": "Time entry",
+          "de-DE": "Zeiteintrag",
+          "fr-FR": "Saisie de temps",
+          "da-DK": "Tidsregistrering",
+          "cs-CZ": "Záznam času",
+          "ar-EG": "إدخال وقت",
+          "zh-CN": "工时记录",
+          "zh-TW": "工時紀錄"
+        },
+        "labelPlural": {
+          "en-US": "Time",
+          "de-DE": "Zeit",
+          "fr-FR": "Temps",
+          "da-DK": "Tid",
+          "cs-CZ": "Čas",
+          "ar-EG": "الوقت",
+          "zh-CN": "工时",
+          "zh-TW": "工時"
+        },
+        "keyField": "note",
+        "columns": [
+          {
+            "ref": "id",
+            "type": "int",
+            "role": "pk"
+          },
+          {
+            "ref": "project_id",
+            "type": "fk",
+            "references": "projects",
+            "label": {
+              "en-US": "Project",
+              "de-DE": "Projekt",
+              "fr-FR": "Projet",
+              "da-DK": "Projekt",
+              "cs-CZ": "Projekt",
+              "ar-EG": "المشروع",
+              "zh-CN": "项目",
+              "zh-TW": "專案"
+            }
+          },
+          {
+            "ref": "client_id",
+            "type": "fk",
+            "references": "clients",
+            "nullable": true,
+            "label": {
+              "en-US": "Client",
+              "de-DE": "Kunde",
+              "fr-FR": "Client",
+              "da-DK": "Kunde",
+              "cs-CZ": "Klient",
+              "ar-EG": "العميل",
+              "zh-CN": "客户",
+              "zh-TW": "客戶"
+            },
+            "rules": {
+              "copy": {
+                "via": "project_id",
+                "from": "client_id",
+                "mode": "always"
+              }
+            }
+          },
+          {
+            "ref": "milestone_id",
+            "type": "fk",
+            "references": "milestones",
+            "label": {
+              "en-US": "Milestone",
+              "de-DE": "Meilenstein",
+              "fr-FR": "Étape",
+              "da-DK": "Milepæl",
+              "cs-CZ": "Milník",
+              "ar-EG": "المرحلة",
+              "zh-CN": "里程碑",
+              "zh-TW": "里程碑"
+            },
+            "nullable": true
+          },
+          {
+            "ref": "person_id",
+            "type": "fk",
+            "references": "people",
+            "label": {
+              "en-US": "Who",
+              "de-DE": "Wer",
+              "fr-FR": "Qui",
+              "da-DK": "Hvem",
+              "cs-CZ": "Kdo",
+              "ar-EG": "مَن",
+              "zh-CN": "谁",
+              "zh-TW": "誰"
+            }
+          },
+          {
+            "ref": "date",
+            "type": "date",
+            "label": {
+              "en-US": "Day",
+              "de-DE": "Tag",
+              "fr-FR": "Jour",
+              "da-DK": "Dag",
+              "cs-CZ": "Den",
+              "ar-EG": "اليوم",
+              "zh-CN": "哪一天",
+              "zh-TW": "哪一天"
+            },
+            "rules": {
+              "notAfter": "today"
+            }
+          },
+          {
+            "ref": "hours",
+            "type": "decimal",
+            "scale": 2,
+            "label": {
+              "en-US": "Hours",
+              "de-DE": "Stunden",
+              "fr-FR": "Heures",
+              "da-DK": "Timer",
+              "cs-CZ": "Hodiny",
+              "ar-EG": "الساعات",
+              "zh-CN": "小时",
+              "zh-TW": "小時"
+            },
+            "nullable": true,
+            "rules": {
+              "validation": {
+                "min": 0.01,
+                "max": 16
+              }
+            }
+          },
+          {
+            "ref": "note",
+            "type": "text",
+            "maxLength": 500,
+            "label": {
+              "en-US": "What it went on",
+              "de-DE": "Wofür die Zeit war",
+              "fr-FR": "À quoi il a servi",
+              "da-DK": "Hvad tiden gik til",
+              "cs-CZ": "Na co čas padl",
+              "ar-EG": "فيمَ صُرف",
+              "zh-CN": "用在哪里",
+              "zh-TW": "用在哪裡"
+            },
+            "nullable": true
+          },
+          {
+            "ref": "running_for",
+            "type": "fk",
+            "references": "people",
+            "label": {
+              "en-US": "Clock running for",
+              "de-DE": "Uhr läuft für",
+              "fr-FR": "Chrono lancé pour",
+              "da-DK": "Uret kører for",
+              "cs-CZ": "Stopky běží pro",
+              "ar-EG": "المؤقت يعمل لـ",
+              "zh-CN": "正在计时的人",
+              "zh-TW": "正在計時的人"
+            },
+            "nullable": true,
+            "unique": true
+          },
+          {
+            "ref": "started_at",
+            "type": "timestamptz",
+            "label": {
+              "en-US": "Clock started",
+              "de-DE": "Uhr gestartet",
+              "fr-FR": "Chrono lancé à",
+              "da-DK": "Uret startet",
+              "cs-CZ": "Stopky spuštěny",
+              "ar-EG": "بدأ المؤقت",
+              "zh-CN": "开始计时",
+              "zh-TW": "開始計時"
+            },
+            "nullable": true,
+            "rules": {
+              "stamp": {
+                "set": "now",
+                "on": {
+                  "column": "running_for",
+                  "filled": true
+                }
+              }
+            }
+          },
+          {
+            "ref": "client_key",
+            "type": "text",
+            "maxLength": 36,
+            "nullable": true,
+            "unique": true,
+            "label": {
+              "en-US": "Action key",
+              "de-DE": "Aktionsschlüssel",
+              "fr-FR": "Clé d’action",
+              "da-DK": "Handlingsnøgle",
+              "cs-CZ": "Klíč akce",
+              "ar-EG": "مفتاح الإجراء",
+              "zh-CN": "操作键",
+              "zh-TW": "操作鍵"
+            }
+          }
+        ]
+      },
+      {
         "ref": "invoices",
         "label": {
           "en-US": "Invoice",
@@ -6912,6 +7754,40 @@
             }
           },
           {
+            "ref": "time_entry_id",
+            "type": "fk",
+            "references": "time_entries",
+            "label": {
+              "en-US": "Time it bills",
+              "de-DE": "Zeit, die sie in Rechnung stellt",
+              "fr-FR": "Temps qu’elle facture",
+              "da-DK": "Tid, linjen fakturerer",
+              "cs-CZ": "Čas, který účtuje",
+              "ar-EG": "الوقت الذي يحتسبه",
+              "zh-CN": "此行计入的工时",
+              "zh-TW": "此行計入的工時"
+            },
+            "nullable": true,
+            "unique": true
+          },
+          {
+            "ref": "expense_id",
+            "type": "fk",
+            "references": "expenses",
+            "label": {
+              "en-US": "Purchase it passes on",
+              "de-DE": "Weitergegebener Einkauf",
+              "fr-FR": "Achat répercuté",
+              "da-DK": "Indkøb, den videregiver",
+              "cs-CZ": "Přeúčtovaný nákup",
+              "ar-EG": "المشترى الذي تحمّله على العميل",
+              "zh-CN": "转给客户的采购",
+              "zh-TW": "轉給客戶的採購"
+            },
+            "nullable": true,
+            "unique": true
+          },
+          {
             "ref": "client_key",
             "type": "text",
             "maxLength": 36,
@@ -7393,6 +8269,7 @@
               "brief-sent",
               "asked-for-a-new-price",
               "new-note",
+              "new-enquiry",
               "invoice-sent",
               "invoice-rung-1",
               "invoice-rung-2",
@@ -7551,6 +8428,16 @@
                     "ar-EG": "ملاحظة جديدة من عميل",
                     "zh-CN": "客户的新留言",
                     "zh-TW": "客戶的新留言"
+                  },
+                  "new-enquiry": {
+                    "en-US": "New enquiry",
+                    "de-DE": "Neue Anfrage",
+                    "fr-FR": "Nouvelle demande",
+                    "da-DK": "Ny henvendelse",
+                    "cs-CZ": "Nová poptávka",
+                    "ar-EG": "استفسار جديد",
+                    "zh-CN": "新询价",
+                    "zh-TW": "新詢價"
                   },
                   "invoice-sent": {
                     "en-US": "Invoice sent",
@@ -8055,6 +8942,270 @@
               "zh-TW": "後續被拒原因"
             },
             "nullable": true
+          },
+          {
+            "ref": "client_key",
+            "type": "text",
+            "maxLength": 36,
+            "nullable": true,
+            "unique": true,
+            "label": {
+              "en-US": "Action key",
+              "de-DE": "Aktionsschlüssel",
+              "fr-FR": "Clé d’action",
+              "da-DK": "Handlingsnøgle",
+              "cs-CZ": "Klíč akce",
+              "ar-EG": "مفتاح الإجراء",
+              "zh-CN": "操作键",
+              "zh-TW": "操作鍵"
+            }
+          }
+        ]
+      },
+      {
+        "ref": "running_costs",
+        "label": {
+          "en-US": "Running cost",
+          "de-DE": "Laufender Posten",
+          "fr-FR": "Frais fixe",
+          "da-DK": "Fast udgift",
+          "cs-CZ": "Provozní náklad",
+          "ar-EG": "تكلفة تشغيل",
+          "zh-CN": "固定开支",
+          "zh-TW": "固定開支"
+        },
+        "labelPlural": {
+          "en-US": "Running costs",
+          "de-DE": "Laufende Kosten",
+          "fr-FR": "Frais fixes",
+          "da-DK": "Faste udgifter",
+          "cs-CZ": "Provozní náklady",
+          "ar-EG": "تكاليف التشغيل",
+          "zh-CN": "固定开支",
+          "zh-TW": "固定開支"
+        },
+        "keyField": "label",
+        "columns": [
+          {
+            "ref": "id",
+            "type": "int",
+            "role": "pk"
+          },
+          {
+            "ref": "label",
+            "type": "text",
+            "maxLength": 160,
+            "label": {
+              "en-US": "What it is",
+              "de-DE": "Was es ist",
+              "fr-FR": "Libellé",
+              "da-DK": "Hvad det er",
+              "cs-CZ": "Co to je",
+              "ar-EG": "ما هو",
+              "zh-CN": "项目",
+              "zh-TW": "項目"
+            }
+          },
+          {
+            "ref": "monthly_amount",
+            "type": "decimal",
+            "scale": "currency",
+            "label": {
+              "en-US": "Every month",
+              "de-DE": "Jeden Monat",
+              "fr-FR": "Chaque mois",
+              "da-DK": "Hver måned",
+              "cs-CZ": "Každý měsíc",
+              "ar-EG": "كل شهر",
+              "zh-CN": "每月",
+              "zh-TW": "每月"
+            },
+            "semantic": "money",
+            "rules": {
+              "validation": {
+                "min": 0
+              }
+            }
+          },
+          {
+            "ref": "position",
+            "type": "int",
+            "label": {
+              "en-US": "Position",
+              "de-DE": "Reihenfolge",
+              "fr-FR": "Ordre",
+              "da-DK": "Rækkefølge",
+              "cs-CZ": "Pořadí",
+              "ar-EG": "الترتيب",
+              "zh-CN": "顺序",
+              "zh-TW": "順序"
+            },
+            "default": 0
+          }
+        ]
+      },
+      {
+        "ref": "events",
+        "label": {
+          "en-US": "Studio date",
+          "de-DE": "Studiotermin",
+          "fr-FR": "Date du studio",
+          "da-DK": "Studiodato",
+          "cs-CZ": "Termín studia",
+          "ar-EG": "موعد الاستوديو",
+          "zh-CN": "工作室日程",
+          "zh-TW": "工作室日程"
+        },
+        "labelPlural": {
+          "en-US": "Studio dates",
+          "de-DE": "Studiotermine",
+          "fr-FR": "Dates du studio",
+          "da-DK": "Studiodatoer",
+          "cs-CZ": "Termíny studia",
+          "ar-EG": "مواعيد الاستوديو",
+          "zh-CN": "工作室日程",
+          "zh-TW": "工作室日程"
+        },
+        "keyField": "title",
+        "columns": [
+          {
+            "ref": "id",
+            "type": "int",
+            "role": "pk"
+          },
+          {
+            "ref": "date",
+            "type": "date",
+            "label": {
+              "en-US": "Date",
+              "de-DE": "Datum",
+              "fr-FR": "Date",
+              "da-DK": "Dato",
+              "cs-CZ": "Datum",
+              "ar-EG": "التاريخ",
+              "zh-CN": "日期",
+              "zh-TW": "日期"
+            }
+          },
+          {
+            "ref": "to_date",
+            "type": "date",
+            "label": {
+              "en-US": "Until",
+              "de-DE": "Bis",
+              "fr-FR": "Jusqu’au",
+              "da-DK": "Til og med",
+              "cs-CZ": "Do",
+              "ar-EG": "حتى",
+              "zh-CN": "截至",
+              "zh-TW": "截至"
+            },
+            "nullable": true,
+            "rules": {
+              "notBefore": {
+                "column": "date"
+              }
+            }
+          },
+          {
+            "ref": "title",
+            "type": "text",
+            "maxLength": 200,
+            "label": {
+              "en-US": "What it is",
+              "de-DE": "Was es ist",
+              "fr-FR": "Libellé",
+              "da-DK": "Hvad det er",
+              "cs-CZ": "Co to je",
+              "ar-EG": "ما هو",
+              "zh-CN": "项目",
+              "zh-TW": "項目"
+            }
+          },
+          {
+            "ref": "kind",
+            "type": "enum",
+            "enum": [
+              "call",
+              "press",
+              "away"
+            ],
+            "label": {
+              "en-US": "Kind",
+              "de-DE": "Art",
+              "fr-FR": "Type",
+              "da-DK": "Type",
+              "cs-CZ": "Druh",
+              "ar-EG": "النوع",
+              "zh-CN": "类型",
+              "zh-TW": "類型"
+            },
+            "default": "call",
+            "rules": {
+              "enumLabels": {
+                "labels": {
+                  "call": {
+                    "en-US": "A call",
+                    "de-DE": "Ein Anruf",
+                    "fr-FR": "Un appel",
+                    "da-DK": "Et opkald",
+                    "cs-CZ": "Telefonát",
+                    "ar-EG": "مكالمة",
+                    "zh-CN": "电话",
+                    "zh-TW": "電話"
+                  },
+                  "press": {
+                    "en-US": "A press check",
+                    "de-DE": "Eine Druckabnahme",
+                    "fr-FR": "Un contrôle chez l’imprimeur",
+                    "da-DK": "En trykkontrol",
+                    "cs-CZ": "Kontrola v tiskárně",
+                    "ar-EG": "مراجعة في المطبعة",
+                    "zh-CN": "印厂看样",
+                    "zh-TW": "印廠看樣"
+                  },
+                  "away": {
+                    "en-US": "One of us away",
+                    "de-DE": "Einer von uns abwesend",
+                    "fr-FR": "L’un de nous absent",
+                    "da-DK": "En af os er væk",
+                    "cs-CZ": "Někdo z nás chybí",
+                    "ar-EG": "أحدنا غائب",
+                    "zh-CN": "我们有人不在",
+                    "zh-TW": "我們有人不在"
+                  }
+                },
+                "tones": {
+                  "call": "info",
+                  "press": "accent",
+                  "away": "warn"
+                }
+              }
+            }
+          },
+          {
+            "ref": "person_id",
+            "type": "fk",
+            "references": "people",
+            "label": {
+              "en-US": "Who is away",
+              "de-DE": "Wer abwesend ist",
+              "fr-FR": "Qui est absent",
+              "da-DK": "Hvem er væk",
+              "cs-CZ": "Kdo chybí",
+              "ar-EG": "مَن الغائب",
+              "zh-CN": "谁不在",
+              "zh-TW": "誰不在"
+            },
+            "nullable": true,
+            "rules": {
+              "requiredWhen": {
+                "column": "kind",
+                "in": [
+                  "away"
+                ]
+              }
+            }
           },
           {
             "ref": "client_key",
@@ -10762,10 +11913,15 @@
         "table:@deliverable_notes:read",
         "table:@briefs:read",
         "table:@brief_answers:read",
+        "table:@suppliers:read",
+        "table:@expenses:read",
+        "table:@time_entries:read",
         "table:@invoices:read",
         "table:@invoice_lines:read",
         "table:@payments:read",
         "table:@messages:read",
+        "table:@running_costs:read",
+        "table:@events:read",
         "table:@clients:create",
         "table:@clients:update",
         "table:@client_notes:create",
@@ -10794,6 +11950,12 @@
         "table:@briefs:update",
         "table:@brief_answers:create",
         "table:@brief_answers:update",
+        "table:@suppliers:create",
+        "table:@suppliers:update",
+        "table:@expenses:create",
+        "table:@expenses:update",
+        "table:@time_entries:create",
+        "table:@time_entries:update",
         "table:@invoices:create",
         "table:@invoices:update",
         "table:@invoice_lines:create",
@@ -10802,6 +11964,8 @@
         "table:@payments:update",
         "table:@messages:create",
         "table:@messages:update",
+        "table:@events:create",
+        "table:@events:update",
         "page:@clients-overview:view",
         "page:@clients-clients:view",
         "page:@clients-enquiries:view",
@@ -10834,10 +11998,15 @@
         "table:@deliverable_notes:read_pii",
         "table:@briefs:read_pii",
         "table:@brief_answers:read_pii",
+        "table:@suppliers:read_pii",
+        "table:@expenses:read_pii",
+        "table:@time_entries:read_pii",
         "table:@invoices:read_pii",
         "table:@invoice_lines:read_pii",
         "table:@payments:read_pii",
-        "table:@messages:read_pii"
+        "table:@messages:read_pii",
+        "table:@running_costs:read_pii",
+        "table:@events:read_pii"
       ],
       "limits": {
         "invoices": {
@@ -10968,6 +12137,18 @@
         "table:@brief_answers:create",
         "table:@brief_answers:update",
         "table:@brief_answers:delete",
+        "table:@suppliers:read",
+        "table:@suppliers:create",
+        "table:@suppliers:update",
+        "table:@suppliers:delete",
+        "table:@expenses:read",
+        "table:@expenses:create",
+        "table:@expenses:update",
+        "table:@expenses:delete",
+        "table:@time_entries:read",
+        "table:@time_entries:create",
+        "table:@time_entries:update",
+        "table:@time_entries:delete",
         "table:@invoices:read",
         "table:@invoices:create",
         "table:@invoices:update",
@@ -10983,6 +12164,14 @@
         "table:@messages:read",
         "table:@messages:create",
         "table:@messages:update",
+        "table:@running_costs:read",
+        "table:@running_costs:create",
+        "table:@running_costs:update",
+        "table:@running_costs:delete",
+        "table:@events:read",
+        "table:@events:create",
+        "table:@events:update",
+        "table:@events:delete",
         "page:@clients-overview:view",
         "page:@clients-overview:edit",
         "page:@clients-clients:view",
@@ -11031,10 +12220,15 @@
         "table:@deliverable_notes:read_pii",
         "table:@briefs:read_pii",
         "table:@brief_answers:read_pii",
+        "table:@suppliers:read_pii",
+        "table:@expenses:read_pii",
+        "table:@time_entries:read_pii",
         "table:@invoices:read_pii",
         "table:@invoice_lines:read_pii",
         "table:@payments:read_pii",
         "table:@messages:read_pii",
+        "table:@running_costs:read_pii",
+        "table:@events:read_pii",
         "addOn:invoices:settings"
       ]
     }
@@ -11727,6 +12921,46 @@
       "level": "verified"
     },
     {
+      "table": "enquiries",
+      "methods": [
+        "POST"
+      ],
+      "select": [
+        "received_at"
+      ],
+      "writable": [
+        "name",
+        "email",
+        "business",
+        "trade",
+        "budget",
+        "start_when",
+        "body"
+      ],
+      "requires": [
+        "name",
+        "email",
+        "body"
+      ],
+      "defaults": {
+        "status": "new",
+        "source": "web"
+      },
+      "humanCheck": true,
+      "anonymous": {
+        "perValue": {
+          "columns": [
+            "email"
+          ],
+          "n": 3
+        },
+        "perKeyHour": 30,
+        "plainText": [
+          "name"
+        ]
+      }
+    },
+    {
       "table": "settings",
       "methods": [
         "GET"
@@ -11910,6 +13144,7 @@
       "brief-sent": "clients-brief-sent",
       "asked-for-a-new-price": "clients-asked-for-a-new-price",
       "new-note": "clients-new-note",
+      "new-enquiry": "clients-new-enquiry",
       "invoice-sent": "clients-invoice-sent",
       "invoice-rung-1": "clients-invoice-rung-1",
       "invoice-rung-2": "clients-invoice-rung-2",
@@ -12239,6 +13474,29 @@
           "via": "project_id",
           "column": "status",
           "to": "sent"
+        }
+      },
+      {
+        "kind": "new-enquiry",
+        "link": "enquiry_id",
+        "recipient": {
+          "setting": {
+            "table": "settings",
+            "column": "reply_to"
+          }
+        },
+        "gate": {
+          "setting": {
+            "table": "settings",
+            "column": "notify_enquiry"
+          }
+        },
+        "onCreate": {
+          "table": "enquiries",
+          "where": {
+            "column": "source",
+            "eq": "web"
+          }
         }
       }
     ]
@@ -16607,6 +17865,326 @@
               "data": {
                 "label": "開啟審閱",
                 "url": "{{staff_url}}projects/{{project.id}}"
+              }
+            }
+          ],
+          "footer": "由 {{practice.name}} 寄至 {{practice.reply_to}}。在設定中更改我們通知您的內容。"
+        }
+      }
+    },
+    {
+      "key": "clients-new-enquiry",
+      "name": {
+        "en-US": "New enquiry",
+        "de-DE": "Neue Anfrage",
+        "fr-FR": "Nouvelle demande",
+        "da-DK": "Ny henvendelse",
+        "cs-CZ": "Nová poptávka",
+        "ar-EG": "استفسار جديد",
+        "zh-CN": "新询价",
+        "zh-TW": "新詢價"
+      },
+      "vars": [
+        "enquiry.body",
+        "enquiry.business",
+        "enquiry.name",
+        "enquiry.number",
+        "practice.name",
+        "practice.phone",
+        "practice.reply_to"
+      ],
+      "locales": {
+        "en-US": {
+          "subject": "A new enquiry from {{enquiry.name}}",
+          "blocks": [
+            {
+              "block": "email.heading",
+              "id": "lead",
+              "data": {
+                "text": "{{enquiry.number}} — {{enquiry.business}}"
+              }
+            },
+            {
+              "block": "email.text",
+              "id": "body",
+              "data": {
+                "paras": [
+                  "{{enquiry.name}} wrote through the form on your website. What they wrote:"
+                ]
+              }
+            },
+            {
+              "block": "email.quote",
+              "id": "their-note",
+              "data": {
+                "text": "{{enquiry.body}}"
+              }
+            },
+            {
+              "block": "email.button",
+              "id": "open",
+              "data": {
+                "label": "Open the enquiries",
+                "url": "{{staff_url}}enquiries"
+              }
+            }
+          ],
+          "footer": "Sent by {{practice.name}} to {{practice.reply_to}}. Change what we tell you in Settings."
+        },
+        "de-DE": {
+          "subject": "Eine neue Anfrage von {{enquiry.name}}",
+          "blocks": [
+            {
+              "block": "email.heading",
+              "id": "lead",
+              "data": {
+                "text": "{{enquiry.number}} — {{enquiry.business}}"
+              }
+            },
+            {
+              "block": "email.text",
+              "id": "body",
+              "data": {
+                "paras": [
+                  "{{enquiry.name}} hat über das Formular auf Ihrer Website geschrieben. Die Nachricht:"
+                ]
+              }
+            },
+            {
+              "block": "email.quote",
+              "id": "their-note",
+              "data": {
+                "text": "{{enquiry.body}}"
+              }
+            },
+            {
+              "block": "email.button",
+              "id": "open",
+              "data": {
+                "label": "Anfragen öffnen",
+                "url": "{{staff_url}}enquiries"
+              }
+            }
+          ],
+          "footer": "Gesendet von {{practice.name}} an {{practice.reply_to}}. Was wir Ihnen melden, ändern Sie in den Einstellungen."
+        },
+        "fr-FR": {
+          "subject": "Une nouvelle demande de {{enquiry.name}}",
+          "blocks": [
+            {
+              "block": "email.heading",
+              "id": "lead",
+              "data": {
+                "text": "{{enquiry.number}} — {{enquiry.business}}"
+              }
+            },
+            {
+              "block": "email.text",
+              "id": "body",
+              "data": {
+                "paras": [
+                  "{{enquiry.name}} a écrit via le formulaire de votre site. Son message :"
+                ]
+              }
+            },
+            {
+              "block": "email.quote",
+              "id": "their-note",
+              "data": {
+                "text": "{{enquiry.body}}"
+              }
+            },
+            {
+              "block": "email.button",
+              "id": "open",
+              "data": {
+                "label": "Ouvrir les demandes",
+                "url": "{{staff_url}}enquiries"
+              }
+            }
+          ],
+          "footer": "Envoyé par {{practice.name}} à {{practice.reply_to}}. Choisissez ce que nous vous signalons dans les réglages."
+        },
+        "da-DK": {
+          "subject": "En ny henvendelse fra {{enquiry.name}}",
+          "blocks": [
+            {
+              "block": "email.heading",
+              "id": "lead",
+              "data": {
+                "text": "{{enquiry.number}} — {{enquiry.business}}"
+              }
+            },
+            {
+              "block": "email.text",
+              "id": "body",
+              "data": {
+                "paras": [
+                  "{{enquiry.name}} har skrevet via formularen på jeres website. Beskeden:"
+                ]
+              }
+            },
+            {
+              "block": "email.quote",
+              "id": "their-note",
+              "data": {
+                "text": "{{enquiry.body}}"
+              }
+            },
+            {
+              "block": "email.button",
+              "id": "open",
+              "data": {
+                "label": "Åbn henvendelserne",
+                "url": "{{staff_url}}enquiries"
+              }
+            }
+          ],
+          "footer": "Sendt af {{practice.name}} til {{practice.reply_to}}. Vælg, hvad vi fortæller dig, under Indstillinger."
+        },
+        "cs-CZ": {
+          "subject": "Nová poptávka od {{enquiry.name}}",
+          "blocks": [
+            {
+              "block": "email.heading",
+              "id": "lead",
+              "data": {
+                "text": "{{enquiry.number}} — {{enquiry.business}}"
+              }
+            },
+            {
+              "block": "email.text",
+              "id": "body",
+              "data": {
+                "paras": [
+                  "Přes formulář na vašem webu přišla zpráva od {{enquiry.name}}. Zní takto:"
+                ]
+              }
+            },
+            {
+              "block": "email.quote",
+              "id": "their-note",
+              "data": {
+                "text": "{{enquiry.body}}"
+              }
+            },
+            {
+              "block": "email.button",
+              "id": "open",
+              "data": {
+                "label": "Otevřít poptávky",
+                "url": "{{staff_url}}enquiries"
+              }
+            }
+          ],
+          "footer": "Odesláno ze studia {{practice.name}} na {{practice.reply_to}}. Co vám hlásíme, změníte v Nastavení."
+        },
+        "ar-EG": {
+          "subject": "استفسار جديد من {{enquiry.name}}",
+          "blocks": [
+            {
+              "block": "email.heading",
+              "id": "lead",
+              "data": {
+                "text": "{{enquiry.number}} — {{enquiry.business}}"
+              }
+            },
+            {
+              "block": "email.text",
+              "id": "body",
+              "data": {
+                "paras": [
+                  "وصلت رسالة من {{enquiry.name}} عبر النموذج في موقعكم. نصّها:"
+                ]
+              }
+            },
+            {
+              "block": "email.quote",
+              "id": "their-note",
+              "data": {
+                "text": "{{enquiry.body}}"
+              }
+            },
+            {
+              "block": "email.button",
+              "id": "open",
+              "data": {
+                "label": "افتح الاستفسارات",
+                "url": "{{staff_url}}enquiries"
+              }
+            }
+          ],
+          "footer": "أرسلها {{practice.name}} إلى {{practice.reply_to}}. غيّر ما نُخبرك به من الإعدادات."
+        },
+        "zh-CN": {
+          "subject": "来自 {{enquiry.name}} 的新询价",
+          "blocks": [
+            {
+              "block": "email.heading",
+              "id": "lead",
+              "data": {
+                "text": "{{enquiry.number}} — {{enquiry.business}}"
+              }
+            },
+            {
+              "block": "email.text",
+              "id": "body",
+              "data": {
+                "paras": [
+                  "{{enquiry.name}}通过你们网站上的表单来信。内容如下："
+                ]
+              }
+            },
+            {
+              "block": "email.quote",
+              "id": "their-note",
+              "data": {
+                "text": "{{enquiry.body}}"
+              }
+            },
+            {
+              "block": "email.button",
+              "id": "open",
+              "data": {
+                "label": "打开询价",
+                "url": "{{staff_url}}enquiries"
+              }
+            }
+          ],
+          "footer": "由 {{practice.name}} 发送至 {{practice.reply_to}}。在设置中更改我们通知您的内容。"
+        },
+        "zh-TW": {
+          "subject": "來自 {{enquiry.name}} 的新詢價",
+          "blocks": [
+            {
+              "block": "email.heading",
+              "id": "lead",
+              "data": {
+                "text": "{{enquiry.number}} — {{enquiry.business}}"
+              }
+            },
+            {
+              "block": "email.text",
+              "id": "body",
+              "data": {
+                "paras": [
+                  "{{enquiry.name}}透過你們網站上的表單來信。內容如下："
+                ]
+              }
+            },
+            {
+              "block": "email.quote",
+              "id": "their-note",
+              "data": {
+                "text": "{{enquiry.body}}"
+              }
+            },
+            {
+              "block": "email.button",
+              "id": "open",
+              "data": {
+                "label": "開啟詢價",
+                "url": "{{staff_url}}enquiries"
               }
             }
           ],

@@ -26,6 +26,7 @@ import type {
   Deliverable,
   Enquiry,
   Id,
+  Instant,
   Invoice,
   Message,
   Milestone,
@@ -236,6 +237,27 @@ export interface ClientNote {
 }
 
 
+/**
+ * An enquiry from the studio's website: what a stranger may write. Adminium
+ * makes it a new enquiry from the web, numbers it, stamps when it came, and
+ * asks the human check first (the public client solves it).
+ */
+export interface EnquiryForm {
+  name: string;
+  email: string;
+  /** What they wrote. */
+  body: string;
+  business?: string | null;
+  trade?: string | null;
+  budget?: string | null;
+  start_when?: string | null;
+}
+
+/** What the enquiry form hears back: when it arrived, and nothing else. */
+export interface EnquiryReceipt {
+  received_at: Instant | null;
+}
+
 /** The shared handover page, read through its share link. */
 export interface HandoverView {
   studio: Pick<Settings, "name" | "mark" | "website"> | null;
@@ -310,4 +332,11 @@ export interface PortalPort {
 
   // the shared handover (its own key, by token)
   openHandover(token: string): Promise<HandoverView>;
+
+  // anyone, from the studio's website
+  /**
+   * Send an enquiry. Needs no session; Adminium limits how many one address
+   * and the key may send, and answers only when it arrived.
+   */
+  sendEnquiry(form: EnquiryForm): Promise<EnquiryReceipt>;
 }

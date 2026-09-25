@@ -201,6 +201,13 @@ export const EMAIL_EN: EmailWords = {
     paras: ["{{client.contact_name}} answered the kickoff questions. The answers are on the project page, under Their brief."],
     button: "Open the project",
   },
+  "new-enquiry": {
+    name: "New enquiry",
+    subject: "A new enquiry from {{enquiry.name}}",
+    lead: "{{enquiry.number}} — {{enquiry.business}}",
+    paras: ["{{enquiry.name}} wrote through the form on your website. What they wrote:", "{{enquiry.body}}"],
+    button: "Open the enquiries",
+  },
 };
 
 type Block = { block: string; id: string; data: Record<string, unknown> };
@@ -227,6 +234,7 @@ const BUTTON: Record<Kind, string | null> = {
   "new-note": "{{staff_url}}projects/{{project.id}}",
   "client-says-paid": "{{staff_url}}invoices/{{invoice.id}}",
   "brief-sent": "{{staff_url}}projects/{{project.id}}",
+  "new-enquiry": "{{staff_url}}enquiries",
 };
 
 /** The notices to the studio: plain, no greeting and no sign-off. */
@@ -239,10 +247,11 @@ const STUDIO: ReadonlySet<Kind> = new Set([
   "new-note",
   "client-says-paid",
   "brief-sent",
+  "new-enquiry",
 ]);
 
 /** A notice's second sentence is the client's own words, quoted. */
-const QUOTED: ReadonlySet<Kind> = new Set(["declined", "changes-requested", "client-says-paid"]);
+const QUOTED: ReadonlySet<Kind> = new Set(["declined", "changes-requested", "client-says-paid", "new-enquiry"]);
 
 function layout(kind: Kind, all: EmailWords) {
   const w = all[kind];

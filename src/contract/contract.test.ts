@@ -14,7 +14,15 @@
  *      one with money on it is refused;
  *   6. a client signs in by an emailed link and accepts the proposal still
  *      out: sealed with the SHA-256 of what was agreed;
- *   7. the sample removed, keeping what the studio and the client made of it.
+ *   7. the back office: purchases and suppliers numbered without gaps under
+ *      parallel creates; the desk's own "Move onto an invoice" and "Pass on",
+ *      pressed twice at once, put each entry and purchase on ONE line; one
+ *      running clock per person; an invoiced entry kept; a line taken off a
+ *      draft frees it, a sent one's lines are locked;
+ *   8. an enquiry from the studio's site: behind the human check, only its
+ *      own columns, landing as a new enquiry from the web, and the studio
+ *      emailed about it; the per-address limit;
+ *   9. the sample removed, keeping what the studio and the client made of it.
  *
  * The demo's stand-in world plays the same scenario (`demo/world.test.ts`),
  * and the figures here are held to it: the same receipt number, the same
@@ -29,7 +37,16 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { sessionDeskReads } from "../data/adminiumSource.ts";
 import { normaliseAll } from "../data/rows.ts";
+import { createSessionTransport } from "../data/sessionSource.ts";
+import { sessionSink } from "../data/sink.ts";
+import { realTables } from "../data/tableOfRef.ts";
+import { setClockSource, setZone } from "../lib/clock.ts";
+import { resetDesk, setDeskReads, setDeskWrites } from "../state/desk.ts";
+import { takeOffDraft } from "../state/invoiceDrafts.ts";
+import { addPurchase, passOn } from "../state/officeActions.ts";
+import { logTime, moveTimeOntoInvoice, removeTime, startClock, stopClock } from "../state/timeActions.ts";
 import { COLUMNS, resolveSample } from "../data/sampleRows.ts";
 import { setServerZone } from "../data/venueTime.ts";
 import type { Id, TableRef } from "../data/types.ts";
@@ -115,9 +132,16 @@ describe.skipIf(why !== null)(`the contract with a built Adminium${why === null 
         const staged = await staff.post(`/api/v1/apps/upload?expectedSha512=${encodeURIComponent(app.integrity)}`, app.buffer);
         expect([200, 201], JSON.stringify(staged.body).slice(0, 800)).toContain(staged.status);
         const body = { key: app.key, version: app.version, connectionId };
-        const plan = ok(await staff.post<{ plan: { installable: boolean; checksum: string; addOns: { key: string; action: string }[] } }>("/api/v1/apps/plan", body)).plan;
+        const plan = ok(
+          await staff.post<{ plan: { installable: boolean; checksum: string; addOns: { key: string; need: string; checked: boolean; action: string | null }[] } }>("/api/v1/apps/plan", body),
+        ).plan;
         expect(plan.installable).toBe(true);
-        expect(plan.addOns.map((a) => [a.key, a.action])).toEqual([["invoices", "install"]]);
+        // Invoices & Receipts is installed with it; Holiday calendars is offered for one feature, not ticked, and nothing waits on it.
+        expect(plan.addOns.map((a) => [a.key, a.need, a.checked])).toEqual([
+          ["invoices", "requires", true],
+          ["holiday-calendars", "feature", false],
+        ]);
+        expect(plan.addOns.find((a) => a.key === "invoices")!.action).toBe("install");
         const installed = ok(
           await staff.post<{ rules: { skipped: unknown[] }; schema: { created: string[] }; publicAccess: { keys: Record<string, string> }; outbox: { defined: boolean } }>(
             "/api/v1/apps/install",
@@ -228,6 +252,155 @@ describe.skipIf(why !== null)(`the contract with a built Adminium${why === null 
         // Once: a second acceptance finds nothing to accept.
         const twice = await guest.patch(`/api/v1/public/records/${accept}/${String(proposal.id)}`, { values: { status: "accepted", signed_name: "Someone Else" } }, as);
         expect(twice.status).toBe(404);
+      }, 240_000);
+
+      // ── the back office ─────────────────────────────────────────────────────
+
+      it("numbers purchases EX- and suppliers SUP- without gaps when many are made at once", async () => {
+        const made = await Promise.all(
+          Array.from({ length: 8 }, (_, i) => staff.post<{ data: Row }>(data("expenses"), { values: { date: "2026-07-28", what: `Stamps ${String(i)}`, amount: "10", rebill: false } })),
+        );
+        expect(made.map((m) => m.status)).toEqual(Array(8).fill(201));
+        expect(made.map((m) => String(m.body.data["number"])).sort()).toEqual(["EX-001", "EX-002", "EX-003", "EX-004", "EX-005", "EX-006", "EX-007", "EX-008"]);
+        const suppliers = await Promise.all(Array.from({ length: 6 }, (_, i) => staff.post<{ data: Row }>(data("suppliers"), { values: { name: `Printer ${String(i)}` } })));
+        expect(suppliers.map((m) => m.status)).toEqual(Array(6).fill(201));
+        expect(suppliers.map((m) => String(m.body.data["number"])).sort()).toEqual(["SUP-01", "SUP-02", "SUP-03", "SUP-04", "SUP-05", "SUP-06"]);
+        // A purchase is dated when it was made, never later; a cost is above zero.
+        const future = await staff.post(data("expenses"), { values: { date: "2026-08-02", what: "Later", amount: "10" } });
+        const free = await staff.post(data("expenses"), { values: { date: "2026-07-28", what: "Nothing", amount: "0" } });
+        expect([future.status, free.status]).toEqual([422, 422]);
+      }, 120_000);
+
+      it("moves time onto an invoice ONCE, through the desk's own code pressed twice at once", async () => {
+        // The desk, booted as main.tsx boots it, speaking to this server with the operator's session.
+        const { csrfToken } = staff.session();
+        const tables = realTables(real);
+        const transport = createSessionTransport({
+          tableOfRef: tables,
+          connectionId,
+          staff: { csrfToken, timezone: DEMO_ZONE, currency: DEMO_CURRENCY },
+          fetchImpl: staff.fetchAs(),
+        });
+        resetDesk();
+        setZone(DEMO_ZONE);
+        setClockSource(() => DEMO_START);
+        setDeskReads(sessionDeskReads(transport));
+        setDeskWrites(sessionSink(transport, tables, { csrfToken: () => csrfToken, fetchImpl: staff.fetchAs() }));
+
+        const project = byNumber(await rows("projects"), "PRJ-S02");
+        const people = await rows("people");
+        const [nadia, tomas] = [people.find((p) => p["name"] === "Nadia Cole")!.id, people.find((p) => p["name"] === "Tomas Wilde")!.id];
+        const logged = await Promise.all([
+          logTime({ project_id: project.id, person_id: nadia, hours: "2.5", note: "Sleeve layouts, contract run" }),
+          logTime({ project_id: project.id, person_id: tomas, hours: "1.25", note: "Board check, contract run" }),
+        ]);
+        const ids = logged.map((o) => (o.ok ? o.value.id : Number.NaN));
+        expect(ids.every(Number.isFinite), JSON.stringify(logged)).toBe(true);
+        const move = { rate: "125.00", newTitle: () => "Time, contract run" };
+        const [a, b] = await Promise.all([moveTimeOntoInvoice(ids, move), moveTimeOntoInvoice(ids, move)]);
+        expect([a.ok, b.ok], JSON.stringify([a, b]).slice(0, 800)).toEqual([true, true]);
+        const carried = (await rows("invoice_lines")).filter((l) => ids.includes(l["time_entry_id"] as Id));
+        expect(carried.map((l) => l["time_entry_id"]).sort()).toEqual([...ids].sort());
+        const drafts = new Set(carried.map((l) => l["document_id"]));
+        expect(drafts.size).toBe(1);
+        const draft = (await rows("invoices")).find((i) => i.id === [...drafts][0])!;
+        // 3.75 hours at 125, taxed at the client's 8.5 %: Adminium's figures.
+        expect([draft["status"], draft["title"], Number(draft["subtotal"]), Number(draft["total"])]).toEqual(["draft", "Time, contract run", 468.75, 508.59]);
+        expect((await rows("invoices")).filter((i) => i["title"] === "Time, contract run")).toHaveLength(1);
+
+        // Adminium's own guarantee, under the desk: a second line for the same hours is refused.
+        const again = await staff.post(data("invoice_lines"), { values: { document_id: draft.id, description: "Again", qty: "1", rate: "1", time_entry_id: ids[0] } });
+        expect([again.status, again.code]).toEqual([409, "UNIQUE_VIOLATION"]);
+        // An invoiced entry stays: the line points at it.
+        const removed = await removeTime(ids[0]!);
+        expect(!removed.ok && removed.code).toBe("FK_VIOLATION");
+        // Off the draft, the entry is free; moved again, it is on one line again.
+        const line = carried.find((l) => l["time_entry_id"] === ids[0])!;
+        expect((await takeOffDraft(line.id)).ok).toBe(true);
+        const moved = await moveTimeOntoInvoice([ids[0]!], move);
+        expect(moved.ok && moved.value.lines.map((l) => l.time_entry_id)).toEqual([ids[0]]);
+        // Sent, the draft's lines are locked: nothing comes off it any more.
+        ok(await staff.patch(`${data("invoices")}/${String(draft.id)}`, { values: { status: "sent" } }));
+        const locked = await takeOffDraft(moved.ok ? moved.value.lines[0]!.id : 0);
+        expect(!locked.ok && ["RECORD_LOCKED", "DELETE_REFUSED"].includes(locked.code)).toBe(true);
+      }, 180_000);
+
+      it("keeps one running clock per person, started by Adminium's stamp", async () => {
+        const project = byNumber(await rows("projects"), "PRJ-S01");
+        const nadia = (await rows("people")).find((p) => p["name"] === "Nadia Cole")!.id;
+        const [a, b] = await Promise.all([startClock({ project_id: project.id, person_id: nadia }), startClock({ project_id: project.id, person_id: nadia })]);
+        const started = [a, b].filter((o) => o.ok);
+        const refused = [a, b].filter((o) => !o.ok);
+        expect([started.length, refused.length]).toEqual([1, 1]);
+        expect(!refused[0]!.ok && refused[0]!.code).toBe("UNIQUE_VIOLATION");
+        const clock = started[0]!.ok ? started[0]!.value : null;
+        expect(clock?.started_at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+        const stopped = await stopClock(clock!.id, { hours: "0.5", note: "Contract clock" });
+        expect(stopped.ok && [Number(stopped.value.hours), stopped.value.running_for]).toEqual([0.5, null]);
+        expect((await startClock({ project_id: project.id, person_id: nadia })).ok).toBe(true);
+      }, 120_000);
+
+      it("passes a purchase on at cost ONCE, pressed twice at once", async () => {
+        const project = byNumber(await rows("projects"), "PRJ-S01");
+        const bought = await addPurchase({ what: "Proof prints, contract run", amount: "42.10", project_id: project.id, rebill: true, date: "2026-07-28" });
+        expect(bought.ok, JSON.stringify(bought)).toBe(true);
+        const id = bought.ok ? bought.value.id : 0;
+        // The project's client, copied by Adminium.
+        expect(bought.ok && bought.value.client_id).toBe(project["client_id"]);
+        const title = { newTitle: () => "Purchases, contract run" };
+        const [a, b] = await Promise.all([passOn([id], title), passOn([id], title)]);
+        expect([a.ok, b.ok]).toEqual([true, true]);
+        const carried = (await rows("invoice_lines")).filter((l) => l["expense_id"] === id);
+        expect(carried.map((l) => [Number(l["qty"]), Number(l["rate"])])).toEqual([[1, 42.1]]);
+      }, 120_000);
+
+      it("takes an enquiry from the studio's site behind the human check, as a new one from the web, and tells the studio", async () => {
+        ok(await staff.put("/api/v1/public-api", { enabled: true }));
+        ok(await staff.put("/api/v1/settings/email", { publicOrigin: server.base }));
+        // The sample studio's address is on a reserved domain, which Adminium never mails: the contract's studio has its own.
+        const settings = (await rows("settings"))[0]!;
+        const studio = "desk@studio-contract.net";
+        ok(await staff.patch(`${data("settings")}/${String(settings.id)}`, { values: { notify_enquiry: true, reply_to: studio } }));
+        const config = ok(await new Caller(server.base).get<{ publishableKey: string }>("/apps/clients/customer/surface-config.json"));
+        const guest = new Caller(server.base, { authorization: `Bearer ${config.publishableKey}`, origin: server.base });
+        const refs = ok(await guest.get<{ data: { refs: Record<string, { actions: string[]; writable: string[]; expose: string[] }> } }>("/api/v1/public/config")).data.refs;
+        const [door, entry] = Object.entries(refs).find(([ref, r]) => ref.startsWith(real["enquiries"]!) && r.writable.includes("body"))!;
+        expect([entry.actions, entry.expose]).toEqual([["create"], ["received_at"]]);
+        const proof = async () => {
+          const challenge = ok(await guest.get<{ data: { id: string; salt: string; difficulty: number } }>("/api/v1/public/challenge?purpose=write")).data;
+          return { "x-adminium-proof": `${challenge.id}.${solve(challenge.salt, challenge.difficulty)}` };
+        };
+        const form = { name: "Rosa Vento", email: "rosa.contract@ventoandsons.example", business: "Vento & Sons", body: "A sign, and a name people can find." };
+        // No proof, no enquiry; nor one that tries to choose what the studio decides.
+        const unproved = await guest.post(`/api/v1/public/records/${door}`, { values: form });
+        expect(unproved.status).toBeGreaterThanOrEqual(400);
+        const forged = await guest.post(`/api/v1/public/records/${door}`, { values: { ...form, status: "proposal" } }, await proof());
+        expect([forged.status, forged.code]).toEqual([400, "PUBLIC_WRITE_REFUSED"]);
+        const sent = await guest.post<{ data: Row }>(`/api/v1/public/records/${door}`, { values: form }, await proof());
+        expect(sent.status).toBe(201);
+        expect(Object.keys(sent.body.data)).toEqual(["received_at"]);
+        const made = (await rows("enquiries")).find((e) => e["email"] === form.email)!;
+        expect(made).toMatchObject({ status: "new", source: "web", fit: null, client_id: null, name: "Rosa Vento", number: "ENQ-001" });
+        expect(made["received_at"]).not.toBeNull();
+        // The studio's notice, to its reply-to address, behind its switch.
+        const mail = await until(
+          async () => {
+            const messages = (await (await fetch(`${server.sink}/messages`)).json()) as { to: string[]; subject: string; text: string }[];
+            return messages.find((m) => m.to.some((to) => to.includes(studio)) && m.subject.includes("Rosa Vento"));
+          },
+          "the studio's new-enquiry notice",
+          150_000,
+        );
+        expect(mail.subject).toBe("A new enquiry from Rosa Vento");
+        expect(mail.text).toContain(form.body);
+        // A personal column (their address) is never read into an email: the studio answers from the desk.
+        expect(mail.text).not.toContain(form.email);
+        const notice = (await rows("messages")).find((m) => m["kind"] === "new-enquiry")!;
+        expect(notice).toMatchObject({ enquiry_id: made.id, status: "sent", to: studio });
+        // Three a day from one address; a fourth waits.
+        for (let i = 0; i < 2; i += 1) expect((await guest.post(`/api/v1/public/records/${door}`, { values: form }, await proof())).status).toBe(201);
+        const fourth = await guest.post(`/api/v1/public/records/${door}`, { values: form }, await proof());
+        expect([fourth.status, fourth.code]).toEqual([409, "PUBLIC_LIMIT_REACHED"]);
       }, 240_000);
 
       it("removes the sample, keeping what the studio and its client made of it", async () => {

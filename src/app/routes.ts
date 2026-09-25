@@ -30,6 +30,15 @@ export const DESK_VIEWS = [
   "chasing",
   "terms",
   "settings",
+  "time",
+  "expenses",
+  "suppliers",
+  "scoping",
+  "schedule",
+  "capacity",
+  "money",
+  "archive",
+  "emails",
   "notfound",
 ] as const;
 
@@ -46,6 +55,7 @@ export const CLIENT_VIEWS = [
   "handover",
   "expired",
   "notavailable",
+  "enquire",
   "notfound",
 ] as const;
 
@@ -81,6 +91,15 @@ export const DESK_ROUTES: Readonly<Record<DeskView, Route>> = {
   chasing: { file: "src/screens/Chasing.tsx", titleKey: "nav.chasing" },
   terms: { file: "src/screens/Terms.tsx", titleKey: "nav.terms" },
   settings: { file: "src/screens/Settings.tsx", titleKey: "nav.settings" },
+  time: { file: "src/screens/Time.tsx", titleKey: "nav.time" },
+  expenses: { file: "src/screens/Expenses.tsx", titleKey: "nav.expenses" },
+  suppliers: { file: "src/screens/Suppliers.tsx", titleKey: "nav.suppliers" },
+  scoping: { file: "src/screens/Scoping.tsx", titleKey: "screen.scoping" },
+  schedule: { file: "src/screens/Schedule.tsx", titleKey: "nav.schedule" },
+  capacity: { file: "src/screens/Capacity.tsx", titleKey: "nav.capacity" },
+  money: { file: "src/screens/Money.tsx", titleKey: "nav.money" },
+  archive: { file: "src/screens/Archive.tsx", titleKey: "nav.archive" },
+  emails: { file: "src/screens/Emails.tsx", titleKey: "screen.emails" },
   notfound: { file: "src/screens/NotFound.tsx", titleKey: "notFound.title" },
 };
 
@@ -97,6 +116,7 @@ export const CLIENT_ROUTES: Readonly<Record<ClientView, Route>> = {
   handover: { file: "src/screens/client/Handover.tsx", titleKey: "nav.handover" },
   expired: { file: "src/screens/client/Expired.tsx", titleKey: "screen.expired" },
   notavailable: { file: "src/screens/client/NotAvailable.tsx", titleKey: "notAvailable.kicker" },
+  enquire: { file: "src/screens/client/Enquire.tsx", titleKey: "screen.enquire" },
   notfound: { file: "src/screens/client/NotFound.tsx", titleKey: "notFound.title" },
 };
 

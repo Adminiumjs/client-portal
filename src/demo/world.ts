@@ -415,6 +415,33 @@ export function createWorld(source: Seed | SampleSource, base: () => number, zon
       sendBrief: async (briefId) => write("briefs", briefId, { status: "sent" }, (r) => r["status"] === "open"),
       sentPayment: async (id, p) =>
         write("invoices", id, { client_paid: true, client_paid_on: p.on, client_paid_amount: p.amount, client_paid_note: p.note }, (r) => r["status"] === "sent" && r["client_paid_at"] === null),
+      // The enquiry form: anyone, no session. As the manifest's entry: only what a stranger may
+      // write, a new enquiry from the web whatever was sent, and only when it arrived comes back.
+      sendEnquiry: async (form) => {
+        const text = (value: string | null | undefined) => (value === null || value === undefined || value.trim() === "" ? null : value.trim());
+        try {
+          const row = written(
+            engine.insert(
+              "enquiries",
+              {
+                name: form.name.trim(),
+                email: form.email.trim(),
+                body: form.body.trim(),
+                business: text(form.business),
+                trade: text(form.trade),
+                budget: text(form.budget),
+                start_when: text(form.start_when),
+                status: "new",
+                source: "web",
+              },
+              { origin: "public", name: null, claim: null },
+            ),
+          );
+          return { received_at: typeof row["received_at"] === "string" ? (row["received_at"] as string) : null };
+        } catch (error) {
+          return asPort(error);
+        }
+      },
       openHandover: async (token): Promise<HandoverView> => {
         const project = engine.rows.projects.find((p) => p["share_token"] === token && p["share_stopped"] !== true);
         if (project === undefined) throw new PortError("LINK_STOPPED", "stopped", 410);

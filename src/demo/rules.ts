@@ -34,6 +34,12 @@ export const DEMO_RULES: DemoRules = {
       "pin_x": 4,
       "pin_y": 4
     },
+    "expenses": {
+      "amount": "currency"
+    },
+    "time_entries": {
+      "hours": 2
+    },
     "invoices": {
       "tax_rate": 3,
       "subtotal": "currency",
@@ -53,6 +59,9 @@ export const DEMO_RULES: DemoRules = {
     },
     "payments": {
       "amount": "currency"
+    },
+    "running_costs": {
+      "monthly_amount": "currency"
     }
   },
   "states": {
@@ -648,6 +657,16 @@ export const DEMO_RULES: DemoRules = {
         "on": "create"
       }
     ],
+    "time_entries": [
+      {
+        "column": "started_at",
+        "set": "now",
+        "on": {
+          "column": "running_for",
+          "filled": true
+        }
+      }
+    ],
     "invoices": [
       {
         "column": "issued_on",
@@ -1131,6 +1150,29 @@ export const DEMO_RULES: DemoRules = {
           "column": "status",
           "to": "sent"
         }
+      },
+      {
+        "kind": "new-enquiry",
+        "link": "enquiry_id",
+        "recipient": {
+          "setting": {
+            "table": "settings",
+            "column": "reply_to"
+          }
+        },
+        "gate": {
+          "setting": {
+            "table": "settings",
+            "column": "notify_enquiry"
+          }
+        },
+        "onCreate": {
+          "table": "enquiries",
+          "where": {
+            "column": "source",
+            "eq": "web"
+          }
+        }
       }
     ]
   },
@@ -1230,6 +1272,18 @@ export const DEMO_RULES: DemoRules = {
         "startSetting": null
       }
     ],
+    "suppliers": [
+      {
+        "column": "number_seq",
+        "startSetting": null
+      }
+    ],
+    "expenses": [
+      {
+        "column": "number_seq",
+        "startSetting": null
+      }
+    ],
     "invoices": [
       {
         "column": "number_seq",
@@ -1304,11 +1358,25 @@ export const DEMO_RULES: DemoRules = {
     "brief_answers": [
       "client_key"
     ],
+    "suppliers": [
+      "number",
+      "client_key"
+    ],
+    "expenses": [
+      "number",
+      "client_key"
+    ],
+    "time_entries": [
+      "running_for",
+      "client_key"
+    ],
     "invoices": [
       "number",
       "client_key"
     ],
     "invoice_lines": [
+      "time_entry_id",
+      "expense_id",
       "client_key"
     ],
     "payments": [
@@ -1316,6 +1384,9 @@ export const DEMO_RULES: DemoRules = {
       "client_key"
     ],
     "messages": [
+      "client_key"
+    ],
+    "events": [
       "client_key"
     ]
   },
@@ -1327,6 +1398,9 @@ export const DEMO_RULES: DemoRules = {
       "email"
     ],
     "enquiries": [
+      "email"
+    ],
+    "suppliers": [
       "email"
     ]
   },
@@ -1388,6 +1462,18 @@ export const DEMO_RULES: DemoRules = {
       "brief_id": "briefs",
       "client_id": "clients"
     },
+    "expenses": {
+      "client_id": "clients",
+      "project_id": "projects",
+      "supplier_id": "suppliers"
+    },
+    "time_entries": {
+      "project_id": "projects",
+      "client_id": "clients",
+      "milestone_id": "milestones",
+      "person_id": "people",
+      "running_for": "people"
+    },
     "invoices": {
       "from_quote_id": "proposals",
       "client_id": "clients",
@@ -1397,7 +1483,9 @@ export const DEMO_RULES: DemoRules = {
     "invoice_lines": {
       "document_id": "invoices",
       "quote_id": "proposals",
-      "client_id": "clients"
+      "client_id": "clients",
+      "time_entry_id": "time_entries",
+      "expense_id": "expenses"
     },
     "payments": {
       "document_id": "invoices",
@@ -1411,6 +1499,9 @@ export const DEMO_RULES: DemoRules = {
       "project_id": "projects",
       "deliverable_id": "deliverables",
       "enquiry_id": "enquiries"
+    },
+    "events": {
+      "person_id": "people"
     }
   }
 };

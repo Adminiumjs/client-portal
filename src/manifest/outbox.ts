@@ -22,7 +22,8 @@
  * To the studio (its reply-to address, each behind its own switch in
  * Settings): a proposal accepted and signed, declined, or a new price asked
  * for; work approved or sent back; a note from a client; a client saying they
- * paid; a brief sent.
+ * paid; a brief sent; an enquiry from the studio's website (one the desk
+ * types in from a call is not news to the desk).
  *
  * The log is the dedupe: a kind already queued or sent for the same row is not
  * queued again.
@@ -68,6 +69,7 @@ export const KINDS = [
   "brief-sent",
   "asked-for-a-new-price",
   "new-note",
+  "new-enquiry",
   "invoice-sent",
   "invoice-rung-1",
   "invoice-rung-2",
@@ -136,5 +138,6 @@ export const OUTBOX = {
     notice("new-note", "deliverable_id", { onCreate: { table: "deliverable_notes", via: "deliverable_id", where: { column: "side", eq: "client" } } }, "notify_notes"),
     notice("client-says-paid", "invoice_id", { onChange: { table: "invoices", column: "client_paid", to: true } }, "notify_paid"),
     notice("brief-sent", "project_id", { onChange: { table: "briefs", via: "project_id", column: "status", to: "sent" } }, "notify_brief"),
+    notice("new-enquiry", "enquiry_id", { onCreate: { table: "enquiries", where: { column: "source", eq: "web" } } }, "notify_enquiry"),
   ],
 };

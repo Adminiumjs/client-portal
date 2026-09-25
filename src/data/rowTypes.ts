@@ -63,6 +63,12 @@ export const ROW_NAMES: Readonly<Record<string, string>> = {
   invoice_lines: "InvoiceLine",
   payments: "Payment",
   messages: "Message",
+  time_entries: "TimeEntry",
+  suppliers: "Supplier",
+  expenses: "Expense",
+  running_costs: "RunningCost",
+  // "Event" is the browser's own type.
+  events: "StudioEvent",
 };
 
 /** The kind `rows.ts` normalises a column to. Text needs nothing and is left out. */

@@ -59,8 +59,8 @@ export const SURFACE_NAV = [
  * and the dead ends are where a failure lands.
  */
 export const SURFACE_EXTRAS = {
-  staff: ["proposal", "composer", "project", "review", "handover", "client", "invoice", "print", "notfound"],
-  customer: ["review", "expired", "notavailable", "notfound"],
+  staff: ["proposal", "composer", "project", "review", "handover", "client", "invoice", "print", "notfound", "time", "expenses", "suppliers", "scoping", "schedule", "capacity", "money", "archive", "emails"],
+  customer: ["review", "expired", "notavailable", "notfound", "enquire"],
 } as const satisfies Record<"staff" | "customer", readonly View[]>;
 
 export type StaffView =

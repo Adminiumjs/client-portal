@@ -165,6 +165,13 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
       paras: ["{{client.contact_name}} hat die Fragen zum Projektstart beantwortet. Die Antworten stehen auf der Projektseite unter Ihr Briefing."],
       button: "Projekt öffnen",
     },
+    "new-enquiry": {
+      name: "Neue Anfrage",
+      subject: "Eine neue Anfrage von {{enquiry.name}}",
+      lead: "{{enquiry.number}} — {{enquiry.business}}",
+      paras: ["{{enquiry.name}} hat über das Formular auf Ihrer Website geschrieben. Die Nachricht:", "{{enquiry.body}}"],
+      button: "Anfragen öffnen",
+    },
   },
   "fr-FR": {
     greeting: "Bonjour {{recipient.first_name}},",
@@ -322,6 +329,13 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
       lead: "{{project.number}} — {{project.name}}",
       paras: ["{{client.contact_name}} a répondu aux questions de lancement. Les réponses sont sur la page du projet, sous Leur brief."],
       button: "Ouvrir le projet",
+    },
+    "new-enquiry": {
+      name: "Nouvelle demande",
+      subject: "Une nouvelle demande de {{enquiry.name}}",
+      lead: "{{enquiry.number}} — {{enquiry.business}}",
+      paras: ["{{enquiry.name}} a écrit via le formulaire de votre site. Son message :", "{{enquiry.body}}"],
+      button: "Ouvrir les demandes",
     },
   },
   "da-DK": {
@@ -481,6 +495,13 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
       paras: ["{{client.contact_name}} har besvaret opstartsspørgsmålene. Svarene står på projektsiden under Deres brief."],
       button: "Åbn projektet",
     },
+    "new-enquiry": {
+      name: "Ny henvendelse",
+      subject: "En ny henvendelse fra {{enquiry.name}}",
+      lead: "{{enquiry.number}} — {{enquiry.business}}",
+      paras: ["{{enquiry.name}} har skrevet via formularen på jeres website. Beskeden:", "{{enquiry.body}}"],
+      button: "Åbn henvendelserne",
+    },
   },
   "cs-CZ": {
     greeting: "Dobrý den, {{recipient.first_name}},",
@@ -639,6 +660,13 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
       paras: ["{{client.contact_name}} odpověděl(a) na úvodní otázky. Odpovědi najdete na stránce projektu v části Jejich brief."],
       button: "Otevřít projekt",
     },
+    "new-enquiry": {
+      name: "Nová poptávka",
+      subject: "Nová poptávka od {{enquiry.name}}",
+      lead: "{{enquiry.number}} — {{enquiry.business}}",
+      paras: ["Přes formulář na vašem webu přišla zpráva od {{enquiry.name}}. Zní takto:", "{{enquiry.body}}"],
+      button: "Otevřít poptávky",
+    },
   },
   "ar-EG": {
     greeting: "مرحبًا {{recipient.first_name}}،",
@@ -792,6 +820,13 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
       paras: ["أجاب {{client.contact_name}} عن أسئلة الانطلاق. الإجابات في صفحة المشروع تحت «موجزهم»."],
       button: "افتح المشروع",
     },
+    "new-enquiry": {
+      name: "استفسار جديد",
+      subject: "استفسار جديد من {{enquiry.name}}",
+      lead: "{{enquiry.number}} — {{enquiry.business}}",
+      paras: ["وصلت رسالة من {{enquiry.name}} عبر النموذج في موقعكم. نصّها:", "{{enquiry.body}}"],
+      button: "افتح الاستفسارات",
+    },
   },
   "zh-CN": {
     greeting: "{{recipient.first_name}}，您好：",
@@ -930,6 +965,13 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
       paras: ["{{client.contact_name}} 已回答启动问题。答案在项目页面的“他们的简报”下。"],
       button: "打开项目",
     },
+    "new-enquiry": {
+      name: "新询价",
+      subject: "来自 {{enquiry.name}} 的新询价",
+      lead: "{{enquiry.number}} — {{enquiry.business}}",
+      paras: ["{{enquiry.name}}通过你们网站上的表单来信。内容如下：", "{{enquiry.body}}"],
+      button: "打开询价",
+    },
   },
   "zh-TW": {
     greeting: "{{recipient.first_name}}，您好：",
@@ -1067,6 +1109,13 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
       lead: "{{project.number}} — {{project.name}}",
       paras: ["{{client.contact_name}} 已回答啟動問題。答案在專案頁面的「他們的簡報」下。"],
       button: "開啟專案",
+    },
+    "new-enquiry": {
+      name: "新詢價",
+      subject: "來自 {{enquiry.name}} 的新詢價",
+      lead: "{{enquiry.number}} — {{enquiry.business}}",
+      paras: ["{{enquiry.name}}透過你們網站上的表單來信。內容如下：", "{{enquiry.body}}"],
+      button: "開啟詢價",
     },
   },
 };

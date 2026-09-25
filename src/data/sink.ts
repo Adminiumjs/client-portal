@@ -238,6 +238,19 @@ export function actionKey(): string {
     : "xxxxxxxx-xxxx-4xxx-8xxx-xxxxxxxxxxxx".replace(/x/g, () => Math.floor(Math.random() * 16).toString(16));
 }
 
+/**
+ * An action key made from what the action is ABOUT, not drawn at random: the
+ * same parts give the same 36 characters on every computer. An action that
+ * must happen once per thing — moving these hours onto an invoice, passing
+ * these purchases on — runs under it, so a second press (or a second tab)
+ * finds every row the first one saved by its key and adds nothing.
+ */
+export function keyFor(...parts: readonly string[]): string {
+  const text = parts.join("\u0000");
+  const hex = ["a", "b", "c", "d"].map((salt) => hash8(`${salt}\u0000${text}`)).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
+}
+
 /** FNV-1a, 32 bits, as 8 hex characters. */
 function hash8(text: string): string {
   let h = 0x811c9dc5;

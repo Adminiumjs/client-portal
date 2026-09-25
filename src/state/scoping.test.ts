@@ -1,0 +1,118 @@
+/**
+ * The scoping worksheet is a calculator: its figures come from the studio's
+ * rows, nothing is written while it is worked, and "Turn this into a
+ * proposal" saves one draft with its lines — then nothing more.
+ */
+import { beforeEach, describe, expect, it } from "vitest";
+
+import type { Rate } from "../data/types.ts";
+import { fakeStudio, tableOf, type FakeStudio } from "../testing/fakeStudio.ts";
+import type { Outcome } from "./outcome.ts";
+import { pastStages, turnIntoProposal, workSheet, type Worksheet, type WorksheetInputs } from "./scoping.ts";
+
+const rate = (id: number, label: string, amount: string, hours: string | null): Rate => ({ id, label, amount, hours_per_unit: hours, position: id, active: true });
+
+const inputs: WorksheetInputs = {
+  rates: [rate(1, "Day rate, design", "750.00", "6"), rate(2, "Half day", "400.00", "3"), rate(3, "Template, each", "90.00", null)],
+  settings: { hours_per_day: 6, days_per_week: 4 },
+  people: [{ days_per_week: null }, { days_per_week: null }],
+  runningCosts: [{ monthly_amount: "1450.00" }, { monthly_amount: "1400.00" }],
+  milestones: [
+    { id: 1, project_id: 1, title: "Logo direction", state: "done", estimated_days: "2" },
+    { id: 2, project_id: 2, title: "Pattern studies", state: "done", estimated_days: "1.5" },
+    // Open, or with no estimate: not history.
+    { id: 3, project_id: 1, title: "Wordmark", state: "now", estimated_days: "3" },
+    { id: 4, project_id: 3, title: "Sleeve grid", state: "done", estimated_days: null },
+  ],
+  time: [
+    { milestone_id: 1, hours: "9.00" },
+    { milestone_id: 1, hours: "6.00" },
+    { milestone_id: 2, hours: "9.00" },
+    { milestone_id: 3, hours: "2.00" },
+  ],
+  taxRate: "8.5",
+};
+
+const sheet: Worksheet = {
+  clientId: 4,
+  stage: "Podcast identity — mark & wordmark",
+  rows: [
+    { rateId: 1, qty: "6" },
+    { rateId: 2, qty: "1" },
+    { rateId: 3, qty: "12" },
+  ],
+  expenses: [
+    { what: "Type licence — two weights", amount: "420", passOn: true },
+    { what: "Reference books", amount: "38", passOn: false },
+  ],
+  contingency: false,
+  split: "5050",
+};
+
+describe("the worksheet's figures", () => {
+  it("prices the rows against the rate card and counts the studio's days by its own hours", () => {
+    const f = workSheet(sheet, inputs);
+    expect(f.rows.map((r) => [r.label, r.amount, r.hours])).toEqual([
+      ["Day rate, design", 4500, 36],
+      ["Half day", 400, 3],
+      ["Template, each", 1080, null],
+    ]);
+    expect([f.fees, f.hours, f.days]).toEqual([5980, 39, 6.5]);
+    expect([f.expensesAtCost, f.expensesCarried]).toEqual([420, 38]);
+    expect([f.price, f.tax, f.priceWithTax]).toEqual([6400, 544, 6944]);
+    // Two people at the studio's four days: eight days a week.
+    expect([f.studioDaysAWeek, f.weeks, f.dayRate, f.monthsCovered]).toEqual([8, 0.8, 920, 2.2]);
+    expect(f.stages).toEqual([3472, 3472]);
+  });
+
+  it("learns from finished stages: estimated days against the hours logged on them", () => {
+    expect(pastStages(inputs).map((p) => [p.title, p.quotedDays, p.actualDays])).toEqual([
+      ["Logo direction", 2, 2.5],
+      ["Pattern studies", 1.5, 1.5],
+    ]);
+    const f = workSheet({ ...sheet, contingency: true }, inputs);
+    // Stages ran 12.5 % over on average; the reserve is that share of the fees.
+    expect([f.drift, f.contingency, f.price]).toEqual([0.13, 777.4, 7177.4]);
+    expect(workSheet({ ...sheet, contingency: true }, { ...inputs, milestones: [] }).contingency).toBe(0);
+  });
+
+  it("splits the price with tax into the stages, the last taking what rounding left", () => {
+    expect(workSheet({ ...sheet, split: "403030", rows: [{ rateId: 3, qty: "1" }], expenses: [] }, inputs).stages).toEqual([39.06, 29.3, 29.29]);
+  });
+});
+
+describe("turning it into a proposal", () => {
+  let studio: FakeStudio;
+  beforeEach(async () => {
+    studio = await fakeStudio();
+  });
+  const ok = <T,>(outcome: Outcome<T>): T => {
+    if (!outcome.ok) throw new Error(`refused: ${outcome.reason} ${outcome.code}`);
+    return outcome.value;
+  };
+
+  it("saves one draft for the client with a line per rate, the reserve and the purchases at cost — and nothing before", async () => {
+    workSheet({ ...sheet, contingency: true }, inputs);
+    expect(studio.writes).toEqual([]);
+    const proposal = ok(await turnIntoProposal({ ...sheet, contingency: true }, inputs, { contingencyWords: "Time held in reserve for this stage" }));
+    expect(studio.writes.map((w) => `${w.op} ${w.table}`)).toEqual(["insert proposals", ...Array(5).fill("insert proposal_lines")]);
+    expect(studio.writes[0]!.values).toMatchObject({ client_id: 4, title: "Podcast identity — mark & wordmark", split: "5050", valid_until: "2026-08-18", terms_version_id: 3 });
+    expect(studio.writes.slice(1).map((w) => [w.values!["description"], w.values!["qty"], w.values!["rate"]])).toEqual([
+      ["Day rate, design", "6", "750.00"],
+      ["Half day", "1", "400.00"],
+      ["Template, each", "12", "90.00"],
+      ["Time held in reserve for this stage", "1", "777.40"],
+      ["Type licence — two weights", "1", "420"],
+    ]);
+    // The totals are Adminium's: 5980 + 777.40 + 420.
+    expect(proposal).toMatchObject({ status: "draft", subtotal: "7177.40" });
+    expect(tableOf(studio, "proposals").filter((p) => p["status"] === "draft")).toHaveLength(2);
+  });
+
+  it("asks for a client and a stage name before saving anything", async () => {
+    const noClient = await turnIntoProposal({ ...sheet, clientId: null }, inputs, { contingencyWords: "x" });
+    const noStage = await turnIntoProposal({ ...sheet, stage: " " }, inputs, { contingencyWords: "x" });
+    expect([!noClient.ok && noClient.code, !noStage.ok && noStage.code]).toEqual(["CLIENT_REQUIRED", "TITLE_REQUIRED"]);
+    expect(studio.writes).toEqual([]);
+  });
+});
