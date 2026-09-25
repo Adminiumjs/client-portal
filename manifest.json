@@ -5389,6 +5389,23 @@
                 "on": "create"
               }
             }
+          },
+          {
+            "ref": "client_key",
+            "type": "text",
+            "maxLength": 36,
+            "nullable": true,
+            "unique": true,
+            "label": {
+              "en-US": "Action key",
+              "de-DE": "Aktionsschlüssel",
+              "fr-FR": "Clé d’action",
+              "da-DK": "Handlingsnøgle",
+              "cs-CZ": "Klíč akce",
+              "ar-EG": "مفتاح الإجراء",
+              "zh-CN": "操作键",
+              "zh-TW": "操作鍵"
+            }
           }
         ]
       },
@@ -9775,7 +9792,8 @@
         "version_id",
         "body",
         "pin_x",
-        "pin_y"
+        "pin_y",
+        "client_key"
       ],
       "visibleWith": {
         "table": "deliverables",
@@ -9830,7 +9848,8 @@
       "writable": [
         "brief_id",
         "question_key",
-        "answer"
+        "answer",
+        "client_key"
       ],
       "visibleWith": {
         "table": "briefs",

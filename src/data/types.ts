@@ -366,6 +366,7 @@ export interface BriefAnswer {
   question_key: string;
   answer: string | null;
   first_answer: string | null;
+  client_key: string | null;
 }
 
 export type InvoiceStatus = "draft" | "sent" | "void";
@@ -555,7 +556,7 @@ export const NULLABLE: Readonly<Record<TableRef, readonly string[]>> = {
   deliverable_versions: ["client_id", "v", "file", "link", "note", "posted_by", "posted_at", "client_key"],
   deliverable_notes: ["client_id", "version_id", "side", "author", "pin_x", "pin_y", "at", "client_key"],
   briefs: ["client_id", "sent_at"],
-  brief_answers: ["client_id", "answer", "first_answer"],
+  brief_answers: ["client_id", "answer", "first_answer", "client_key"],
   invoices: ["number_seq", "number", "issued_on", "terms", "due_on", "currency", "tax_name", "tax_rate", "subtotal", "tax", "total", "paid", "balance", "ladder", "sent_at", "void_reason", "voided_at", "voided_by", "from_quote_id", "share_pct", "project_id", "proposal_id", "stage", "title", "client_paid_note", "client_paid_amount", "client_paid_on", "client_paid", "client_paid_at", "client_key"],
   invoice_lines: ["description", "rate", "discount", "currency", "quote_id", "share_pct", "amount", "client_id", "client_key"],
   payments: ["number_seq", "number", "currency", "method_note", "recorded_by", "recorded_at", "void_reason", "voided_by", "voided_at", "client_id", "client_key"],

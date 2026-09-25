@@ -18,7 +18,8 @@
     "manifest": "vite-node scripts/write-manifest.ts",
     "sample": "vite-node scripts/write-sample-columns.ts",
     "lexicon": "node scripts/sync-lexicon.mjs",
-    "lexicon:check": "node scripts/sync-lexicon.mjs --check"
+    "lexicon:check": "node scripts/sync-lexicon.mjs --check",
+    "row-types": "vite-node scripts/write-row-types.ts"
   },
   "dependencies": {
     "@adminiumjs/public-client": "0.3.0",

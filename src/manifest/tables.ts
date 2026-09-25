@@ -705,6 +705,7 @@ export const TABLES: Table[] = [
       text("question_key", 40, "Question"),
       text("answer", null, "Answer", opt),
       text("first_answer", null, "First answer", { ...opt, rules: stamp({ copy: "answer" }, onCreate) }),
+      clientKey,
     ],
   },
   {

@@ -204,7 +204,7 @@ export const PUBLIC_ACCESS = [
     table: "deliverable_notes",
     methods: ["GET", "POST"],
     select: ["id", "deliverable_id", "version_id", "side", "author", "body", "pin_x", "pin_y", "at"],
-    writable: ["deliverable_id", "version_id", "body", "pin_x", "pin_y"],
+    writable: ["deliverable_id", "version_id", "body", "pin_x", "pin_y", "client_key"],
     ...under("deliverables", "deliverable_id"),
   },
 
@@ -222,7 +222,7 @@ export const PUBLIC_ACCESS = [
     table: "brief_answers",
     methods: ["GET", "POST", "PATCH"],
     select: ["id", "brief_id", "question_key", "answer"],
-    writable: ["brief_id", "question_key", "answer"],
+    writable: ["brief_id", "question_key", "answer", "client_key"],
     ...under("briefs", "brief_id"),
   },
 
