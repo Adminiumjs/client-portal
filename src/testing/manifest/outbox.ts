@@ -306,6 +306,20 @@ const emailContentSchema = z
   })
   .strict();
 
+/**
+ * A variable a template reads, spelled as the sender fills it: a column of the
+ * row or of a row it links (`patient.name`, `practice.phone`, a column with a
+ * number in its name), one of the sender's own (`appName`, `manage_url`), or
+ * an add-on's public setting (`addOn.<add-on key>.<setting>`). A template may
+ * use any of them, so the list may name any of them.
+ */
+const templateVariableSchema = z
+  .string()
+  .regex(
+    /^(?:appName|addOn\.[a-z][a-z0-9-]*\.[A-Za-z][A-Za-z0-9_]*|[a-z_][a-z0-9_]*(?:\.[a-z_][a-z0-9_]*)*)$/,
+    'a variable such as patient.name or appName',
+  );
+
 export const emailTemplateSchema = z
   .object({
     /** `<app key>-<name>`: an app names only its own templates. */
@@ -319,7 +333,7 @@ export const emailTemplateSchema = z
      */
     attach: z.object({ kind: z.string().regex(/^[a-z][a-z0-9-]*$/, 'a document kind'), link: z.string().min(1).max(40) }).strict().optional(),
     /** The variables it reads, for the editor's list. */
-    vars: z.array(z.string().regex(/^[a-z_]+(\.[a-z_]+)*$/, 'a variable such as patient.name')).max(60).optional(),
+    vars: z.array(templateVariableSchema).max(60).optional(),
     /** The template in each language it ships, US English always among them. */
     locales: z
       .record(bcp47TagSchema, emailContentSchema)
