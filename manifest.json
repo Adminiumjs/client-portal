@@ -12426,6 +12426,8 @@
         "table:@messages:update",
         "table:@events:create",
         "table:@events:update",
+        "table:@proposal_lines:delete",
+        "table:@invoice_lines:delete",
         "page:@clients-overview:view",
         "page:@clients-clients:view",
         "page:@clients-enquiries:view",

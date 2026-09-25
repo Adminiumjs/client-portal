@@ -7,7 +7,10 @@
  *                   studio's dates. It reads the studio's set-up and never
  *                   changes it (settings, people, the rate card, the terms,
  *                   the brief questions, the running costs), voids nothing
- *                   and deletes nothing;
+ *                   and deletes nothing but a line of a draft (taking a line
+ *                   out of a proposal or an invoice being written; a sent
+ *                   document's lines are locked by Adminium, so only a
+ *                   draft's can go);
  *   studio-manager  everything, the set-up and the Invoices & Receipts
  *                   add-on's own settings included; voids an invoice or a
  *                   payment, discards a draft, and reopens a finished project.
@@ -30,6 +33,8 @@ const EVERY_TABLE = TABLES.map((t) => t.ref);
 /** The studio's set-up: read by the desk, changed by a manager (what it costs to open the door among it). */
 const SET_UP = ["settings", "people", "rates", "terms_versions", "terms_clauses", "brief_questions", "running_costs"];
 const DESK_WRITES = EVERY_TABLE.filter((table) => !SET_UP.includes(table));
+/** Lines the composer takes out of a draft; the document's states lock them once it is sent. */
+const DRAFT_LINES = ["proposal_lines", "invoice_lines"];
 const DESK_PAGES = PAGE_REFS.filter((page) => !["clients-settings", "clients-terms"].includes(page));
 
 /** A column list of a table, but some. */
@@ -46,6 +51,7 @@ export const ROLES = [
       "app:@:staff",
       ...EVERY_TABLE.flatMap((table) => grant(table, "read")),
       ...DESK_WRITES.flatMap((table) => grant(table, "create", "update")),
+      ...DRAFT_LINES.flatMap((table) => grant(table, "delete")),
       ...DESK_PAGES.map(view),
       ...EVERY_TABLE.map(pii),
     ],
