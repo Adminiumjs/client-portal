@@ -7856,6 +7856,1492 @@
   },
   "pages": [
     {
+      "ref": "clients-overview",
+      "template": "page-dashboard",
+      "title": {
+        "key": "mft.clients.overview",
+        "fallback": "Overview"
+      },
+      "titles": {
+        "de-DE": "Übersicht",
+        "fr-FR": "Vue d’ensemble",
+        "da-DK": "Overblik",
+        "cs-CZ": "Přehled",
+        "ar-EG": "نظرة عامة",
+        "zh-CN": "概览",
+        "zh-TW": "總覽"
+      },
+      "nav": {
+        "group": "overview",
+        "icon": "layout-dashboard",
+        "order": 0
+      },
+      "config": {
+        "layout": {
+          "version": 1,
+          "toolbar": {
+            "link": {
+              "label": "Open the desk",
+              "labels": {
+                "en-US": "Open the desk",
+                "de-DE": "Studio-Arbeitsplatz öffnen",
+                "fr-FR": "Ouvrir le bureau du studio",
+                "da-DK": "Åbn studiets skrivebord",
+                "cs-CZ": "Otevřít pracoviště studia",
+                "ar-EG": "افتح مكتب الاستوديو",
+                "zh-CN": "打开工作室工作台",
+                "zh-TW": "開啟工作室工作台"
+              },
+              "href": "@staff",
+              "icon": "external-link"
+            }
+          },
+          "items": [
+            {
+              "i": "kpi-outstanding",
+              "widget": "kpi-stat-card",
+              "x": 0,
+              "y": 0,
+              "w": 4,
+              "h": 3,
+              "config": {
+                "title": "Outstanding",
+                "titles": {
+                  "en-US": "Outstanding",
+                  "de-DE": "Offen",
+                  "fr-FR": "À encaisser",
+                  "da-DK": "Udestående",
+                  "cs-CZ": "Nezaplaceno",
+                  "ar-EG": "المستحق",
+                  "zh-CN": "未收款",
+                  "zh-TW": "未收款"
+                },
+                "iconName": "receipt",
+                "metricFormat": "currency",
+                "deltaMode": "none",
+                "showSparkline": false,
+                "href": "/p/clients-invoices?f.status=eq:sent&f.balance=gt:0",
+                "binding": {
+                  "kind": "table-query",
+                  "source": {
+                    "name": "invoices",
+                    "type": "table"
+                  },
+                  "shape": "metric+delta",
+                  "aggregations": [
+                    {
+                      "fn": "sum",
+                      "column": "balance",
+                      "alias": "owed"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "column": "status",
+                      "op": "eq",
+                      "value": "sent"
+                    },
+                    {
+                      "column": "balance",
+                      "op": "gt",
+                      "value": 0
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "i": "kpi-overdue",
+              "widget": "kpi-stat-card",
+              "x": 4,
+              "y": 0,
+              "w": 4,
+              "h": 3,
+              "config": {
+                "title": "Overdue",
+                "titles": {
+                  "en-US": "Overdue",
+                  "de-DE": "Überfällig",
+                  "fr-FR": "En retard",
+                  "da-DK": "Forfalden",
+                  "cs-CZ": "Po splatnosti",
+                  "ar-EG": "المتأخر",
+                  "zh-CN": "已逾期",
+                  "zh-TW": "已逾期"
+                },
+                "iconName": "clock-alert",
+                "iconTone": "warn",
+                "metricFormat": "currency",
+                "deltaMode": "none",
+                "showSparkline": false,
+                "href": "/p/clients-invoices?f.status=eq:sent&f.balance=gt:0&f.due_on=before:today",
+                "binding": {
+                  "kind": "table-query",
+                  "source": {
+                    "name": "invoices",
+                    "type": "table"
+                  },
+                  "shape": "metric+delta",
+                  "aggregations": [
+                    {
+                      "fn": "sum",
+                      "column": "balance",
+                      "alias": "overdue"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "column": "status",
+                      "op": "eq",
+                      "value": "sent"
+                    },
+                    {
+                      "column": "balance",
+                      "op": "gt",
+                      "value": 0
+                    }
+                  ],
+                  "window": {
+                    "column": "due_on",
+                    "last": 3650,
+                    "unit": "day",
+                    "calendar": true,
+                    "offset": 1
+                  }
+                }
+              }
+            },
+            {
+              "i": "kpi-collected",
+              "widget": "kpi-stat-card",
+              "x": 8,
+              "y": 0,
+              "w": 4,
+              "h": 3,
+              "config": {
+                "title": "Collected this month",
+                "titles": {
+                  "en-US": "Collected this month",
+                  "de-DE": "Diesen Monat eingenommen",
+                  "fr-FR": "Encaissé ce mois-ci",
+                  "da-DK": "Indbetalt denne måned",
+                  "cs-CZ": "Přijato tento měsíc",
+                  "ar-EG": "المحصَّل هذا الشهر",
+                  "zh-CN": "本月已收款",
+                  "zh-TW": "本月已收款"
+                },
+                "iconName": "banknote",
+                "metricFormat": "currency",
+                "deltaMode": "none",
+                "showSparkline": false,
+                "href": "/p/clients-payments?f.voided=eq:false&f.paid_on=month:this",
+                "binding": {
+                  "kind": "table-query",
+                  "source": {
+                    "name": "payments",
+                    "type": "table"
+                  },
+                  "shape": "metric+delta",
+                  "aggregations": [
+                    {
+                      "fn": "sum",
+                      "column": "amount",
+                      "alias": "collected"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "column": "voided",
+                      "op": "eq",
+                      "value": false
+                    }
+                  ],
+                  "window": {
+                    "column": "paid_on",
+                    "last": 1,
+                    "unit": "month",
+                    "calendar": true
+                  }
+                }
+              }
+            },
+            {
+              "i": "kpi-proposals",
+              "widget": "kpi-stat-card",
+              "x": 0,
+              "y": 3,
+              "w": 4,
+              "h": 3,
+              "config": {
+                "title": "Proposals waiting",
+                "titles": {
+                  "en-US": "Proposals waiting",
+                  "de-DE": "Offene Angebote",
+                  "fr-FR": "Propositions en attente",
+                  "da-DK": "Tilbud, der venter",
+                  "cs-CZ": "Čekající nabídky",
+                  "ar-EG": "عروض بانتظار الرد",
+                  "zh-CN": "待回复的提案",
+                  "zh-TW": "待回覆的提案"
+                },
+                "iconName": "file-pen-line",
+                "metricFormat": "currency",
+                "deltaMode": "none",
+                "showSparkline": false,
+                "href": "/p/clients-proposals?f.status=eq:sent&f.valid_until=gte:today",
+                "binding": {
+                  "kind": "table-query",
+                  "source": {
+                    "name": "proposals",
+                    "type": "table"
+                  },
+                  "shape": "metric+delta",
+                  "aggregations": [
+                    {
+                      "fn": "sum",
+                      "column": "total",
+                      "alias": "waiting"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "column": "status",
+                      "op": "eq",
+                      "value": "sent"
+                    }
+                  ],
+                  "window": {
+                    "column": "valid_until",
+                    "ahead": true,
+                    "last": 1,
+                    "unit": "day"
+                  }
+                }
+              }
+            },
+            {
+              "i": "kpi-active",
+              "widget": "kpi-stat-card",
+              "x": 4,
+              "y": 3,
+              "w": 4,
+              "h": 3,
+              "config": {
+                "title": "Active projects",
+                "titles": {
+                  "en-US": "Active projects",
+                  "de-DE": "Aktive Projekte",
+                  "fr-FR": "Projets actifs",
+                  "da-DK": "Aktive projekter",
+                  "cs-CZ": "Aktivní projekty",
+                  "ar-EG": "المشاريع النشطة",
+                  "zh-CN": "进行中的项目",
+                  "zh-TW": "進行中的專案"
+                },
+                "iconName": "folder-kanban",
+                "metricFormat": "plain",
+                "deltaMode": "none",
+                "showSparkline": false,
+                "href": "/p/clients-projects?f.status=eq:active",
+                "binding": {
+                  "kind": "table-query",
+                  "source": {
+                    "name": "projects",
+                    "type": "table"
+                  },
+                  "shape": "metric+delta",
+                  "aggregations": [
+                    {
+                      "fn": "count",
+                      "alias": "active"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "column": "status",
+                      "op": "eq",
+                      "value": "active"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "i": "kpi-paused",
+              "widget": "kpi-stat-tile-compact",
+              "x": 8,
+              "y": 3,
+              "w": 2,
+              "h": 3,
+              "config": {
+                "title": "Paused",
+                "titles": {
+                  "en-US": "Paused",
+                  "de-DE": "Pausiert",
+                  "fr-FR": "En pause",
+                  "da-DK": "Sat på pause",
+                  "cs-CZ": "Pozastaveno",
+                  "ar-EG": "متوقف مؤقتًا",
+                  "zh-CN": "已暂停",
+                  "zh-TW": "已暫停"
+                },
+                "metricFormat": "plain",
+                "deltaMode": "none",
+                "showSparkline": false,
+                "href": "/p/clients-projects?f.status=eq:paused",
+                "binding": {
+                  "kind": "table-query",
+                  "source": {
+                    "name": "projects",
+                    "type": "table"
+                  },
+                  "shape": "metric+delta",
+                  "aggregations": [
+                    {
+                      "fn": "count",
+                      "alias": "paused"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "column": "status",
+                      "op": "eq",
+                      "value": "paused"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "i": "kpi-done",
+              "widget": "kpi-stat-tile-compact",
+              "x": 10,
+              "y": 3,
+              "w": 2,
+              "h": 3,
+              "config": {
+                "title": "Done this month",
+                "titles": {
+                  "en-US": "Done this month",
+                  "de-DE": "Diesen Monat abgeschlossen",
+                  "fr-FR": "Terminés ce mois-ci",
+                  "da-DK": "Færdige denne måned",
+                  "cs-CZ": "Dokončeno tento měsíc",
+                  "ar-EG": "اكتملت هذا الشهر",
+                  "zh-CN": "本月完成",
+                  "zh-TW": "本月完成"
+                },
+                "metricFormat": "plain",
+                "deltaMode": "none",
+                "showSparkline": false,
+                "href": "/p/clients-projects?f.status=eq:done&f.done_on=month:this",
+                "binding": {
+                  "kind": "table-query",
+                  "source": {
+                    "name": "projects",
+                    "type": "table"
+                  },
+                  "shape": "metric+delta",
+                  "aggregations": [
+                    {
+                      "fn": "count",
+                      "alias": "done"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "column": "status",
+                      "op": "eq",
+                      "value": "done"
+                    }
+                  ],
+                  "window": {
+                    "column": "done_on",
+                    "last": 1,
+                    "unit": "month",
+                    "calendar": true
+                  }
+                }
+              }
+            },
+            {
+              "i": "owed-current",
+              "widget": "kpi-stat-tile-compact",
+              "x": 0,
+              "y": 6,
+              "w": 3,
+              "h": 3,
+              "config": {
+                "title": "Owed · not yet due",
+                "titles": {
+                  "en-US": "Owed · not yet due",
+                  "de-DE": "Offen · noch nicht fällig",
+                  "fr-FR": "Dû · pas encore échu",
+                  "da-DK": "Udestående · ikke forfaldent endnu",
+                  "cs-CZ": "Dlužno · zatím nesplatné",
+                  "ar-EG": "المستحق · لم يحن موعده",
+                  "zh-CN": "应收 · 尚未到期",
+                  "zh-TW": "應收 · 尚未到期"
+                },
+                "metricFormat": "currency",
+                "deltaMode": "none",
+                "showSparkline": false,
+                "href": "/p/clients-invoices?f.status=eq:sent&f.balance=gt:0&f.due_on=gte:today",
+                "binding": {
+                  "kind": "table-query",
+                  "source": {
+                    "name": "invoices",
+                    "type": "table"
+                  },
+                  "shape": "metric+delta",
+                  "aggregations": [
+                    {
+                      "fn": "sum",
+                      "column": "balance",
+                      "alias": "owed"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "column": "status",
+                      "op": "eq",
+                      "value": "sent"
+                    },
+                    {
+                      "column": "balance",
+                      "op": "gt",
+                      "value": 0
+                    }
+                  ],
+                  "window": {
+                    "column": "due_on",
+                    "ahead": true,
+                    "last": 1,
+                    "unit": "day"
+                  }
+                }
+              }
+            },
+            {
+              "i": "owed-30",
+              "widget": "kpi-stat-tile-compact",
+              "x": 3,
+              "y": 6,
+              "w": 3,
+              "h": 3,
+              "config": {
+                "title": "Owed · 1–30 days late",
+                "titles": {
+                  "en-US": "Owed · 1–30 days late",
+                  "de-DE": "Offen · 1–30 Tage überfällig",
+                  "fr-FR": "Dû · 1 à 30 jours de retard",
+                  "da-DK": "Udestående · 1–30 dage for sent",
+                  "cs-CZ": "Dlužno · 1–30 dní po splatnosti",
+                  "ar-EG": "المستحق · متأخر 1–30 يومًا",
+                  "zh-CN": "应收 · 逾期 1–30 天",
+                  "zh-TW": "應收 · 逾期 1–30 天"
+                },
+                "metricFormat": "currency",
+                "deltaMode": "none",
+                "showSparkline": false,
+                "binding": {
+                  "kind": "table-query",
+                  "source": {
+                    "name": "invoices",
+                    "type": "table"
+                  },
+                  "shape": "metric+delta",
+                  "aggregations": [
+                    {
+                      "fn": "sum",
+                      "column": "balance",
+                      "alias": "owed"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "column": "status",
+                      "op": "eq",
+                      "value": "sent"
+                    },
+                    {
+                      "column": "balance",
+                      "op": "gt",
+                      "value": 0
+                    }
+                  ],
+                  "window": {
+                    "column": "due_on",
+                    "last": 30,
+                    "unit": "day",
+                    "calendar": true,
+                    "offset": 1
+                  }
+                }
+              }
+            },
+            {
+              "i": "owed-60",
+              "widget": "kpi-stat-tile-compact",
+              "x": 0,
+              "y": 9,
+              "w": 3,
+              "h": 3,
+              "config": {
+                "title": "Owed · 31–60 days late",
+                "titles": {
+                  "en-US": "Owed · 31–60 days late",
+                  "de-DE": "Offen · 31–60 Tage überfällig",
+                  "fr-FR": "Dû · 31 à 60 jours de retard",
+                  "da-DK": "Udestående · 31–60 dage for sent",
+                  "cs-CZ": "Dlužno · 31–60 dní po splatnosti",
+                  "ar-EG": "المستحق · متأخر 31–60 يومًا",
+                  "zh-CN": "应收 · 逾期 31–60 天",
+                  "zh-TW": "應收 · 逾期 31–60 天"
+                },
+                "metricFormat": "currency",
+                "deltaMode": "none",
+                "showSparkline": false,
+                "binding": {
+                  "kind": "table-query",
+                  "source": {
+                    "name": "invoices",
+                    "type": "table"
+                  },
+                  "shape": "metric+delta",
+                  "aggregations": [
+                    {
+                      "fn": "sum",
+                      "column": "balance",
+                      "alias": "owed"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "column": "status",
+                      "op": "eq",
+                      "value": "sent"
+                    },
+                    {
+                      "column": "balance",
+                      "op": "gt",
+                      "value": 0
+                    }
+                  ],
+                  "window": {
+                    "column": "due_on",
+                    "last": 30,
+                    "unit": "day",
+                    "calendar": true,
+                    "offset": 31
+                  }
+                }
+              }
+            },
+            {
+              "i": "owed-older",
+              "widget": "kpi-stat-tile-compact",
+              "x": 3,
+              "y": 9,
+              "w": 3,
+              "h": 3,
+              "config": {
+                "title": "Owed · over 60 days late",
+                "titles": {
+                  "en-US": "Owed · over 60 days late",
+                  "de-DE": "Offen · über 60 Tage überfällig",
+                  "fr-FR": "Dû · plus de 60 jours de retard",
+                  "da-DK": "Udestående · over 60 dage for sent",
+                  "cs-CZ": "Dlužno · přes 60 dní po splatnosti",
+                  "ar-EG": "المستحق · متأخر أكثر من 60 يومًا",
+                  "zh-CN": "应收 · 逾期超过 60 天",
+                  "zh-TW": "應收 · 逾期超過 60 天"
+                },
+                "metricFormat": "currency",
+                "deltaMode": "none",
+                "showSparkline": false,
+                "binding": {
+                  "kind": "table-query",
+                  "source": {
+                    "name": "invoices",
+                    "type": "table"
+                  },
+                  "shape": "metric+delta",
+                  "aggregations": [
+                    {
+                      "fn": "sum",
+                      "column": "balance",
+                      "alias": "owed"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "column": "status",
+                      "op": "eq",
+                      "value": "sent"
+                    },
+                    {
+                      "column": "balance",
+                      "op": "gt",
+                      "value": 0
+                    }
+                  ],
+                  "window": {
+                    "column": "due_on",
+                    "last": 3589,
+                    "unit": "day",
+                    "calendar": true,
+                    "offset": 61
+                  }
+                }
+              }
+            },
+            {
+              "i": "needs-chase",
+              "widget": "kpi-stat-card",
+              "x": 6,
+              "y": 6,
+              "w": 3,
+              "h": 3,
+              "config": {
+                "title": "Chase reminders to approve",
+                "titles": {
+                  "en-US": "Chase reminders to approve",
+                  "de-DE": "Mahnungen zur Freigabe",
+                  "fr-FR": "Relances à valider",
+                  "da-DK": "Rykkere til godkendelse",
+                  "cs-CZ": "Upomínky ke schválení",
+                  "ar-EG": "تذكيرات تحصيل بانتظار الموافقة",
+                  "zh-CN": "待批准的催款提醒",
+                  "zh-TW": "待核准的催款提醒"
+                },
+                "iconName": "bell-ring",
+                "iconTone": "warn",
+                "metricFormat": "plain",
+                "deltaMode": "none",
+                "showSparkline": false,
+                "href": "/p/clients-messages?f.status=eq:held&f.kind=in:invoice-rung-1,invoice-rung-2,invoice-rung-3&f.due=lte:today",
+                "binding": {
+                  "kind": "table-query",
+                  "source": {
+                    "name": "messages",
+                    "type": "table"
+                  },
+                  "shape": "metric+delta",
+                  "aggregations": [
+                    {
+                      "fn": "count",
+                      "alias": "chase"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "column": "status",
+                      "op": "eq",
+                      "value": "held"
+                    },
+                    {
+                      "column": "kind",
+                      "op": "in",
+                      "value": [
+                        "invoice-rung-1",
+                        "invoice-rung-2",
+                        "invoice-rung-3"
+                      ]
+                    }
+                  ],
+                  "window": {
+                    "column": "due",
+                    "last": 3650,
+                    "unit": "day"
+                  }
+                }
+              }
+            },
+            {
+              "i": "needs-paid",
+              "widget": "kpi-stat-card",
+              "x": 9,
+              "y": 6,
+              "w": 3,
+              "h": 3,
+              "config": {
+                "title": "Clients say they’ve paid",
+                "titles": {
+                  "en-US": "Clients say they’ve paid",
+                  "de-DE": "Kunden melden Zahlung",
+                  "fr-FR": "Clients qui disent avoir payé",
+                  "da-DK": "Kunder, der siger, de har betalt",
+                  "cs-CZ": "Klienti uvádějí, že zaplatili",
+                  "ar-EG": "عملاء يقولون إنهم دفعوا",
+                  "zh-CN": "客户称已付款",
+                  "zh-TW": "客戶稱已付款"
+                },
+                "iconName": "hand-coins",
+                "iconTone": "info",
+                "metricFormat": "plain",
+                "deltaMode": "none",
+                "showSparkline": false,
+                "href": "/p/clients-invoices?f.status=eq:sent&f.balance=gt:0&f.client_paid_at=set",
+                "binding": {
+                  "kind": "table-query",
+                  "source": {
+                    "name": "invoices",
+                    "type": "table"
+                  },
+                  "shape": "metric+delta",
+                  "aggregations": [
+                    {
+                      "fn": "count",
+                      "alias": "claimed"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "column": "status",
+                      "op": "eq",
+                      "value": "sent"
+                    },
+                    {
+                      "column": "balance",
+                      "op": "gt",
+                      "value": 0
+                    },
+                    {
+                      "column": "client_paid_at",
+                      "op": "not_null"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "i": "needs-changes",
+              "widget": "kpi-stat-card",
+              "x": 6,
+              "y": 9,
+              "w": 3,
+              "h": 3,
+              "config": {
+                "title": "Changes asked",
+                "titles": {
+                  "en-US": "Changes asked",
+                  "de-DE": "Änderungen erbeten",
+                  "fr-FR": "Modifications demandées",
+                  "da-DK": "Ændringer ønsket",
+                  "cs-CZ": "Požadovány změny",
+                  "ar-EG": "طُلبت تعديلات",
+                  "zh-CN": "已要求修改",
+                  "zh-TW": "已要求修改"
+                },
+                "iconName": "message-square-diff",
+                "iconTone": "warn",
+                "metricFormat": "plain",
+                "deltaMode": "none",
+                "showSparkline": false,
+                "href": "/p/clients-deliverables?f.status=eq:changes",
+                "binding": {
+                  "kind": "table-query",
+                  "source": {
+                    "name": "deliverables",
+                    "type": "table"
+                  },
+                  "shape": "metric+delta",
+                  "aggregations": [
+                    {
+                      "fn": "count",
+                      "alias": "changes"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "column": "status",
+                      "op": "eq",
+                      "value": "changes"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "i": "needs-enquiries",
+              "widget": "kpi-stat-card",
+              "x": 9,
+              "y": 9,
+              "w": 3,
+              "h": 3,
+              "config": {
+                "title": "New enquiries",
+                "titles": {
+                  "en-US": "New enquiries",
+                  "de-DE": "Neue Anfragen",
+                  "fr-FR": "Nouvelles demandes",
+                  "da-DK": "Nye henvendelser",
+                  "cs-CZ": "Nové poptávky",
+                  "ar-EG": "استفسارات جديدة",
+                  "zh-CN": "新询价",
+                  "zh-TW": "新詢價"
+                },
+                "iconName": "inbox",
+                "metricFormat": "plain",
+                "deltaMode": "none",
+                "showSparkline": false,
+                "href": "/p/clients-enquiries",
+                "binding": {
+                  "kind": "table-query",
+                  "source": {
+                    "name": "enquiries",
+                    "type": "table"
+                  },
+                  "shape": "metric+delta",
+                  "aggregations": [
+                    {
+                      "fn": "count",
+                      "alias": "new"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "column": "status",
+                      "op": "eq",
+                      "value": "new"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "i": "invoiced",
+              "widget": "chart-bar",
+              "x": 0,
+              "y": 12,
+              "w": 6,
+              "h": 7,
+              "config": {
+                "title": "Invoiced by month",
+                "titles": {
+                  "en-US": "Invoiced by month",
+                  "de-DE": "In Rechnung gestellt nach Monat",
+                  "fr-FR": "Facturé par mois",
+                  "da-DK": "Faktureret pr. måned",
+                  "cs-CZ": "Fakturováno po měsících",
+                  "ar-EG": "المُفوتَر حسب الشهر",
+                  "zh-CN": "按月开票",
+                  "zh-TW": "按月開立發票"
+                },
+                "metricFormat": "currency",
+                "deltaMode": "none",
+                "showSparkline": false,
+                "highlight": "current",
+                "binding": {
+                  "kind": "table-query",
+                  "source": {
+                    "name": "invoices",
+                    "type": "table"
+                  },
+                  "shape": "timeseries",
+                  "aggregations": [
+                    {
+                      "fn": "sum",
+                      "column": "total",
+                      "alias": "invoiced"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "column": "status",
+                      "op": "eq",
+                      "value": "sent"
+                    }
+                  ],
+                  "bucket": {
+                    "column": "issued_on",
+                    "unit": "month"
+                  },
+                  "window": {
+                    "column": "issued_on",
+                    "last": 6,
+                    "unit": "month",
+                    "calendar": true
+                  }
+                }
+              }
+            },
+            {
+              "i": "collected",
+              "widget": "chart-bar",
+              "x": 6,
+              "y": 12,
+              "w": 6,
+              "h": 7,
+              "config": {
+                "title": "Collected by month",
+                "titles": {
+                  "en-US": "Collected by month",
+                  "de-DE": "Eingenommen nach Monat",
+                  "fr-FR": "Encaissé par mois",
+                  "da-DK": "Indbetalt pr. måned",
+                  "cs-CZ": "Přijato po měsících",
+                  "ar-EG": "المحصَّل حسب الشهر",
+                  "zh-CN": "按月收款",
+                  "zh-TW": "按月收款"
+                },
+                "metricFormat": "currency",
+                "deltaMode": "none",
+                "showSparkline": false,
+                "highlight": "current",
+                "binding": {
+                  "kind": "table-query",
+                  "source": {
+                    "name": "payments",
+                    "type": "table"
+                  },
+                  "shape": "timeseries",
+                  "aggregations": [
+                    {
+                      "fn": "sum",
+                      "column": "amount",
+                      "alias": "collected"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "column": "voided",
+                      "op": "eq",
+                      "value": false
+                    }
+                  ],
+                  "bucket": {
+                    "column": "paid_on",
+                    "unit": "month"
+                  },
+                  "window": {
+                    "column": "paid_on",
+                    "last": 6,
+                    "unit": "month",
+                    "calendar": true
+                  }
+                }
+              }
+            },
+            {
+              "i": "wait-proposals",
+              "widget": "mini-table",
+              "x": 0,
+              "y": 19,
+              "w": 4,
+              "h": 5,
+              "config": {
+                "title": "Proposals sent",
+                "titles": {
+                  "en-US": "Proposals sent",
+                  "de-DE": "Versendete Angebote",
+                  "fr-FR": "Propositions envoyées",
+                  "da-DK": "Sendte tilbud",
+                  "cs-CZ": "Odeslané nabídky",
+                  "ar-EG": "العروض المُرسلة",
+                  "zh-CN": "已发送的提案",
+                  "zh-TW": "已送出的提案"
+                },
+                "limit": 4,
+                "viewAllHref": "/p/clients-proposals?f.status=eq:sent&f.valid_until=gte:today",
+                "columns": [
+                  {
+                    "name": "id",
+                    "label": "Id",
+                    "logicalType": "integer",
+                    "primaryKey": true,
+                    "hidden": true
+                  },
+                  {
+                    "name": "number",
+                    "label": "Proposal",
+                    "logicalType": "text"
+                  },
+                  {
+                    "name": "client",
+                    "label": "Client",
+                    "logicalType": "text"
+                  },
+                  {
+                    "name": "valid_until",
+                    "label": "Holds until",
+                    "logicalType": "date"
+                  }
+                ],
+                "binding": {
+                  "kind": "table-query",
+                  "source": {
+                    "name": "proposals",
+                    "type": "table"
+                  },
+                  "shape": "record-list",
+                  "select": [
+                    "id",
+                    "number",
+                    "valid_until"
+                  ],
+                  "lookups": [
+                    "client:client_id.company"
+                  ],
+                  "filters": [
+                    {
+                      "column": "status",
+                      "op": "eq",
+                      "value": "sent"
+                    }
+                  ],
+                  "window": {
+                    "column": "valid_until",
+                    "ahead": true,
+                    "last": 1,
+                    "unit": "day"
+                  },
+                  "orderBy": [
+                    {
+                      "column": "valid_until",
+                      "dir": "asc"
+                    }
+                  ],
+                  "limit": 4
+                }
+              }
+            },
+            {
+              "i": "wait-files",
+              "widget": "mini-table",
+              "x": 4,
+              "y": 19,
+              "w": 4,
+              "h": 5,
+              "config": {
+                "title": "Files to review",
+                "titles": {
+                  "en-US": "Files to review",
+                  "de-DE": "Dateien zur Prüfung",
+                  "fr-FR": "Fichiers à valider",
+                  "da-DK": "Filer til gennemsyn",
+                  "cs-CZ": "Soubory ke kontrole",
+                  "ar-EG": "ملفات بانتظار المراجعة",
+                  "zh-CN": "待审阅的文件",
+                  "zh-TW": "待審閱的檔案"
+                },
+                "limit": 4,
+                "viewAllHref": "/p/clients-deliverables?f.status=eq:pending",
+                "columns": [
+                  {
+                    "name": "id",
+                    "label": "Id",
+                    "logicalType": "integer",
+                    "primaryKey": true,
+                    "hidden": true
+                  },
+                  {
+                    "name": "title",
+                    "label": "File",
+                    "logicalType": "text"
+                  },
+                  {
+                    "name": "client",
+                    "label": "Client",
+                    "logicalType": "text"
+                  },
+                  {
+                    "name": "shared_at",
+                    "label": "Shared",
+                    "logicalType": "timestamptz"
+                  }
+                ],
+                "binding": {
+                  "kind": "table-query",
+                  "source": {
+                    "name": "deliverables",
+                    "type": "table"
+                  },
+                  "shape": "record-list",
+                  "select": [
+                    "id",
+                    "title",
+                    "shared_at"
+                  ],
+                  "lookups": [
+                    "client:client_id.company"
+                  ],
+                  "filters": [
+                    {
+                      "column": "status",
+                      "op": "eq",
+                      "value": "pending"
+                    }
+                  ],
+                  "orderBy": [
+                    {
+                      "column": "shared_at",
+                      "dir": "asc"
+                    }
+                  ],
+                  "limit": 4
+                }
+              }
+            },
+            {
+              "i": "wait-overdue",
+              "widget": "mini-table",
+              "x": 8,
+              "y": 19,
+              "w": 4,
+              "h": 5,
+              "config": {
+                "title": "Overdue invoices",
+                "titles": {
+                  "en-US": "Overdue invoices",
+                  "de-DE": "Überfällige Rechnungen",
+                  "fr-FR": "Factures en retard",
+                  "da-DK": "Forfaldne fakturaer",
+                  "cs-CZ": "Faktury po splatnosti",
+                  "ar-EG": "الفواتير المتأخرة",
+                  "zh-CN": "逾期发票",
+                  "zh-TW": "逾期發票"
+                },
+                "limit": 4,
+                "viewAllHref": "/p/clients-invoices?f.status=eq:sent&f.balance=gt:0&f.due_on=before:today",
+                "columns": [
+                  {
+                    "name": "id",
+                    "label": "Id",
+                    "logicalType": "integer",
+                    "primaryKey": true,
+                    "hidden": true
+                  },
+                  {
+                    "name": "number",
+                    "label": "Invoice",
+                    "logicalType": "text"
+                  },
+                  {
+                    "name": "client",
+                    "label": "Client",
+                    "logicalType": "text"
+                  },
+                  {
+                    "name": "due_on",
+                    "label": "Due",
+                    "logicalType": "date"
+                  }
+                ],
+                "binding": {
+                  "kind": "table-query",
+                  "source": {
+                    "name": "invoices",
+                    "type": "table"
+                  },
+                  "shape": "record-list",
+                  "select": [
+                    "id",
+                    "number",
+                    "due_on",
+                    "balance"
+                  ],
+                  "lookups": [
+                    "client:client_id.company"
+                  ],
+                  "filters": [
+                    {
+                      "column": "status",
+                      "op": "eq",
+                      "value": "sent"
+                    },
+                    {
+                      "column": "balance",
+                      "op": "gt",
+                      "value": 0
+                    }
+                  ],
+                  "window": {
+                    "column": "due_on",
+                    "last": 3650,
+                    "unit": "day",
+                    "calendar": true,
+                    "offset": 1
+                  },
+                  "orderBy": [
+                    {
+                      "column": "due_on",
+                      "dir": "asc"
+                    }
+                  ],
+                  "limit": 4
+                }
+              }
+            },
+            {
+              "i": "week-milestones",
+              "widget": "mini-table",
+              "x": 0,
+              "y": 24,
+              "w": 4,
+              "h": 6,
+              "config": {
+                "title": "Milestones this week",
+                "titles": {
+                  "en-US": "Milestones this week",
+                  "de-DE": "Meilensteine diese Woche",
+                  "fr-FR": "Étapes de la semaine",
+                  "da-DK": "Milepæle denne uge",
+                  "cs-CZ": "Milníky tento týden",
+                  "ar-EG": "مراحل هذا الأسبوع",
+                  "zh-CN": "本周里程碑",
+                  "zh-TW": "本週里程碑"
+                },
+                "limit": 6,
+                "viewAllHref": "/p/clients-projects",
+                "columns": [
+                  {
+                    "name": "id",
+                    "label": "Id",
+                    "logicalType": "integer",
+                    "primaryKey": true,
+                    "hidden": true
+                  },
+                  {
+                    "name": "title",
+                    "label": "Milestone",
+                    "logicalType": "text"
+                  },
+                  {
+                    "name": "client",
+                    "label": "Client",
+                    "logicalType": "text"
+                  },
+                  {
+                    "name": "due_on",
+                    "label": "Due",
+                    "logicalType": "date"
+                  }
+                ],
+                "binding": {
+                  "kind": "table-query",
+                  "source": {
+                    "name": "milestones",
+                    "type": "table"
+                  },
+                  "shape": "record-list",
+                  "select": [
+                    "id",
+                    "title",
+                    "due_on"
+                  ],
+                  "lookups": [
+                    "client:client_id.company"
+                  ],
+                  "filters": [
+                    {
+                      "column": "state",
+                      "op": "neq",
+                      "value": "done"
+                    }
+                  ],
+                  "window": {
+                    "column": "due_on",
+                    "last": 1,
+                    "unit": "week",
+                    "calendar": true
+                  },
+                  "orderBy": [
+                    {
+                      "column": "due_on",
+                      "dir": "asc"
+                    }
+                  ],
+                  "limit": 6
+                }
+              }
+            },
+            {
+              "i": "due-next",
+              "widget": "mini-table",
+              "x": 4,
+              "y": 24,
+              "w": 4,
+              "h": 6,
+              "config": {
+                "title": "Invoices falling due next",
+                "titles": {
+                  "en-US": "Invoices falling due next",
+                  "de-DE": "Als Nächstes fällige Rechnungen",
+                  "fr-FR": "Prochaines factures à échéance",
+                  "da-DK": "Fakturaer, der forfalder næste gang",
+                  "cs-CZ": "Faktury splatné jako další",
+                  "ar-EG": "الفواتير المستحقة تاليًا",
+                  "zh-CN": "即将到期的发票",
+                  "zh-TW": "即將到期的發票"
+                },
+                "limit": 4,
+                "viewAllHref": "/p/clients-invoices?f.status=eq:sent&f.balance=gt:0&f.due_on=gte:today",
+                "columns": [
+                  {
+                    "name": "id",
+                    "label": "Id",
+                    "logicalType": "integer",
+                    "primaryKey": true,
+                    "hidden": true
+                  },
+                  {
+                    "name": "number",
+                    "label": "Invoice",
+                    "logicalType": "text"
+                  },
+                  {
+                    "name": "client",
+                    "label": "Client",
+                    "logicalType": "text"
+                  },
+                  {
+                    "name": "due_on",
+                    "label": "Due",
+                    "logicalType": "date"
+                  }
+                ],
+                "binding": {
+                  "kind": "table-query",
+                  "source": {
+                    "name": "invoices",
+                    "type": "table"
+                  },
+                  "shape": "record-list",
+                  "select": [
+                    "id",
+                    "number",
+                    "due_on",
+                    "balance"
+                  ],
+                  "lookups": [
+                    "client:client_id.company"
+                  ],
+                  "filters": [
+                    {
+                      "column": "status",
+                      "op": "eq",
+                      "value": "sent"
+                    },
+                    {
+                      "column": "balance",
+                      "op": "gt",
+                      "value": 0
+                    }
+                  ],
+                  "window": {
+                    "column": "due_on",
+                    "ahead": true,
+                    "last": 1,
+                    "unit": "day"
+                  },
+                  "orderBy": [
+                    {
+                      "column": "due_on",
+                      "dir": "asc"
+                    }
+                  ],
+                  "limit": 4
+                }
+              }
+            },
+            {
+              "i": "wip-projects",
+              "widget": "mini-table",
+              "x": 8,
+              "y": 24,
+              "w": 4,
+              "h": 6,
+              "config": {
+                "title": "Work in progress",
+                "titles": {
+                  "en-US": "Work in progress",
+                  "de-DE": "Laufende Arbeit",
+                  "fr-FR": "Travaux en cours",
+                  "da-DK": "Igangværende arbejde",
+                  "cs-CZ": "Rozpracovaná práce",
+                  "ar-EG": "العمل الجاري",
+                  "zh-CN": "进行中的工作",
+                  "zh-TW": "進行中的工作"
+                },
+                "limit": 6,
+                "viewAllHref": "/p/clients-projects?f.status=in:active,paused",
+                "columns": [
+                  {
+                    "name": "id",
+                    "label": "Id",
+                    "logicalType": "integer",
+                    "primaryKey": true,
+                    "hidden": true
+                  },
+                  {
+                    "name": "name",
+                    "label": "Project",
+                    "logicalType": "text"
+                  },
+                  {
+                    "name": "status",
+                    "label": "Status",
+                    "logicalType": "enum",
+                    "semantic": "status-workflow",
+                    "enumValues": [
+                      "active",
+                      "paused"
+                    ],
+                    "enumTones": {
+                      "active": "pos",
+                      "paused": "warn"
+                    }
+                  },
+                  {
+                    "name": "pause_note",
+                    "label": "Note",
+                    "logicalType": "text"
+                  }
+                ],
+                "binding": {
+                  "kind": "table-query",
+                  "source": {
+                    "name": "projects",
+                    "type": "table"
+                  },
+                  "shape": "record-list",
+                  "select": [
+                    "id",
+                    "name",
+                    "status",
+                    "pause_note"
+                  ],
+                  "filters": [
+                    {
+                      "column": "status",
+                      "op": "in",
+                      "value": [
+                        "active",
+                        "paused"
+                      ]
+                    }
+                  ],
+                  "orderBy": [
+                    {
+                      "column": "status",
+                      "dir": "asc"
+                    },
+                    {
+                      "column": "name",
+                      "dir": "asc"
+                    }
+                  ],
+                  "limit": 6
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
       "ref": "clients-clients",
       "template": "page-master-detail",
       "title": {
@@ -9090,6 +10576,7 @@
         "table:@payments:update",
         "table:@messages:create",
         "table:@messages:update",
+        "page:@clients-overview:view",
         "page:@clients-clients:view",
         "page:@clients-enquiries:view",
         "page:@clients-proposals:view",
@@ -9270,6 +10757,8 @@
         "table:@messages:read",
         "table:@messages:create",
         "table:@messages:update",
+        "page:@clients-overview:view",
+        "page:@clients-overview:edit",
         "page:@clients-clients:view",
         "page:@clients-clients:edit",
         "page:@clients-enquiries:view",

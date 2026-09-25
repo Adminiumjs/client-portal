@@ -13,6 +13,7 @@
  * total, a number, a stamp — shows in a form and cannot be typed over.
  */
 import { l, titles } from "./labels.ts";
+import { OVERVIEW_LAYOUT } from "./overview.ts";
 
 export const NAV_GROUPS = [
   { key: "records", label: l("Records"), order: 1 },
@@ -52,6 +53,17 @@ interface PageSpec {
 }
 
 const SPECS: PageSpec[] = [
+  // ── the Overview: above every group, with no heading of its own ─────────────
+  {
+    ref: "clients-overview",
+    template: "page-dashboard",
+    title: "Overview",
+    group: "overview",
+    icon: "layout-dashboard",
+    order: 0,
+    config: { layout: OVERVIEW_LAYOUT },
+  },
+
   // ── records ────────────────────────────────────────────────────────────────
   {
     ref: "clients-clients",
