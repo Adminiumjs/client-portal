@@ -1,5 +1,5 @@
 /**
- * `surface.json` — the build-emitted nav contract (29-app-surfaces.md D7).
+ * `surface.json` — the build-emitted nav contract.
  *
  * ─── Why the build writes this and a human never does ───────────────────────
  *

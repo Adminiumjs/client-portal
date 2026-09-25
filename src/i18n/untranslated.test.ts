@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 /**
- * The deferred-translation ledger, checked (28-public-surface.md §7C, 28-T24).
+ * The deferred-translation ledger, checked.
  *
  * ── WHAT THIS GATES ────────────────────────────────────────────────────────
  * `en("…")` makes a key optional in the other seven locales. That is the point

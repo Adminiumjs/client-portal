@@ -1,5 +1,5 @@
 /**
- * WHICH CONNECTION a hosted STAFF surface reads (29-app-surfaces.md D9).
+ * WHICH CONNECTION a hosted STAFF surface reads.
  *
  * ─── Why this has to be asked at all ─────────────────────────────────────────
  *

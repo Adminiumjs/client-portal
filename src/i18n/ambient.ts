@@ -48,7 +48,7 @@ const fallbackNumber: NumberFn = (value, opts) =>
  * The TENANT's currency — the business's, not the reader's and not a default.
  *
  * `money()` used to default to a hardcoded `"USD"`, so a tenant currency set on
- * the connection (28-T34) reached exactly one place: the activity feed, which
+ * the connection reached exactly one place: the activity feed, which
  * formats through `formatTenantMoney`. Every screen formatter ignored it and
  * printed dollars — visible as `$6,338.40` above a `€1,200.00` on the same
  * page, against a database configured for EUR.

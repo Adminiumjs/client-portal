@@ -1,5 +1,6 @@
 /**
- * The nav contract's TYPES, and nothing else (29-app-surfaces.md D7/D8).
+ * The nav contract's TYPES, and nothing else — the shape both `surface.json`
+ * and the URL sync read.
  *
  * Split out of `urlSync.ts` for one concrete reason: `vite.config.ts` imports
  * the emitter, the emitter needs this shape, and the config is typechecked by
@@ -35,7 +36,7 @@ export interface SurfaceNavEntry<View extends string = string> {
    */
   side: 'staff' | 'customer';
   /**
-   * A lens within the side, not a permission (28-T44's ruling). Renders as a
+   * A lens within the side, deliberately not a permission. Renders as a
    * separate sidebar item; the app decides what it means.
    */
   persona?: string;

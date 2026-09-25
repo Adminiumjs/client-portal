@@ -79,7 +79,7 @@ const I18nContext = createContext<I18nValue | null>(null);
 
 /**
  * The locale the Adminium host frame pushed, and the live setter that applies
- * it (29 D8).
+ * it.
  *
  * Module scope because it arrives from the embed bridge BEFORE React mounts —
  * the host hands over its locale during the handshake — and again later when an

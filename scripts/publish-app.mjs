@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //
 // publish-app.mjs — put this app's built surfaces in the downloads bucket and
-// record what was released (48-self-hosted-downloads.md D5/D6; 47-app-installation.md §5, 4c).
+// record what was released.
 //
 // VENDORED. The canonical copy is `workplan/tools/app-release/publish-app.mjs`
 // in the Adminium monorepo; `app-release.sh sync` copies it into every app repo
@@ -21,7 +21,7 @@
 //
 // `RELEASES.json` records `{name, version, integrity, publishedAt}` for every
 // release. The marketplace catalog carries that integrity to every server, and a
-// server keeps a download only if its bytes hash to it (48 D3) — so a row may
+// server keeps a download only if its bytes hash to it — so a row may
 // exist only for bytes the public address really serves. It is committed and
 // tagged, readable at a pinned SHA, rather than left as a build artifact.
 //
@@ -122,7 +122,7 @@ if (oldestSide < lastCommit) {
 }
 
 // The name is npm-shaped because `npm pack` needs one and the files copied from
-// npm carry it (48 D8). Nothing resolves it on a registry any more; the ledger
+// npm carry it. Nothing resolves it on a registry any more; the ledger
 // and the tarball's own package.json keep it so every row reads the same way.
 const name = `@adminiumjs/app-${key}`;
 
@@ -170,7 +170,7 @@ try {
 
   // X-RAY BEFORE UPLOADING ANYTHING. A released version is immutable, so a
   // defect found after the upload is in the bucket forever. `npm pack` is only
-  // the local packer (48 D5): `archive.ts` reads exactly its tar shape, and
+  // the local packer: `archive.ts` reads exactly its tar shape, and
   // macOS `tar` output was already refused there.
   execFileSync('npm', ['pack', '--pack-destination', staging], { cwd: staging, stdio: 'pipe' });
   const packed = readdirSync(staging).find((f) => f.endsWith('.tgz'));

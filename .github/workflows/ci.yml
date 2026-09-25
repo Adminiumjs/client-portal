@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 #
-# The example apps' CI (28-T23).
+# The example apps' CI.
 #
 # WHY THIS EXISTS. Every one of the fifteen marketplace repos had an EMPTY
 # `.github` directory. That is how thirteen of fifteen manifests came to be
@@ -19,7 +19,7 @@
 # WHAT IT DOES NOT DO YET: validate `manifest.json` against `@adminiumjs/manifest`
 # from npm in all sixteen repos. The published version (0.2.1) predates the
 # `frontends[]` schema, so wiring THAT on would pin the fleet to a validator
-# that disagrees with the fleet; it is 28-T22 and it waits on a release.
+# that disagrees with the fleet; that step waits on a release.
 #
 # What it DOES do, since 2026-08-20, is check out the product and build
 # `packages/manifest` for the two repos whose suites load the real validator by
@@ -63,7 +63,7 @@ jobs:
       - name: Build
         run: npm run build
 
-      # ── THE REAL VALIDATOR, WHICH CI WAS NOT RUNNING (28-T26 follow-up) ───
+      # ── THE REAL VALIDATOR, WHICH CI WAS NOT RUNNING ──────────────────────
       #
       # Two of the sixteen repos put `manifest.json` through the PRODUCT's own
       # validator, loaded by path from a sibling checkout, and compare their

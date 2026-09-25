@@ -1,5 +1,5 @@
 /**
- * The staff surface's connection binding (29 D9).
+ * The staff surface's connection binding.
  *
  * Every case here is a way the answer can be ABSENT, because absent is the
  * common case — unbound surfaces, and any Adminium older than the binding —

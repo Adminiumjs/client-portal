@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //
 // r2.mjs — write one released file into the downloads bucket, then prove the
-// public address serves exactly those bytes (48-self-hosted-downloads.md D1, D2,
-// D4, D6).
+// public address serves exactly those bytes.
 //
 // VENDORED. The canonical copy is `workplan/tools/app-release/r2.mjs` in the
 // Adminium monorepo. `app-release.sh sync` copies it, byte for byte, into every
@@ -11,7 +10,7 @@
 // ─── What a release may conclude, and from what ─────────────────────────────
 //
 // A ledger row says "this version's file is served with this fingerprint". An
-// upload answering 200 does not establish that; the public address does (D6).
+// upload answering 200 does not establish that; the public address does.
 // So `publishObject` returns only after https://downloads.adminium.dev has
 // served bytes whose sha512 equals the build's, and callers write their ledger
 // row after it returns, never before.
@@ -21,7 +20,7 @@
 //     └── 200 ──▶ GET: same sha512 ─────────────────────────┴──────▶ read back
 //                      different sha512 ──▶ STOP
 //
-// DIFFERENT BYTES ARE FINAL. The bucket lock (D2) keeps whatever is there, so
+// DIFFERENT BYTES ARE FINAL. The bucket lock keeps whatever is there, so
 // that version number is burned and the release needs the next patch. SAME
 // BYTES ARE THE RECOVERY: a release that uploaded and then failed its read-back
 // is re-dispatched with the same version and completes here, because `npm pack`
@@ -37,9 +36,9 @@
 
 import { createHash, createHmac } from 'node:crypto';
 
-/** The only public host a release is read back from (D4). */
+/** The only public host a release is read back from. */
 export const DOWNLOAD_HOST = 'downloads.adminium.dev';
-/** An edge can serve a miss cached from before the upload (48 §4); poll past it. */
+/** An edge can serve a miss cached from before the upload; poll past it. */
 export const READ_BACK_WAIT_MS = 5 * 60 * 1000;
 const READ_BACK_POLL_MS = 10_000;
 /** The server's MAX_TARBALL_BYTES: nothing larger is installable, so nothing larger ships. */
@@ -65,8 +64,9 @@ export class R2Error extends Error {
 export const sriOf = (bytes) => `sha512-${createHash('sha512').update(bytes).digest('base64')}`;
 
 /**
- * D1's layout, and D4's own check: a URL built from the key must carry exactly
- * this path (a version's pre-release tail may hold `.` or `+`).
+ * The bucket's folder layout, and the same check the server makes: a URL built
+ * from the key must carry exactly this path (a version's pre-release tail may
+ * hold `.` or `+`).
  */
 export function objectKeyFor({ kind, key, version }) {
   if (typeof key !== 'string' || !KEY_RE.test(key)) throw new R2Error(`not a key: ${JSON.stringify(key)}`, 'key');
@@ -268,13 +268,14 @@ export function createR2(config, { fetchImpl = fetch } = {}) {
   return {
     head: (objectKey) => send('HEAD', objectKey),
     get: (objectKey) => send('GET', objectKey),
-    /** Refuse rather than replace (D6); the lock refuses too, this makes it explicit. */
+    /** Refuse rather than replace; the lock refuses too, this makes it explicit. */
     putIfAbsent: (objectKey, bytes) =>
       send('PUT', objectKey, {
         body: bytes,
         headers: {
           'content-type': 'application/octet-stream',
-          // Immutable by construction (D2), so any cache may keep it for good.
+          // Immutable by construction (the bucket lock), so any cache may keep it
+          // for good.
           // Permanent: under the lock, metadata can never be edited later.
           'cache-control': 'public, max-age=31536000, immutable',
           'content-disposition': `attachment; filename="${objectKey.split('/').pop()}"`,
@@ -302,7 +303,7 @@ export async function readBack({ url, integrity, waitMs = READ_BACK_WAIT_MS, pol
     if (got?.bytes != null) {
       const sri = sriOf(got.bytes);
       if (sri !== integrity) {
-        // A bot challenge arrives as a 200 with an HTML body (48 §4), so name the type.
+        // A bot challenge arrives as a 200 with an HTML body, so name the type.
         throw new R2Error(
           `${url} served ${String(got.bytes.length)} bytes of ${String(got.headers.get('content-type'))} ` +
             `hashing to ${sri}, not ${integrity}`,
@@ -322,8 +323,8 @@ export async function readBack({ url, integrity, waitMs = READ_BACK_WAIT_MS, pol
 }
 
 /**
- * The whole D6 leg for one file: into the bucket if absent, the same bytes if
- * present, and served publicly — in that order, or a thrown R2Error.
+ * The whole publish leg for one file: into the bucket if absent, the same bytes
+ * if present, and served publicly — in that order, or a thrown R2Error.
  */
 export async function publishObject({ config, kind, key, version, bytes, waitMs, pollMs, fetchImpl = fetch, log = () => {} }) {
   const objectKey = objectKeyFor({ kind, key, version });

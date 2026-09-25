@@ -1,5 +1,5 @@
 /**
- * Screen ⇄ URL (29-app-surfaces.md D8, 29-T13).
+ * Screen ⇄ URL.
  *
  * The pure functions are tested directly because they are where the decisions
  * live; `attachUrlSync` is tested against a hand-built `window` because the
@@ -41,7 +41,7 @@ describe('surfaceBase — where this bundle actually is', () => {
     /*
      * THE CASE THIS FUNCTION EXISTS FOR. Vite bakes an ABSOLUTE base into the
      * bundle, and `import.meta.env.BASE_URL` is that string in every build —
-     * including the one Adminium serves at `/` on `shop.example.com` (D3, no
+     * including the one Adminium serves at `/` on `shop.example.com` (no
      * rebuild, no second dist). Trusting the baked value there would make every
      * path unreachable and every reflected URL wrong.
      */

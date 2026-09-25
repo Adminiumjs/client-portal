@@ -30,7 +30,7 @@ export interface SnapshotPort {
      */
     timezoneSource?: 'operator' | 'host' | 'fallback' | null;
     /**
-     * Nullable on the wire (28 §5.5: a scope exposing no money needs none), so
+     * Nullable on the wire (a scope exposing no money needs no currency), so
      * `null` and not `undefined` — matching `PublicConfig` exactly is what lets
      * `PublicClient` satisfy this port structurally, with no adapter.
      */

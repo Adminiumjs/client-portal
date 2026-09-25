@@ -4,7 +4,7 @@
 # Adminium monorepo; `app-release.sh sync` copies it into every app repo. Edit it
 # there, never here.
 #
-# WHERE A RELEASE GOES (48-self-hosted-downloads.md D1/D6). The packed file is
+# WHERE A RELEASE GOES. The packed file is
 # uploaded to the Adminiumjs downloads bucket, read back from
 # https://downloads.adminium.dev, and only then recorded in RELEASES.json. Apps
 # are not published to npm.
@@ -18,9 +18,9 @@
 #
 # BEFORE THE FIRST RUN: this repository must be granted the Adminiumjs
 # organization's variables R2_ACCOUNT_ID + R2_BUCKET and secrets
-# R2_ACCESS_KEY_ID + R2_SECRET_ACCESS_KEY (48 §3 gate 1.7). The secret key is
+# R2_ACCESS_KEY_ID + R2_SECRET_ACCESS_KEY. The secret key is
 # an Object Read & Write token scoped to the bucket: it can add a version and
-# can never replace or delete one (D2).
+# can never replace or delete one — a released file never changes.
 
 name: release
 

@@ -14,15 +14,15 @@ export const SUBSTRING_BANNED = [
 ] as const;
 
 /**
- * The one 24 D12 adds that is a WORD rather than a substring.
+ * The one the add-on rules add that is a WORD rather than a substring.
  *
- * "pro" is not in 17 §2's run of substrings and must not be turned into one: a
- * shop that makes things says "proof", "process", "product" and "properties" on
- * nearly every screen, and a substring rule over those would trade a real
- * defect for an imaginary one. What D12 forbids is the marketing word — a "Pro"
- * add-on, a "Pro" account — so it is checked as a standalone token, and the
- * places a translator legitimately wrote it are allowed by exact phrase in
- * `PRO_PHRASES`.
+ * "pro" is not in the release sweep's run of substrings and must not be turned
+ * into one: a shop that makes things says "proof", "process", "product" and
+ * "properties" on nearly every screen, and a substring rule over those would
+ * trade a real defect for an imaginary one. What the rule forbids is the
+ * marketing word — a "Pro" add-on, a "Pro" account — so it is checked as a
+ * standalone token, and the places a translator legitimately wrote it are
+ * allowed by exact phrase in `PRO_PHRASES`.
  */
 export const WORD_BANNED = ['pro'] as const;
 
@@ -165,7 +165,7 @@ export const PRO_PHRASES: readonly ProPhrase[] = [
  */
 
 /**
- * The ideas 17 §2 and 24 D12 forbid, named once.
+ * The ideas the release sweep and the add-on rules forbid, named once.
  *
  * `paid` ON ITS OWN IS DELIBERATELY NOT ONE OF THEM, and the attempt is worth
  * recording. It was in this list for one run and came straight back out: a shop
@@ -319,10 +319,11 @@ export const IDEA_IN_LANGUAGE: Record<OtherLanguage, Record<BannedIdea, RegExp[]
 /**
  * The per-locale view a message-bundle gate wants.
  *
- * `en-US` is the English substring ban's own job, so its only entry is what D12
- * adds on top plus the round-6 plant WRITTEN IN ENGLISH: 17 §2's substring run
- * covers `pricing plan tier billing upgrade free /mo` and none of them appears
- * in "switch to the paid version for more". The hole was in every language
+ * `en-US` is the English substring ban's own job, so its only entry is what the
+ * add-on rules add on top plus the phrase an adversarial review planted,
+ * WRITTEN IN ENGLISH: the sweep's substring run covers
+ * `pricing plan tier billing upgrade free /mo` and none of them appears in
+ * "switch to the paid version for more". The hole was in every language
  * including this one.
  */
 export const TIERING_WORDS: Readonly<Record<string, readonly RegExp[]>> = {

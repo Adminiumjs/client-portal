@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 /**
- * Deferred translations, marked so the compiler and a human can both see them
- * (28-public-surface.md §7C, 28-T24).
+ * Deferred translations, marked so the compiler and a human can both see them.
  *
  * ── THE PROBLEM THIS SOLVES ────────────────────────────────────────────────
  * Non-English locales are typed against the English key set, so a missing key

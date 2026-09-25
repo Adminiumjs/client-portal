@@ -31,12 +31,12 @@
  *
  * ─── Where the tenant's timezone comes from ─────────────────────────────────
  *
- * The CONNECTION carries it (28-T34). This transport already fetches
+ * The CONNECTION carries it. This transport already fetches
  * `/api/v1/connections` to discover which database the app reads, so the zone
  * arrives on the same response with no extra request and nothing to configure
  * in the build.
  *
- * It was a build argument until 28-T34, which made a property of the BUSINESS a
+ * It used to be a build argument, which made a property of the BUSINESS a
  * property of the artifact: changing your timezone meant rebuilding the front
  * end. The one answer that is always wrong is
  * `Intl.DateTimeFormat().resolvedOptions().timeZone` — that is the READER's
@@ -142,7 +142,7 @@ interface BootstrapReply {
 interface ConnectionRow {
   id: string;
   name?: string;
-  /** 28-T34. Null when the operator has not configured one. */
+  /** The tenant's timezone. Null when the operator has not configured one. */
   timezone?: string | null;
   /**
    * Who chose `timezone` (Adminium meta wave 0018): `operator`, or `host` when

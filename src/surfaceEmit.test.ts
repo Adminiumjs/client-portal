@@ -1,5 +1,5 @@
 /**
- * `surface.json`, the document (29-app-surfaces.md D7, 29-T11).
+ * `surface.json`, the document — the nav contract the build emits.
  *
  * `buildSurfaceJson` is a pure function precisely so this can assert the
  * contract without running a build — the build is asserted separately, by

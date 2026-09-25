@@ -1,8 +1,8 @@
 /**
- * The host bridge's FAILURE modes (29-app-surfaces.md D6, 29-T13).
+ * The host bridge's FAILURE modes.
  *
  * The happy path demos well and is the least valuable thing here. What this
- * file is actually for is the plan's own warning: version mismatch, parent
+ * file is actually for is the design's own warning: version mismatch, parent
  * absent, parent silent — "each must degrade to something usable and loud, and
  * each is a test nobody writes when the happy path demos well".
  *

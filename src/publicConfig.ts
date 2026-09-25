@@ -1,11 +1,11 @@
 /**
- * Served-not-baked customer configuration (29-app-surfaces.md D10, 29-T16).
+ * Served-not-baked customer configuration.
  *
  * A HOSTED customer surface no longer needs its publishable key baked at build
  * time: Adminium serves `surface-config.json` beside the bundle — the newest
  * live key BOUND to this app in Studio — so rotating a key is Studio + reload,
  * zero rebuilds. The document is exactly as public as the bundle that fetches
- * it; a publishable key in a public JS file was always the design (28 §3.3).
+ * it; a publishable key in a public JS file was always the design.
  *
  * ─── Resolution order, and why ───────────────────────────────────────────────
  *
@@ -21,7 +21,8 @@
  *      absolute path is correct under BOTH placements: path-hosted directly,
  *      and domain-hosted through the host-agnostic `/apps/*` pass-through.
  *   3. Neither → null, and the app's existing hard-stop renders the legible
- *      not-connected screen (28 D24's failure surface). Never a silent demo.
+ *      not-connected screen — the app's one failure surface. Never a
+ *      silent demo.
  *
  * `baseUrl: ""` in the served document means "this same origin"; it is
  * normalized here, in the one synced place, so no splice re-derives it.
@@ -29,7 +30,7 @@
 
 import { HOSTED, SURFACE_SIDE } from "./surface.ts";
 // The mount-path math lives with the staff resolver because that is the one
-// module every app in the fleet has; it is not staff-specific (29 D9).
+// module every app in the fleet has; it is not staff-specific.
 import { configBase } from "./staffConnection.ts";
 
 export interface SurfaceConfig {
@@ -84,7 +85,7 @@ export async function resolveSurfaceConfig(
   if (!hostedCustomer) return null;
 
   /*
-   * Instance-aware (29 D9): the same customer bundle is served at
+   * Instance-aware: the same customer bundle is served at
    * `/apps/<key>/customer/` and at `/apps/<key>/<slug>/customer/`, and those
    * two answer with DIFFERENT keys — one per database. Reading the baked base
    * here would make every instance fetch the root's key and quietly serve the

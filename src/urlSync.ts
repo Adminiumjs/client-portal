@@ -1,5 +1,5 @@
 /**
- * Screen ⇄ URL, for every hosted surface (29-app-surfaces.md D8).
+ * Screen ⇄ URL, for every hosted surface.
  *
  * ─── The hole this closes ────────────────────────────────────────────────────
  *
@@ -8,7 +8,7 @@
  * under a surface, so `/apps/clients/staff/invoices` renders — and then the app
  * ignores the path entirely and shows its home screen. Reload lands you
  * somewhere else than where you were, and no link to a screen can be shared.
- * 28-T40 recorded that as unsolved.
+ * Hosted surfaces first shipped with that gap known and unsolved.
  *
  * ─── Why this is not "just for the embedded placement" ───────────────────────
  *
@@ -27,7 +27,7 @@
  * history entry per screen produces a Back button that appears to do nothing.
  *
  * The parent's URL is the one that gets a real history entry, and the parent
- * owns that (`AppFrame`, D6).
+ * owns that (`AppFrame`, the dashboard's half of the host bridge).
  */
 
 import type { SurfaceNavEntry } from './surface-types.ts';
@@ -69,7 +69,7 @@ export function surfaceBase(pathname: string, bakedBase: string): string {
 
 /**
  * The base of an INSTANCE mount — the same app served over a second database at
- * `/apps/<appKey>/<slug>/<side>/` (29 D9) — or null when this is not one.
+ * `/apps/<appKey>/<slug>/<side>/` — or null when this is not one.
  *
  * The baked base names the app and the side; the live pathname supplies the
  * slug between them. Without this the app would treat `apps/clients/berlin/…`

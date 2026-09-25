@@ -1,5 +1,5 @@
 /**
- * `resolveSurfaceConfig` (29-app-surfaces.md D10, 29-T16) — the resolution
+ * `resolveSurfaceConfig` — the resolution
  * order is the contract: baked wins outright; only a hosted CUSTOMER build
  * fetches; every malformed answer degrades to null (the app's hard-stop),
  * never to a thrown boot.

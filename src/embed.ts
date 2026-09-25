@@ -1,5 +1,5 @@
 /**
- * The child half of the host bridge (29-app-surfaces.md D6).
+ * The child half of the host bridge.
  *
  * ─── What "internal placement" is ────────────────────────────────────────────
  *
@@ -22,7 +22,7 @@
  * What folds at build time is `HOSTED`; what is discovered at runtime is "am I
  * framed, by a host that speaks this protocol". Making it a build flag would
  * mean two staff builds per app and an operator choice that requires a rebuild
- * — the opposite of D9, where placement is a setting.
+ * — the opposite of what placement is meant to be: a setting.
  *
  * ─── Every failure mode degrades to USABLE, loudly ──────────────────────────
  *
@@ -86,7 +86,7 @@ export interface EmbedHandlers {
   onLocale?: (locale: string) => void;
   /** Navigate to a path under the surface base (back/forward, sidebar click). */
   onPath?: (path: string) => void;
-  /** The lens the host wants (D7's `persona`), applied once at init. */
+  /** The lens the host wants (`surface.json`'s `persona`), applied once at init. */
   onPersona?: (persona: string) => void;
 }
 

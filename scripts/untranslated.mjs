@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: AGPL-3.0-only
 /**
- * The deferred-translation ledger (28-public-surface.md §7C, 28-T24).
+ * The deferred-translation ledger.
  *
  * Reads every shipped string module under `src/i18n` and writes
  * `src/i18n/untranslated.json` — the sorted key list of everything authored as
