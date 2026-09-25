@@ -242,6 +242,15 @@ describe("an invoice", () => {
     expect(page).toContain("INV-2039 was settled on June 20, 2026. There is nothing to pay.");
     expect(page).toContain("See the receipt");
   });
+
+  it("each payment says its day and amount in the entry too, for a phone where those columns fold away", async () => {
+    await signIn(3);
+    select("invoice", 5);
+    const html = draw(<Invoice />);
+    const narrow = [...html.matchAll(/<span class="cl-ledger-narrow">(.*?)<\/span><\/span>/g)].map((m) => text(m[1]!));
+    expect(narrow.length).toBeGreaterThan(0);
+    for (const entry of narrow) expect(entry).toMatch(/^ · \w{3} \d{1,2}.* · −\$[\d,]+\.\d{2}$/);
+  });
 });
 
 describe("the statement, the brief and signing in", () => {
@@ -254,6 +263,13 @@ describe("the statement, the brief and signing in", () => {
     expect(page).toContain("Last 12 months");
     expect(page).toContain("What you have paid");
     expect(page).toContain("$2,656.08 to date");
+  });
+
+  it("the statement and the brief lead back to everything (a reload would sign the client out)", async () => {
+    await signIn(2);
+    for (const page of [draw(<Statement />), draw(<Brief />)]) {
+      expect(page).toMatch(/<button[^>]*class="[^"]*cl-back[^"]*"[^>]*>.*Back to everything<\/button>/);
+    }
   });
 
   it("the brief asks the studio's questions with the answers saved so far", () => {

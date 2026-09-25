@@ -160,6 +160,13 @@
   direction: ltr;
   text-align: start;
 }
+/* A sentence in its place (no link, or one Adminium keeps hidden) reads in the page's own direction. */
+.ho-address--words {
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+  direction: inherit;
+}
 .ho-address--stopped {
   color: var(--fg-subtle);
   text-decoration: line-through;

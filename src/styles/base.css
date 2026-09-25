@@ -258,3 +258,25 @@ p {
     display: none !important;
   }
 }
+
+/* ── right to left: each run of text takes its own direction ──────────────
+ * The design's rule: under dir="rtl", a text element's direction follows its
+ * own first letter, so a studio's English title, a client's note or a line
+ * that starts with a figure ("50 % of the accepted proposal") keeps its word
+ * order inside an Arabic page instead of being mirrored around it. Amounts and
+ * dates stay isolated left to right (`.money`, `.when`). */
+[dir="rtl"] h1,
+[dir="rtl"] h2,
+[dir="rtl"] p,
+[dir="rtl"] label,
+[dir="rtl"] div,
+[dir="rtl"] span,
+[dir="rtl"] button,
+[dir="rtl"] textarea,
+[dir="rtl"] input {
+  unicode-bidi: plaintext;
+}
+[dir="rtl"] .money,
+[dir="rtl"] .when {
+  unicode-bidi: isolate;
+}

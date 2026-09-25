@@ -1107,6 +1107,9 @@
   .cl-ledger-row > :nth-child(3) {
     display: block;
   }
+  .cl-ledger-narrow {
+    display: none;
+  }
 }
 .cl-doc-body {
   container-type: inline-size;

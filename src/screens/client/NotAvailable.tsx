@@ -13,11 +13,17 @@ import { Button } from "../../components/ui.tsx";
 import { useI18n } from "../../i18n/index.tsx";
 import { loadPortal, loadStudio, usePortal } from "../../state/portal.ts";
 import { go } from "../../state/ui.ts";
+import { portOrNull } from "./shared/page.ts";
 
 export default function NotAvailable() {
   const { t } = useI18n();
   const replyTo = usePortal((s) => s.studio?.settings?.reply_to ?? null);
   const again = async () => {
+    // Switched off before the page could start: only a fresh start can read again.
+    if (portOrNull() === null) {
+      window.location.reload();
+      return;
+    }
     usePortal.setState({ loadError: null });
     await loadStudio(true);
     if (usePortal.getState().me !== null) await loadPortal();

@@ -19,7 +19,8 @@
     "sample": "vite-node scripts/write-sample-columns.ts",
     "lexicon": "node scripts/sync-lexicon.mjs",
     "lexicon:check": "node scripts/sync-lexicon.mjs --check",
-    "row-types": "vite-node scripts/write-row-types.ts"
+    "row-types": "vite-node scripts/write-row-types.ts",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "@adminiumjs/public-client": "0.3.1",
@@ -30,10 +31,13 @@
     "zustand": "^5.0.2"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
+    "@playwright/test": "1.62.1",
     "@types/node": "^26.1.2",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.4",
+    "playwright-core": "1.62.1",
     "typescript": "^5.7.2",
     "vite": "^7.0.0",
     "vitest": "^2.1.9",

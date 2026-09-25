@@ -22,7 +22,8 @@
  * ```
  *
  * The grammar is small on purpose: numbers, the row's own columns, the four
- * operations, `min`, `max`, `round`, `coalesce` and one `if`. Anything that
+ * operations, `min`, `max`, `round`, `coalesce`, one `if`, and the hours
+ * between two moments of the row (`hoursBetween`). Anything that
  * reads another row is a `copy` or a `rollup`, which already know how to keep
  * in step when that other row changes; a formula that could read across rows
  * would need the same machinery again.
@@ -37,6 +38,14 @@
  * An empty column makes the result empty, unless `coalesce` says what to read
  * instead: a draft line with no rate yet has no amount, not an amount of 0
  * that looks like a price. Division by zero is empty too.
+ *
+ * HOURS ARE THE TIME THAT PASSED. `hoursBetween` reads two moments: one with
+ * a zone is that moment; one without is read on this clock — the server's,
+ * which is the clock Adminium keeps zone-less times on, and the one the
+ * Postgres and MySQL drivers read them back on. So on the night the clocks go
+ * forward an hour, 00:30 → 03:30 on the wall is two hours. A stop before its
+ * start is empty, not negative: a negative number of hours would quietly take
+ * pay off a total.
  *
  * Pure: a browser (an app's demo) evaluates the same formula the server does.
  */
@@ -58,7 +67,8 @@ export type FormulaExpr =
   | { max: FormulaExpr[] }
   | { round: FormulaExpr | [FormulaExpr, number] }
   | { coalesce: [FormulaExpr, FormulaExpr] }
-  | { if: [FormulaCondition, FormulaExpr, FormulaExpr] };
+  | { if: [FormulaCondition, FormulaExpr, FormulaExpr] }
+  | { hoursBetween: [string, string] };
 
 export type FormulaCondition =
   | { eq: [string, string | number | boolean] }
@@ -88,6 +98,7 @@ export const formulaExprSchema: z.ZodType<FormulaExpr> = z.lazy(() =>
       .strict(),
     z.object({ coalesce: z.tuple([formulaExprSchema, formulaExprSchema]) }).strict(),
     z.object({ if: z.tuple([formulaConditionSchema, formulaExprSchema, formulaExprSchema]) }).strict(),
+    z.object({ hoursBetween: z.tuple([columnName, columnName]) }).strict(),
   ]),
 );
 
@@ -154,8 +165,13 @@ export function formulaIssues(
   const out: string[] = [];
   if (depthOf(expr) > FORMULA_MAX_DEPTH) out.push(`a formula nests at most ${String(FORMULA_MAX_DEPTH)} deep`);
   // A column compared with `eq` may be any type (an enum, a bool); one that
-  // takes part in arithmetic or an ordering must hold a number.
+  // takes part in arithmetic or an ordering must hold a number, and one
+  // hours are counted from, a moment.
   const arithmetic = arithmeticColumns(expr);
+  const moments = momentColumns(expr);
+  for (const [start, stop] of moments.pairs) {
+    if (start === stop) out.push('hours are counted between two different columns');
+  }
   for (const name of formulaColumns(expr)) {
     if (name === own) {
       out.push(`a formula does not read its own column "${name}"`);
@@ -169,11 +185,35 @@ export function formulaIssues(
     if (arithmetic.has(name) && !NUMERIC_TYPES.includes(found.type)) {
       out.push(`"${name}" is not a number, so a formula cannot count with it`);
     }
+    if (moments.columns.has(name) && found.type !== 'timestamptz') {
+      out.push(`"${name}" is not a moment (a timestamptz column), so no hours are counted from it`);
+    }
   }
   return out;
 }
 
-/** The columns a formula counts with (every name outside `eq`, `neq` and `isNull`). */
+/** The columns `hoursBetween` reads, and each pair it reads them in. */
+export function momentColumns(expr: unknown): { columns: Set<string>; pairs: [string, string][] } {
+  const columns = new Set<string>();
+  const pairs: [string, string][] = [];
+  const walk = (node: unknown): void => {
+    if (typeof node !== 'object' || node === null) return;
+    const [op, args] = Object.entries(node)[0] as [string, unknown];
+    if (op === 'hoursBetween') {
+      const [start, stop] = args as [string, string];
+      columns.add(start);
+      columns.add(stop);
+      pairs.push([start, stop]);
+      return;
+    }
+    const children = Array.isArray(args) ? args : [args];
+    children.forEach(walk);
+  };
+  walk(expr);
+  return { columns, pairs };
+}
+
+/** The columns a formula counts with (every name outside `eq`, `neq`, `isNull` and `hoursBetween`). */
 function arithmeticColumns(expr: unknown): Set<string> {
   const out = new Set<string>();
   const walk = (node: unknown): void => {
@@ -183,7 +223,7 @@ function arithmeticColumns(expr: unknown): Set<string> {
     }
     if (typeof node !== 'object' || node === null) return;
     const [op, args] = Object.entries(node)[0] as [string, unknown];
-    if (op === 'eq' || op === 'neq' || op === 'isNull') return;
+    if (op === 'eq' || op === 'neq' || op === 'isNull' || op === 'hoursBetween') return;
     const children = Array.isArray(args) ? args : [args];
     children.forEach(walk);
   };
@@ -394,9 +434,55 @@ function evaluate(expr: FormulaExpr, row: Readonly<Record<string, unknown>>, sca
       const [condition, then, otherwise] = args as [FormulaCondition, FormulaExpr, FormulaExpr];
       return evaluate(holds(condition, row, scale) ? then : otherwise, row, scale);
     }
+    case 'hoursBetween': {
+      const [start, stop] = (args as [string, string]).map((column) => momentOf(row[column]));
+      if (start === null || start === undefined || stop === null || stop === undefined || stop < start) return null;
+      return ratio(BigInt(stop - start), MS_PER_HOUR);
+    }
     default:
       return null;
   }
+}
+
+const MS_PER_HOUR = 3_600_000n;
+
+/**
+ * A time as the drivers and a form spell one — `2026-09-25 09:15:00`,
+ * `2026-09-25T09:15` — and its zone when it has one: `Z`, `+02:00`, `+0200`
+ * or `+02`, straight after the time or after a space
+ * (`2026-09-25 09:15:00 +02:00`).
+ */
+const TIME = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.(\d+))?)?(?: ?(Z|[+-]\d{2}(?::?\d{2})?))?$/i;
+
+/** Whether the parts name a day and a time the calendar has: no 30 February, no 25 o'clock. */
+function onTheCalendar(y: number, mo: number, d: number, h: number, mi: number, s: number): boolean {
+  if (mo < 1 || mo > 12 || d < 1 || h > 23 || mi > 59 || s > 59) return false;
+  return d <= new Date(Date.UTC(y, mo, 0)).getUTCDate();
+}
+
+/**
+ * A stored moment as milliseconds since the epoch, or `null` when it is empty
+ * or not a time: a `Date` as a driver hands one back; a number as the seconds
+ * since 1970 SQLite's `unixepoch()` fills a column with; a zoned text as the
+ * moment it names, and a zone-less one on this clock (see the header). A day
+ * or an hour the calendar does not have (30 February) is no time, not the one
+ * it would roll over to.
+ */
+export function momentOf(value: unknown): number | null {
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value.getTime();
+  if (typeof value === 'number') return Number.isFinite(value) ? Math.round(value * 1000) : null;
+  if (typeof value === 'bigint') return Number(value) * 1000;
+  if (typeof value !== 'string') return null;
+  const found = TIME.exec(value.trim());
+  if (found === null) return null;
+  const [y, mo, d, h, mi, s] = found.slice(1, 7).map((part) => Number(part ?? 0)) as [number, number, number, number, number, number];
+  if (!onTheCalendar(y, mo, d, h, mi, s)) return null;
+  const ms = Number((found[7] ?? '').slice(0, 3).padEnd(3, '0'));
+  const zone = found[8];
+  if (zone === undefined) return new Date(y, mo - 1, d, h, mi, s, ms).getTime();
+  const [, sign, hours, minutes] = /^([+-])(\d{2}):?(\d{2})?$/.exec(zone) ?? [];
+  const offset = sign === undefined ? 0 : (sign === '-' ? -1 : 1) * (Number(hours) * 60 + Number(minutes ?? 0));
+  return Date.UTC(y, mo - 1, d, h, mi, s, ms) - offset * 60_000;
 }
 
 /** Whether a condition holds for the row; a comparison with an empty side does not. */

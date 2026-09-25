@@ -263,6 +263,8 @@ export { labelsSchema };
  *  - `venueLocal`: a wall time with no zone is read in the venue's zone.
  *  - `personal`: whether the column is personal data, overriding the guess
  *    Adminium makes from its name.
+ *  - `secret`: whether the column is a secret no response ever carries,
+ *    overriding the same guess (a `…token…` name reads as one).
  */
 /** A child list a fingerprint covers: its rows in `orderBy` order, then by key. */
 const hashChildSchema = z
@@ -361,6 +363,15 @@ export const columnRulesSchema = z
       .strict()
       .optional(),
     required: z.literal(true).optional(),
+    /**
+     * Required only while another column of the same row holds one of `in`
+     * (`person_id` when `kind` is `away`). The row as the write leaves it is
+     * judged: a change of either column that leaves this one empty is refused.
+     */
+    requiredWhen: z
+      .object({ column: refSchema, in: z.array(scalarSchema).min(1).max(32) })
+      .strict()
+      .optional(),
     validation: z
       .object({
         format: z.enum(['email', 'url', 'phone']).optional(),
@@ -475,6 +486,14 @@ export const columnRulesSchema = z
      * mark it otherwise.
      */
     personal: z.boolean().optional(),
+    /**
+     * Whether the column is a secret no response ever carries, when the app
+     * knows better than a guess from its name: a `share_token` whose `code`
+     * is the link a studio sends is shown to the staff who read the table.
+     * A `code` column is not taken for a secret by its name alone; `true`
+     * makes it one, as it makes any other column one.
+     */
+    secret: z.boolean().optional(),
     /**
      * A date that may never be later than today, on the venue's calendar — a
      * payment is recorded when it came in, not when it might.
@@ -1203,6 +1222,21 @@ export function appReferenceIssues(
           else if (!dated(other.type)) out.push({ path: here('notBefore', 'column'), message: `"${owner}.${bound.column}" is not a date` });
           else if (bound.via === undefined && other.ref === column.ref) out.push({ path: here('notBefore', 'column'), message: 'a date is bounded by another column' });
         }
+      }
+      if (rules.requiredWhen !== undefined) {
+        const when = rules.requiredWhen;
+        const other = index.column(table.ref, when.column);
+        if (other === undefined) out.push({ path: here('requiredWhen', 'column'), message: `"${table.ref}" has no column "${when.column}"` });
+        else if (other.ref === column.ref) out.push({ path: here('requiredWhen', 'column'), message: 'a column is required by another column' });
+        else {
+          for (const value of when.in) {
+            if (!valueFits(other, value)) out.push({ path: here('requiredWhen', 'in'), message: `${JSON.stringify(value)} is not a value of "${table.ref}.${when.column}"` });
+          }
+        }
+        // Never empty already, or always asked for: the condition would say nothing.
+        if (column.nullable !== true) out.push({ path: here('requiredWhen'), message: 'a column required only sometimes may be empty the rest of the time, so make it nullable' });
+        if (rules.required === true) out.push({ path: here('requiredWhen'), message: 'a column is required always, or only when another column says so, not both' });
+        if (deciders.length > 0) out.push({ path: here('requiredWhen'), message: 'Adminium fills this column, so nobody is asked for it' });
       }
       if (rules.default !== undefined) {
         const from = rules.default.from;

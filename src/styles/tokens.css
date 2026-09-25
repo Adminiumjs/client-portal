@@ -34,8 +34,9 @@
   --info: #1c59e0;
   --info-soft: #e7edfd;
 
-  /* the studio's accent (bronze) */
-  --accent: #b25e09;
+  /* the studio's accent (bronze) — a shade deeper than the design's #b25e09, so
+     accent text keeps AA (4.5:1) on its own tint and on the grey surfaces */
+  --accent: #9f5307;
   --accent-fg: #ffffff;
   --accent-soft: rgba(178, 94, 9, 0.1);
 
@@ -101,7 +102,7 @@
     --pos-soft: rgba(62, 207, 142, 0.14);
     --warn: #e0a458;
     --warn-soft: rgba(224, 164, 88, 0.14);
-    --danger: #ff6b6b;
+    --danger: #ff7b7b;
     --danger-soft: rgba(255, 107, 107, 0.14);
     --info: #6ea8ff;
     --info-soft: rgba(110, 168, 255, 0.14);
@@ -128,7 +129,7 @@
   --pos-soft: rgba(62, 207, 142, 0.14);
   --warn: #e0a458;
   --warn-soft: rgba(224, 164, 88, 0.14);
-  --danger: #ff6b6b;
+  --danger: #ff7b7b;
   --danger-soft: rgba(255, 107, 107, 0.14);
   --info: #6ea8ff;
   --info-soft: rgba(110, 168, 255, 0.14);

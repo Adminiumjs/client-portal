@@ -71,6 +71,21 @@ describe("a finished project's handover", () => {
     expect(words).toContain("Sent to Jonas");
   });
 
+  it("when Adminium keeps the code hidden: says the link goes out by email, offers Stop and a new link, and no address or Copy", () => {
+    // As a staff read delivers it: no `share_token` key at all.
+    const p = useDesk.getState().rows.projects[4]!;
+    const { share_token: _hidden, ...withoutCode } = p;
+    useDesk.setState((s) => ({ rows: { ...s.rows, projects: { ...s.rows.projects, 4: withoutCode as typeof p } } }));
+    const html = draw(<Handover />);
+    const words = text(html);
+    expect(words).toContain("Adminium keeps the link’s code out of sight here; it goes out in the handover email.");
+    expect(words).not.toContain("undefined");
+    expect(words).toContain("Stop this link");
+    expect(words).not.toContain("Copy");
+    expect(words).toContain("Make a new link");
+    expect(html).toContain("ho-address ho-address--words");
+  });
+
   it("when stopped: the link struck through, the day it stopped, and Make a new link", () => {
     const p = useDesk.getState().rows.projects[4]!;
     upsert("projects", { ...p, share_stopped: true, share_stopped_at: "2026-07-28T14:00:00.000Z" });

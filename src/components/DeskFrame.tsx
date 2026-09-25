@@ -207,8 +207,8 @@ function DeskSearch() {
         value={q}
         placeholder={t("frame.search")}
         aria-label={t("frame.search")}
+        // A search box names the results it drives; "expanded" is a combobox's state, not a searchbox's.
         aria-controls={showing ? listId : undefined}
-        aria-expanded={showing}
         onChange={(e) => setQ(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === "Escape") setQ("");

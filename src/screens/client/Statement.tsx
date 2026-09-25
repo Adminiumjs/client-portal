@@ -14,7 +14,7 @@ import { usePortal, usePortalRows } from "../../state/portal.ts";
 import { openSheet } from "../../state/sheets.ts";
 import { open, toast, useUi } from "../../state/ui.ts";
 import { PERIODS, statement, type Period } from "./statement/model.ts";
-import { Section, useDay } from "./shared/bits.tsx";
+import { BackHome, Section, useDay } from "./shared/bits.tsx";
 import { invoiceState, isOpen } from "./shared/model.ts";
 import { openInNewTab, portOrNull, useSignedIn } from "./shared/page.ts";
 
@@ -52,6 +52,7 @@ export default function Statement() {
 
   return (
     <section className="screen ol-screen cl-page" data-screen="client-statement" aria-labelledby="cl-statement-title">
+      <BackHome />
       <div className="cl-head-row">
         <div className="cl-head-text">
           <h1 className="cl-h1" id="cl-statement-title">

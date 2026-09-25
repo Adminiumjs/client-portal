@@ -11,7 +11,7 @@
  *
  * DEMO BUILD ONLY.
  */
-import bundleJson from "../../seeds/clients.sample.json";
+import bundleJson from "../../seeds/clients.sample.json" with { type: "json" };
 import { resolveSample, type ResolvedSample, type SampleBundleRows } from "../data/sampleRows.ts";
 import type { TableRef } from "../data/types.ts";
 

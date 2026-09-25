@@ -82,7 +82,16 @@ export default function Handover() {
   const number_ = project.number ?? t("projects.noNumber");
   const ms = milestonesOf(milestones, project.id);
   const state = linkState(project, day);
-  const address = project.share_token === null ? null : shareAddress(project.share_token, typeof window === "undefined" ? "" : window.location.origin, import.meta.env.BASE_URL);
+  /*
+   * Adminium hides a column whose name reads like a credential from every
+   * staff read (`share_token` among them), so the desk cannot see the code —
+   * nor whether there is one yet (the sample's projects have none until a
+   * link is made). The page says the link goes out in the handover email,
+   * offers Stop and Make a new link, and never prints an address that opens
+   * nothing.
+   */
+  const hidden = typeof project.share_token !== "string";
+  const address = hidden ? null : shareAddress(project.share_token as string, typeof window === "undefined" ? "" : window.location.origin, import.meta.env.BASE_URL);
   const expiry = expiryOf(project);
   const rows = handoverRows(project.id, deliverables, versions, files);
   const sum = invoiced(invoices, project.id);
@@ -220,12 +229,14 @@ export default function Handover() {
         </div>
         <div className="ho-link-body">
           <div className="ho-link-box">
-            <span className={`ho-address${state === "stopped" ? " ho-address--stopped" : ""}`}>{address === null ? t("handover.link.none") : shownAddress(address)}</span>
-            {state !== "stopped" && address !== null && (
+            <span className={`ho-address${state === "stopped" ? " ho-address--stopped" : ""}${address === null ? " ho-address--words" : ""}`}>{address !== null ? shownAddress(address) : hidden && state !== "stopped" ? t("handover.link.hidden") : t("handover.link.none")}</span>
+            {state !== "stopped" && (address !== null || hidden) && (
               <>
-                <Button size="small" icon={Copy} onClick={() => void copy()}>
-                  {t("handover.link.copy")}
-                </Button>
+                {address !== null && (
+                  <Button size="small" icon={Copy} onClick={() => void copy()}>
+                    {t("handover.link.copy")}
+                  </Button>
+                )}
                 {canEdit && (
                   <Button size="small" kind="danger" icon={Link2Off} onClick={() => openSheet({ kind: "stopShare", projectId: project.id })}>
                     {t("handover.link.stop")}

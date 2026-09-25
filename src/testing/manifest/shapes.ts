@@ -28,7 +28,8 @@
  * What an app may do to a part, and nothing else:
  *  - add columns of its own;
  *  - relabel, and add display rules (`enumLabels`, `personal`) and narrowing
- *    ones (`validation`, `required`, `notAfter`, `notBefore`) to the part's columns;
+ *    ones (`validation`, `required`, `requiredWhen`, `notAfter`, `notBefore`)
+ *    to the part's columns;
  *  - put a `copy` in front of a column the part fills from a setting (a
  *    client's own tax rate before the add-on's default): the part's fill
  *    still answers whenever the copy comes back empty;
@@ -84,7 +85,7 @@ export function shapeKey(addOn: string, shape: { name: string; version: number }
 }
 
 /** Rules an app may add to a part's column: they label or narrow, never decide. */
-const ADDABLE_RULES: ReadonlySet<string> = new Set(['enumLabels', 'personal', 'validation', 'required', 'options', 'notAfter', 'notBefore']);
+const ADDABLE_RULES: ReadonlySet<string> = new Set(['enumLabels', 'personal', 'secret', 'validation', 'required', 'requiredWhen', 'options', 'notAfter', 'notBefore']);
 
 /** JSON with sorted keys, so two spellings of one value compare equal. */
 function canonical(value: unknown): string {

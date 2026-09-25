@@ -17,7 +17,7 @@ import { saveBriefAnswer, sendBrief } from "../../state/clientActions.ts";
 import { usePortal, usePortalRows } from "../../state/portal.ts";
 import { toast, useUi } from "../../state/ui.ts";
 import { createSaver, type SaverState } from "./brief/saver.ts";
-import { Section, useClientRows } from "./shared/bits.tsx";
+import { BackHome, Section, useClientRows } from "./shared/bits.tsx";
 import { leadProject } from "./shared/model.ts";
 import { sayRefusal, useSignedIn } from "./shared/page.ts";
 
@@ -71,6 +71,7 @@ export default function Brief() {
   if (brief === undefined) {
     return (
       <section className="screen ol-screen cl-page" data-screen="client-brief" aria-labelledby="cl-brief-title">
+        <BackHome />
         <h1 className="cl-h1" id="cl-brief-title">
           {t("nav.brief")}
         </h1>
@@ -115,6 +116,7 @@ export default function Brief() {
   if (done) {
     return (
       <section className="screen ol-screen cl-page" data-screen="client-brief" aria-labelledby="cl-brief-title">
+        <BackHome />
         {chooser}
         <div className="cl-card cl-brief-done">
           <span className="cl-done-badge" aria-hidden="true">
@@ -147,6 +149,7 @@ export default function Brief() {
 
   return (
     <section className="screen ol-screen cl-page" data-screen="client-brief" aria-labelledby="cl-brief-title">
+      <BackHome />
       {chooser}
       <div>
         <span className="cl-mono-kicker">{t("client.brief.kicker", { project: project?.name ?? "", company: me.company })}</span>

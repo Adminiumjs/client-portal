@@ -187,6 +187,25 @@ describe("the payment instructions", () => {
   });
 });
 
+describe("reading a client's rows", () => {
+  it("sends no filter or sort (a door refuses both) and narrows and orders what came back", async () => {
+    const { client, list } = fakeClient();
+    list.mockImplementation(async () => ({
+      data: [
+        { id: 1, document_id: 7, paid_on: "2026-07-26", amount: "1200.0000" },
+        { id: 2, document_id: 8, paid_on: "2026-06-02", amount: "500" },
+        { id: 3, document_id: 7, paid_on: "2026-05-02", amount: "80" },
+      ],
+    }));
+    const port = await publicPortalPort(client);
+    const rows = await port.list("payments", { column: "document_id", op: "eq", value: 7 }, "paid_on.asc");
+    expect(rows.map((row) => row.id)).toEqual([3, 1]);
+    expect(list).toHaveBeenCalledWith("clients_payments", { limit: 200 });
+    expect(JSON.stringify(list.mock.calls)).not.toMatch(/where|order/);
+    expect((await port.list("payments", undefined, "id.desc", 1)).map((row) => row.id)).toEqual([3]);
+  });
+});
+
 describe("documents and files", () => {
   it("draws a statement over the client's own row, for its period", async () => {
     const render = vi.fn(async () => ({ id: "doc-1" }));

@@ -136,15 +136,33 @@ export function addOnBundle(): Bundle & { key: string; version: string } {
   return { ...bundle(files), key: manifest.key, version };
 }
 
-/** This repo's app: its manifest, its sample, and a page for each side. */
-export function appBundle(): Bundle & { key: string; version: string } {
+/** Every file under a directory, by its path below it. */
+function filesUnder(root: string, into: string, files: Record<string, Buffer>): void {
+  for (const name of readdirSync(root)) {
+    const absolute = join(root, name);
+    if (statSync(absolute).isDirectory()) filesUnder(absolute, `${into}${name}/`, files);
+    else files[`${into}${name}`] = readFileSync(absolute);
+  }
+}
+
+/**
+ * This repo's app: its manifest, its sample, and a page for each side — a
+ * placeholder page, or with `built: true` the surfaces `npm run build:surface`
+ * made (`dist-surface/<key>/<side>`), as a release packs them: what a
+ * browser test opens.
+ */
+export function appBundle(options: { built?: boolean } = {}): Bundle & { key: string; version: string } {
   const manifest = JSON.parse(read(join(REPO, "manifest.json"))) as { key: string; version: string; sampleData?: { file: string } };
   const files: Record<string, Buffer> = {
     "package.json": Buffer.from(JSON.stringify({ name: `@adminiumjs/app-${manifest.key}`, version: manifest.version })),
     "manifest.json": readFileSync(join(REPO, "manifest.json")),
-    "staff/index.html": Buffer.from('<!doctype html><html><body data-app="clients-staff"></body></html>'),
-    "customer/index.html": Buffer.from('<!doctype html><html><body data-app="clients-customer"></body></html>'),
   };
+  for (const side of ["staff", "customer"]) {
+    const built = join(REPO, "dist-surface", manifest.key, side);
+    if (options.built !== true) files[`${side}/index.html`] = Buffer.from(`<!doctype html><html><body data-app="${manifest.key}-${side}"></body></html>`);
+    else if (!existsSync(join(built, "index.html"))) throw new Error(`no built ${side} surface in ${built} — run \`npm run build:surface\` first`);
+    else filesUnder(built, `${side}/`, files);
+  }
   if (manifest.sampleData !== undefined) files[manifest.sampleData.file] = readFileSync(join(REPO, manifest.sampleData.file));
   return { ...bundle(files), key: manifest.key, version: manifest.version };
 }
@@ -159,14 +177,27 @@ export interface Server {
   stop(): Promise<void>;
 }
 
-/** Boot the built Adminium on one engine, its clock starting at `now`; resolves once it serves. */
-export async function boot(engine: Engine, port: number, now: number): Promise<Server> {
+/**
+ * The ports one engine's server takes: the server at `port`, its SMTP sink
+ * and the sink's mailbox on the next two. The script's scripted LLM, which
+ * nothing here calls, takes whatever port is free.
+ */
+export const PORTS_PER_ENGINE = 3;
+
+/**
+ * Boot the built Adminium on one engine, its clock starting at `now`; resolves once it serves.
+ * `database` names the Postgres/MySQL database the run owns (dropped and made again at boot).
+ */
+export async function boot(engine: Engine, port: number, now: number, options: { database?: string } = {}): Promise<Server> {
   const env: NodeJS.ProcessEnv = {
     ...process.env,
     E2E_ENGINE: engine,
     E2E_PORT: String(port),
+    E2E_SMTP_PORT: String(port + 1),
+    E2E_SINK_PORT: String(port + 2),
+    E2E_FAKE_LLM_PORT: "0",
     // Its own database, so a contract never meets another run's rows.
-    E2E_DATABASE: `cp_contract_${engine}`,
+    E2E_DATABASE: options.database ?? `cp_contract_${engine}`,
     CONTRACT_NOW: String(now),
     NODE_OPTIONS: `${process.env["NODE_OPTIONS"] ?? ""} --import=${pathToFileURL(fileURLToPath(new URL("./clock.mjs", import.meta.url))).href}`.trim(),
   };
@@ -192,7 +223,7 @@ export async function boot(engine: Engine, port: number, now: number): Promise<S
   }
   return {
     base,
-    sink: `http://127.0.0.1:${String(port + 101)}`,
+    sink: `http://127.0.0.1:${String(port + 2)}`,
     log: () => log,
     stop: () =>
       new Promise<void>((resolve) => {
@@ -216,6 +247,10 @@ export interface Reply<T = unknown> {
 /** A caller: the operator (a session cookie) or a client's page (a browser key, a public session). */
 export class Caller {
   private cookie = "";
+  /** The session cookie(s) this caller holds, `name=value; …` — for a browser to carry the same session. */
+  get cookies(): string {
+    return this.cookie;
+  }
   private csrf = "";
   readonly base: string;
   private readonly headers: Record<string, string>;

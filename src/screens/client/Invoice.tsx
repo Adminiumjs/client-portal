@@ -202,7 +202,16 @@ export default function Invoice() {
                     </span>
                     <span role="cell" className="cl-ledger-entry">
                       <span className="cl-ledger-label">{row.kind === "total" ? t("client.invoice.total") : t("client.invoice.received")}</span>
-                      <span className="cl-mono-small">{row.kind === "total" ? [inv.number, termsWord].filter((x) => x !== null && x !== "").join(" · ") : t(METHOD_KEYS[row.method ?? "other"])}</span>
+                      <span className="cl-mono-small">
+                        {row.kind === "total" ? [inv.number, termsWord].filter((x) => x !== null && x !== "").join(" · ") : t(METHOD_KEYS[row.method ?? "other"])}
+                        {/* On a phone the date and amount columns fold away: the entry says them. */}
+                        {row.kind === "payment" && (
+                          <span className="cl-ledger-narrow">
+                            {` · ${date(row.day)} · `}
+                            <span className="money">{`−${money(row.amount, inv.currency)}`}</span>
+                          </span>
+                        )}
+                      </span>
                     </span>
                     <span role="cell" className={`cl-num money${row.kind === "payment" ? " cl-tone-pos" : " cl-tone-muted"}`}>
                       {row.kind === "payment" ? `−${money(row.amount, inv.currency)}` : money(row.amount, inv.currency)}

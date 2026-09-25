@@ -5,7 +5,7 @@
  */
 import { useMemo, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
-import { Box, ChevronRight, File, FileText, FolderOpen, Folders, House, Image, LayoutTemplate, Package, Palette, PanelBottom, PenTool, Printer, ReceiptText, Ruler, Scissors, Shapes, Stamp, Type, Utensils } from "lucide-react";
+import { ArrowLeft, Box, ChevronRight, File, FileText, FolderOpen, Folders, House, Image, LayoutTemplate, Package, Palette, PanelBottom, PenTool, Printer, ReceiptText, Ruler, Scissors, Shapes, Stamp, Type, Utensils } from "lucide-react";
 
 import type { Day, Id } from "../../../data/types.ts";
 import { useI18n } from "../../../i18n/index.tsx";
@@ -184,3 +184,18 @@ export function AlsoWith({ current }: { current: { kind: "proposal" | "invoice" 
 
 /** The page on show, for a screen that is the same component for two ids. */
 export const useSelected = (key: "proposal" | "invoice" | "project" | "deliverable"): Id | null => useUi((s) => s.selected[key]);
+
+/**
+ * The way back to everything, at the top of a page no list leads home from
+ * (the statement, the brief). The session lives in the page, so a reload to
+ * get home would sign the client out: the page itself has to offer the way.
+ */
+export function BackHome() {
+  const { t } = useI18n();
+  return (
+    <button type="button" className="btn ol-gi btn--small cl-back ol-noprint" onClick={() => go("home")}>
+      <ArrowLeft size={14} aria-hidden="true" />
+      {t("client.invoice.backHome")}
+    </button>
+  );
+}

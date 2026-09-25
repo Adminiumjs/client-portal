@@ -25,7 +25,7 @@ import {
 } from "react";
 
 import { tenantCurrency } from "./ambient.ts";
-import { formatMoney } from "../lib/money.ts";
+import { formatMoney, isolateMoney } from "../lib/money.ts";
 import type { Decimal } from "../data/types.ts";
 
 import {
@@ -175,7 +175,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
       dir,
       setLocale,
       t,
-      money: (v, currency) => formatMoney(v, currency ?? tenantCurrency(), locale),
+      money: (v, currency) => isolateMoney(formatMoney(v, currency ?? tenantCurrency(), locale), dir),
       number: (n, opts) =>
         opts ? new Intl.NumberFormat(locale, opts).format(n) : nf.format(n),
       date: (d, opts) => new Intl.DateTimeFormat(locale, opts).format(d),

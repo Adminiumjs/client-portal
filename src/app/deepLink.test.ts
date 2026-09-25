@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { detailFromPath, landingFromHash, linkFragment, tokenFromHash } from "./deepLink.ts";
+import { detailFromPath, landingFromHash, linkFragment, tokenFromHash, unknownPath } from "./deepLink.ts";
 
 describe("links into one document", () => {
   it("opens the document a section path names, on each side", () => {
@@ -23,5 +23,21 @@ describe("links into one document", () => {
   it("reads the token and the landing together, before the fragment leaves the address", () => {
     expect(linkFragment("#abcDEF123_-xyz&to=invoices/12")).toEqual({ token: "abcDEF123_-xyz", landing: "invoices/12" });
     expect(linkFragment("")).toEqual({ token: null, landing: null });
+  });
+
+  it("knows an address that names no screen, so the side's 404 shows instead of its first page", () => {
+    expect(unknownPath("staff", "")).toBe(false);
+    expect(unknownPath("staff", "invoices")).toBe(false);
+    expect(unknownPath("staff", "invoices/12")).toBe(false);
+    expect(unknownPath("staff", "/settings/")).toBe(false);
+    expect(unknownPath("staff", "archive")).toBe(true);
+    expect(unknownPath("staff", "invoicesx")).toBe(true);
+    // Each side knows only its own paths: the clients' sign-in link is no desk page, the desk's chasing no client page.
+    expect(unknownPath("staff", "c")).toBe(true);
+    expect(unknownPath("customer", "c")).toBe(false);
+    expect(unknownPath("customer", "h")).toBe(false);
+    expect(unknownPath("customer", "invoices/12")).toBe(false);
+    expect(unknownPath("customer", "chasing")).toBe(true);
+    expect(unknownPath("customer", "")).toBe(false);
   });
 });

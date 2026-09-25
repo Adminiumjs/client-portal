@@ -27,6 +27,7 @@
  * here rather than signing nobody in — except the payment instructions, which
  * simply read as "none" and the page says where else to find them.
  */
+import { listInBrowser } from "./listInBrowser.ts";
 import { normalise, normaliseAll } from "./rows.ts";
 import { realTables } from "./tableOfRef.ts";
 import type { ListCondition } from "./snapshotPort.ts";
@@ -197,6 +198,9 @@ export interface PublicPortalOptions {
   tables?: Record<string, string>;
 }
 
+/** The most rows one public read may ask for (a door's `max_limit`). */
+const DOOR_LIMIT = 200;
+
 export async function publicPortalPort(client: PortalClient, opts: PublicPortalOptions = {}): Promise<PortalPort> {
   const config = await guard(() => client.config());
   const tables = opts.tables ?? {};
@@ -209,8 +213,16 @@ export async function publicPortalPort(client: PortalClient, opts: PublicPortalO
     if (row === undefined) throw new PortError("PUBLIC_CLAIM_LEVEL", "no client for this session", 401);
     return row;
   };
-  const read = async <R extends TableRef>(table: R, ref: string, where?: ListCondition, order?: string, limit = 200): Promise<Tables[R][]> =>
-    normaliseAll(table, (await client.list<Record<string, unknown>>(ref, { limit, ...(where === undefined ? {} : { where }), ...(order === undefined ? {} : { order }) })).data);
+  /*
+   * A door an app's manifest makes names no column a caller may filter or
+   * sort by, and Adminium refuses a list that sends either — so the whole
+   * door is read (it is only this client's rows, or the studio's few) and
+   * narrowed and ordered here (`listInBrowser.ts`).
+   */
+  const read = async <R extends TableRef>(table: R, ref: string, where?: ListCondition, order?: string, limit = 200): Promise<Tables[R][]> => {
+    const rows = normaliseAll(table, (await client.list<Record<string, unknown>>(ref, { limit: DOOR_LIMIT })).data);
+    return listInBrowser(rows as unknown as Record<string, unknown>[], { ...(where === undefined ? {} : { where }), ...(order === undefined ? {} : { order }), limit }) as unknown as Tables[R][];
+  };
 
   return {
     timeZone: () => config.timezone,

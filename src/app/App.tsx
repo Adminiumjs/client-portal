@@ -18,6 +18,7 @@ import { SURFACE_SIDE } from "../surface.ts";
 import type { CustomerView, StaffView } from "../surface-nav.ts";
 import { usePortal } from "../state/portal.ts";
 import { useUi } from "../state/ui.ts";
+import { isSwitchedOff } from "./switchedOff.ts";
 
 import ClientFrame from "../components/ClientFrame.tsx";
 import ClientSheetHost from "../components/ClientSheetHost.tsx";
@@ -95,8 +96,6 @@ const CLIENT_SCREENS = {
   notfound: ClientNotFound,
 } satisfies Record<CustomerView, ComponentType>;
 
-/** The codes that mean the clients' side is switched off. */
-const SWITCHED_OFF = new Set(["PUBLIC_SWITCHED_OFF", "SURFACE_OFF", "APP_DISABLED", "PUBLIC_API_DISABLED", "PUBLIC_KEY_OFF"]);
 
 function Desk() {
   const view = useUi((s) => s.view);
@@ -114,7 +113,7 @@ function Desk() {
 
 function ClientSide() {
   const view = useUi((s) => s.view);
-  const off = usePortal((s) => s.loadError !== null && SWITCHED_OFF.has(s.loadError));
+  const off = usePortal((s) => isSwitchedOff(s.loadError));
   const Screen = off ? ClientNotAvailable : ((CLIENT_SCREENS as Partial<Record<string, ComponentType>>)[view] ?? ClientNotFound);
   return (
     <>

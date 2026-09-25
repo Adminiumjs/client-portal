@@ -286,7 +286,10 @@
   font-family: var(--font-mono);
   font-size: var(--text-kicker);
   font-weight: 600;
-  opacity: 0.6;
+  color: var(--fg-subtle);
+}
+.ch-seg-chip[aria-pressed="true"] .ch-seg-days {
+  color: var(--fg-muted);
 }
 .ch-ladder-note {
   font-size: var(--text-xs);

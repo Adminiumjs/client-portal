@@ -9,6 +9,8 @@
  * ever sees; it is read once and taken out of the address.
  */
 import type { ClientView, DeskView } from "./routes.ts";
+import { SURFACE_NAV } from "../surface-nav.ts";
+import { entryForPath } from "../urlSync.ts";
 
 const DESK_DETAIL: Record<string, DeskView> = { proposals: "proposal", invoices: "invoice", projects: "project", clients: "client" };
 const CLIENT_DETAIL: Record<string, ClientView> = { proposals: "proposal", invoices: "invoice", projects: "project" };
@@ -40,4 +42,17 @@ export function landingFromHash(hash: string): string | null {
  */
 export function linkFragment(hash: string): { token: string | null; landing: string | null } {
   return { token: tokenFromHash(hash), landing: landingFromHash(hash) };
+}
+
+/**
+ * True when an address under the surface names none of its screens — the
+ * page to show is that side's 404. The shared address reader keeps whatever
+ * screen the app booted with for a path it does not know (the desk's Home,
+ * the clients' Find), which would pass a mistyped or stale link off as the
+ * right page; the base itself (`""`) is the side's first screen, not a miss.
+ */
+export function unknownPath(side: "staff" | "customer", path: string): boolean {
+  const trimmed = path.replace(/^\/+|\/+$/g, "");
+  if (trimmed === "") return false;
+  return entryForPath(SURFACE_NAV.filter((entry) => entry.side === side), trimmed) === null;
 }

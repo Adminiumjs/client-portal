@@ -409,6 +409,10 @@ export function publicAccessIssues(entries: readonly PublicAccess[], ctx: Public
         else if (token.type !== 'text' || (token.rules?.code?.length ?? 0) < 16) {
           out.push({ path: at('claim', 'column'), message: `"${entry.table}.${claim.column}" is the link's secret: a text column Adminium fills with a 16-character code` });
         }
+        // The code opens the row; showing it back would hand the link to whatever reads the page.
+        if (entry.select?.includes(claim.column) === true) {
+          out.push({ path: at('select'), message: `"${entry.table}.${claim.column}" is the link's secret: it opens the row, and is never shown` });
+        }
         if (claim.expires !== undefined) {
           const found = column(claim.expires);
           if (found === undefined) out.push({ path: at('claim', 'expires'), message: `"${entry.table}" has no column "${claim.expires}"` });

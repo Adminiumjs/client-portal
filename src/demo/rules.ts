@@ -758,16 +758,6 @@ export const DEMO_RULES: DemoRules = {
         "column": "created_at",
         "set": "now",
         "on": "create"
-      },
-      {
-        "column": "approved_by",
-        "set": "user-name",
-        "on": {
-          "column": "status",
-          "values": [
-            "queued"
-          ]
-        }
       }
     ]
   },

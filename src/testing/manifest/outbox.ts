@@ -342,6 +342,9 @@ export const emailTemplateSchema = z
   .strict();
 export type EmailTemplate = z.infer<typeof emailTemplateSchema>;
 
+/** The column rules that decide a value on the server (see `columnRulesSchema`). */
+const DECIDING_RULES = ['copy', 'default', 'sequence', 'format', 'code', 'rollup', 'formula', 'stamp'] as const;
+
 /** Everything in `outbox` and `emailTemplates` that names something undeclared, or does not fit. */
 export function outboxIssues(
   m: {
@@ -424,6 +427,24 @@ export function outboxIssues(
     if (ref !== undefined) col(box.table, ref, name === 'skipReason' ? ['text', 'enum'] : ['text'], at('columns', name), 'a text column');
   }
   if (box.columns.effectAt !== undefined) col(box.table, box.columns.effectAt, ['timestamptz'], at('columns', 'effectAt'), 'a timestamptz');
+  /*
+   * The columns Adminium writes as it sends and as a person approves or skips
+   * a message. A rule of the app's own that decides one of them (a stamp of
+   * who approved) races Adminium for it, and the desk's every message is then
+   * refused for writing a column only Adminium writes.
+   */
+  for (const name of ['status', 'sentAt', 'error', 'skipReason', 'approvedBy', 'effectAt', 'effectError'] as const) {
+    const ref = box.columns[name];
+    if (ref === undefined) continue;
+    const rules = (index.column(box.table, ref) as { rules?: Partial<Record<(typeof DECIDING_RULES)[number], unknown>> } | undefined)?.rules;
+    const deciding = DECIDING_RULES.filter((rule) => rules?.[rule] !== undefined);
+    if (deciding.length > 0) {
+      out.push({
+        path: at('columns', name),
+        message: `"${box.table}.${ref}" is the outbox's ${name}, which Adminium writes, so it takes no ${deciding.join(' or ')} rule`,
+      });
+    }
+  }
   const holds = (box.producers ?? []).some((producer) => producer.hold === true);
   if (holds && status !== undefined && !(status.enum ?? []).includes(OUTBOX_HELD)) {
     out.push({ path: at('columns', 'status'), message: `a producer holds its messages, so "${box.table}.${status.ref}" offers "${OUTBOX_HELD}"` });

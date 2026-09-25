@@ -40,7 +40,7 @@ import { placesOf } from "../demo/engine.ts";
 import { DEMO_RULES } from "../demo/rules.ts";
 import { DEMO_BUNDLE, DEMO_CURRENCY, DEMO_SETTINGS, demoSample } from "../demo/sample.ts";
 import { createWorld } from "../demo/world.ts";
-import { addOnBundle, addOnVersions, appBundle, boot, Caller, ENGINES, missing, ok, packedAddOnVersion, solve, until, type Engine, type Server } from "./harness.ts";
+import { addOnBundle, addOnVersions, appBundle, boot, Caller, ENGINES, missing, ok, packedAddOnVersion, PORTS_PER_ENGINE, solve, until, type Engine, type Server } from "./harness.ts";
 
 type Row = Record<string, unknown> & { id: Id };
 
@@ -79,7 +79,7 @@ describe.skipIf(why !== null)(`the contract with a built Adminium${why === null 
       let tableIds: Record<string, string> = {};
 
       beforeAll(async () => {
-        server = await boot(engine as Engine, PORT_BASE + index * 10, DEMO_START);
+        server = await boot(engine as Engine, PORT_BASE + index * PORTS_PER_ENGINE, DEMO_START);
         staff = new Caller(server.base, { origin: server.base });
         await staff.signIn(ADMIN.email, ADMIN.password);
         const connections = ok(await staff.get<{ connections: { id: string; name: string }[] }>("/api/v1/connections"));

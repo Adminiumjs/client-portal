@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 import { buildManifest } from "./build.ts";
 import { EMAIL_EN } from "./emails.ts";
 import { EMAIL_TRANSLATIONS } from "./email-words.ts";
+import { OUTBOX } from "./outbox.ts";
 
 type Json = Record<string, unknown>;
 const manifest = buildManifest() as Json & { requiredSchema: { tables: (Json & { ref: string; columns: (Json & { ref: string })[] })[] }; documents: Json[]; publicAccess: Json[] };
@@ -60,5 +61,17 @@ describe("what the app's screens stand on", () => {
       const rung = words["invoice-rung-3"];
       expect(`${rung.subject} ${rung.paras.join(" ")}`).not.toContain("{{project.");
     }
+  });
+
+  it("leaves the columns Adminium's outbox writes to the outbox: no stamp fills them first", () => {
+    // A stamp on one (who approved, when it went, why it was skipped) is refused as "written by hand" on
+    // every new message and every approval: nothing the desk queues would ever be made or sent.
+    const owned = ["sentAt", "approvedBy", "effectAt", "effectError", "skipReason", "error"].map((key) => (OUTBOX.columns as Record<string, string | undefined>)[key]).filter((c): c is string => c !== undefined);
+    expect(owned).toContain("approved_by");
+    const stamped = owned.filter((c) => {
+      const rules = column(OUTBOX.table, c)?.["rules"] as Json | undefined;
+      return rules !== undefined && "stamp" in rules;
+    });
+    expect(stamped).toEqual([]);
   });
 });

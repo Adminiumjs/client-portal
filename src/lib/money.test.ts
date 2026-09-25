@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatMoney, isPositive, minorUnits, sumDecimals } from "./money.ts";
+import { formatMoney, isolateMoney, isPositive, minorUnits, sumDecimals } from "./money.ts";
 
 describe("money on screen", () => {
   it("shows each currency with its own minor units", () => {
@@ -30,5 +30,12 @@ describe("money on screen", () => {
     expect(isPositive("0.00")).toBe(false);
     expect(isPositive(null)).toBe(false);
     expect(isPositive("0.01")).toBe(true);
+  });
+
+  it("keeps an amount's own order inside right-to-left text, and leaves left-to-right text alone", () => {
+    const arabic = formatMoney("1621", "USD", "ar-EG");
+    expect(isolateMoney(arabic, "rtl")).toBe(`\u2066${arabic}\u2069`);
+    expect(isolateMoney("$1,621.00", "ltr")).toBe("$1,621.00");
+    expect(isolateMoney("", "rtl")).toBe("");
   });
 });

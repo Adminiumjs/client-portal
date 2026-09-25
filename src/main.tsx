@@ -84,7 +84,7 @@ function systemTheme(): "light" | "dark" {
  */
 async function wireHost(side: "staff" | "customer"): Promise<void> {
   if (!HOSTED) return;
-  const [{ attachUrlSync, pathUnderBase, surfaceBase }, { connectToHost }, { SURFACE_NAV, APP_KEY }, { detailFromPath }] = await Promise.all([
+  const [{ attachUrlSync, pathUnderBase, surfaceBase }, { connectToHost }, { SURFACE_NAV, APP_KEY }, { detailFromPath, unknownPath }] = await Promise.all([
     import("./urlSync.ts"),
     import("./embed.ts"),
     import("./surface-nav.ts"),
@@ -101,6 +101,8 @@ async function wireHost(side: "staff" | "customer"): Promise<void> {
   });
   const detail = detailFromPath(side, bootPath);
   if (detail !== null) open(detail.view, detail.id);
+  // An address that names no screen is the side's 404, not its first page passed off as the right one.
+  else if (unknownPath(side, bootPath)) go("notfound");
   bridge = await connectToHost(APP_KEY, side, sync.path(), {
     onTheme: (theme) => useUi.setState({ theme: theme === "dark" ? "dark" : "light" }),
     onLocale: setHostLocale,
@@ -140,6 +142,15 @@ async function bootClients(): Promise<void> {
     setTimezoneClaim(port.timeZone(), "operator");
     setTenantCurrency(port.currency());
   } catch (error) {
+    const { isSwitchedOff } = await import("./app/switchedOff.ts");
+    if (isSwitchedOff(codeOf(error))) {
+      // Switched off by the studio, not broken: the clients' own "not available" page, in their language.
+      portal.usePortal.setState({ loadError: codeOf(error) });
+      useUi.setState({ persona: "client", view: "notavailable", theme: systemTheme() });
+      const { default: App } = await import("./app/App.tsx");
+      render(App);
+      return;
+    }
     showStartupFailure({ text: messageOf(error) }, codeOf(error));
     return;
   }

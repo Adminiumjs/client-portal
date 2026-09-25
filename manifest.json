@@ -7979,18 +7979,7 @@
               "zh-CN": "批准方式",
               "zh-TW": "核准方式"
             },
-            "nullable": true,
-            "rules": {
-              "stamp": {
-                "set": "user-name",
-                "on": {
-                  "column": "status",
-                  "values": [
-                    "queued"
-                  ]
-                }
-              }
-            }
+            "nullable": true
           },
           {
             "ref": "due",

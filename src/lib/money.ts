@@ -55,6 +55,17 @@ export function formatMoney(value: Decimal | number | null | undefined, currency
   }
 }
 
+/**
+ * An amount set inside right-to-left text keeps its own left-to-right order:
+ * wrapped in a left-to-right isolate (U+2066 … U+2069). Without it the
+ * currency's letters and sign are reordered by the sentence around them — an
+ * Arabic line read "$US ١٬٦٢١٫٠٠" for "US$ ١٬٦٢١٫٠٠". A left-to-right page
+ * gets the amount as it is.
+ */
+export function isolateMoney(text: string, dir: "ltr" | "rtl"): string {
+  return dir === "rtl" && text !== "" ? `\u2066${text}\u2069` : text;
+}
+
 /** A decimal string as a whole number of units at `scale` places, exactly. */
 function toUnits(value: Decimal, scale: number): bigint {
   const text = value.trim();

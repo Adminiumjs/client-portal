@@ -824,7 +824,9 @@ export const TABLES: Table[] = [
       fk("enquiry_id", "enquiries", "Enquiry", true),
       text("subject_override", 200, "Subject as approved", opt),
       text("body_override", null, "Words as approved", opt),
-      text("approved_by", 120, "Approved by", { ...opt, rules: stamp("user-name", when("status", "queued")) }),
+      // Adminium's outbox writes who approved a held message (it names this column, `outbox.ts`); a
+      // stamp here would fill it first and the outbox then refuses every new and every approved message.
+      text("approved_by", 120, "Approved by", opt),
       at("due", "Due", opt),
       at("sent_at", "Sent", opt),
       text("error", null, "Why it was not sent", opt),

@@ -66,8 +66,9 @@
   text-align: start;
   font: inherit;
 }
+/* An empty bucket reads quieter by its colour, not by fading: faded text falls below AA. */
 .home-bucket--empty {
-  opacity: 0.5;
+  background: transparent;
 }
 .home-bucket-label {
   font-size: 11px;
