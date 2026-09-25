@@ -2,7 +2,7 @@
  * The icons the frames draw by name (the sidebar's, from `app/routes.ts`).
  * A screen imports its own icons from `lucide-react` directly.
  */
-import { BellRing, CalendarDays, FileText, FolderKanban, Gauge, House, Inbox, ReceiptText, Settings, Timer, Truck, UsersRound, Wallet, type LucideIcon } from "lucide-react";
+import { Archive, BellRing, CalendarDays, ChartNoAxesColumn, FileText, FolderKanban, Gauge, House, Inbox, ReceiptText, Settings, Timer, Truck, UsersRound, Wallet, type LucideIcon } from "lucide-react";
 
 export const NAV_ICONS: Readonly<Record<string, LucideIcon>> = {
   house: House,
@@ -12,10 +12,12 @@ export const NAV_ICONS: Readonly<Record<string, LucideIcon>> = {
   "users-round": UsersRound,
   "receipt-text": ReceiptText,
   "bell-ring": BellRing,
+  "chart-no-axes-column": ChartNoAxesColumn,
   "calendar-days": CalendarDays,
   gauge: Gauge,
   wallet: Wallet,
   truck: Truck,
   timer: Timer,
   settings: Settings,
+  archive: Archive,
 };

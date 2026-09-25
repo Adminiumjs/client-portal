@@ -30,7 +30,7 @@ describe("links into one document", () => {
     expect(unknownPath("staff", "invoices")).toBe(false);
     expect(unknownPath("staff", "invoices/12")).toBe(false);
     expect(unknownPath("staff", "/settings/")).toBe(false);
-    expect(unknownPath("staff", "archive")).toBe(true);
+    expect(unknownPath("staff", "nowhere")).toBe(true);
     expect(unknownPath("staff", "invoicesx")).toBe(true);
     // Each side knows only its own paths: the clients' sign-in link is no desk page, the desk's chasing no client page.
     expect(unknownPath("staff", "c")).toBe(true);

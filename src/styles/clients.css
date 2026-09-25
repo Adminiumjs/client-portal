@@ -558,3 +558,13 @@
   font-weight: 700;
   color: var(--danger);
 }
+
+/* "See what they receive": a wide quiet button under the facts. */
+.cr-email-link.btn {
+  height: 38px;
+  margin-top: 14px;
+  border-radius: 11px;
+  background: var(--surface-2);
+  font-size: 13px;
+  justify-content: center;
+}

@@ -943,6 +943,7 @@ export const TABLES: Table[] = [
       text("label", 160, "What it is"),
       decimal("monthly_amount", "Every month", "currency", { semantic: "money", rules: { validation: { min: 0 } } }),
       int("position", "Position", { default: 0 }),
+      clientKey,
     ],
   },
   {

@@ -36,11 +36,13 @@ export const SURFACE_NAV = [
   { id: "clients", path: "clients", view: "clients", side: "staff", icon: "users-round", labelKey: "nav.clients" },
   { id: "invoices", path: "invoices", view: "invoices", side: "staff", icon: "receipt-text", labelKey: "nav.invoices" },
   { id: "chasing", path: "chasing", view: "chasing", side: "staff", icon: "bell-ring", labelKey: "nav.chasing" },
+  { id: "money", path: "money", view: "money", side: "staff", icon: "chart-no-axes-column", labelKey: "nav.money" },
   { id: "expenses", path: "expenses", view: "expenses", side: "staff", icon: "wallet", labelKey: "nav.expenses" },
   { id: "suppliers", path: "suppliers", view: "suppliers", side: "staff", icon: "truck", labelKey: "nav.suppliers" },
   { id: "time", path: "time", view: "time", side: "staff", icon: "timer", labelKey: "nav.time" },
   { id: "terms", path: "terms", view: "terms", side: "staff", icon: "signature", labelKey: "nav.terms" },
   { id: "settings", path: "settings", view: "settings", side: "staff", icon: "settings", labelKey: "nav.settings" },
+  { id: "archive", path: "archive", view: "archive", side: "staff", icon: "archive", labelKey: "nav.archive" },
   /*
    * The clients' first page takes the EMPTY path: a studio's own domain
    * serves this side at `/`, and finding their documents is what someone
@@ -64,7 +66,7 @@ export const SURFACE_NAV = [
  * and the dead ends are where a failure lands.
  */
 export const SURFACE_EXTRAS = {
-  staff: ["proposal", "composer", "project", "review", "handover", "client", "invoice", "print", "notfound", "scoping", "money", "archive", "emails"],
+  staff: ["proposal", "composer", "project", "review", "handover", "client", "invoice", "print", "notfound", "scoping", "emails"],
   customer: ["review", "expired", "notavailable", "notfound", "enquire"],
 } as const satisfies Record<"staff" | "customer", readonly View[]>;
 

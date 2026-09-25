@@ -53,7 +53,7 @@ describe("the studio's frame", () => {
     );
     expect(html).toContain('class="brand-name">Outline<');
     expect(html).toContain(">Studio<");
-    expect(items(html)).toEqual(["home", "enquiries 3", "proposals 1", "projects", "clients", "invoices 2", "chasing 2", "settings"]);
+    expect(items(html)).toEqual(["home", "schedule", "capacity", "enquiries 3", "proposals 1", "projects", "clients", "invoices 2", "chasing 2", "money", "expenses", "suppliers", "time", "settings", "archive"]);
     expect(html).toMatch(/data-nav="home" aria-current="page"|aria-current="page"[^>]*data-nav="home"/);
     expect(html).toContain("Nadia Cole");
     expect(html).toContain("Studio manager");

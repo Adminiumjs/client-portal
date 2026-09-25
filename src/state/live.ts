@@ -31,7 +31,7 @@ import { studioZone, today } from "../lib/clock.ts";
 const GATHER_MS = 120;
 
 /** Tables whose new rows are open work: read even when the desk held none of them. */
-const OPEN_WORK: readonly TableRef[] = ["enquiries", "messages", "proposals", "invoices", "projects", "milestones", "deliverables", "clients", "time_entries", "events", "expenses", "suppliers"];
+const OPEN_WORK: readonly TableRef[] = ["enquiries", "messages", "proposals", "invoices", "projects", "milestones", "deliverables", "clients", "time_entries", "events", "expenses", "suppliers", "running_costs"];
 
 /** What else a row's change moves, with no frame of its own. */
 const PARENT: Partial<Record<TableRef, { ref: TableRef; column: string }>> = {

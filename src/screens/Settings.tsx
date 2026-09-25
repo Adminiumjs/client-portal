@@ -20,7 +20,7 @@
  */
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
-import { ArrowUpRight, Bell, Calculator, Check, FileSignature, Mail, PenTool, Plus, ReceiptText, Ruler, Trash2, UsersRound } from "lucide-react";
+import { Bell, Calculator, Check, Eye, FileSignature, Mail, PenTool, Plus, ReceiptText, Ruler, Trash2, UsersRound } from "lucide-react";
 
 import { Alert, Button, Field, IconButton, ScreenHead } from "../components/ui.tsx";
 import type { Id, Person, Rate, Settings as SettingsRow } from "../data/types.ts";
@@ -323,9 +323,6 @@ function PeopleCard({ people, manager }: { people: Person[]; manager: boolean })
 
 // ── email ───────────────────────────────────────────────────────────────────
 
-/** Adminium's Email Templates, where every email the studio sends is written. */
-const EMAILS_URL = "/email-templates";
-
 function EmailCard({ settings, people, manager }: { settings: SettingsRow | null; people: Person[]; manager: boolean }) {
   const { t, locale } = useI18n();
   const save = useSave();
@@ -350,10 +347,10 @@ function EmailCard({ settings, people, manager }: { settings: SettingsRow | null
             </select>
           )}
         </Field>
-        <a className="btn ol-gi btn--wide set-email-link" href={EMAILS_URL} target="_blank" rel="noopener">
-          <ArrowUpRight size={15} aria-hidden="true" />
+        <button type="button" className="btn ol-gi btn--wide set-email-link" onClick={() => go("emails")}>
+          <Eye size={15} aria-hidden="true" />
           {t("settings.email.all")}
-        </a>
+        </button>
       </div>
       <RefusedLine refused={save.refused} />
     </SetCard>

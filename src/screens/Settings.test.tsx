@@ -68,11 +68,13 @@ describe("Settings, for a studio manager", () => {
     expect(draw()).toContain("Clients see no one.");
   });
 
-  it("offers the sign-off from the people, keeping what is stored, and the emails in Adminium", () => {
+  it("offers the sign-off from the people, keeping what is stored, and a way to every email we send", () => {
     const html = draw();
     expect(html).toMatch(/<option value="Nadia and Tomas" selected="">Nadia and Tomas<\/option>/);
     expect(html).toContain('<option value="Nadia">Nadia</option>');
-    expect(html).toContain('href="/email-templates"');
+    // The desk's own page of every email, not a page of Adminium's in another tab.
+    expect(html).toMatch(/<button type="button" class="btn ol-gi btn--wide set-email-link">.*See every email we send<\/button>/);
+    expect(html).not.toContain('href="/email-templates"');
   });
 
   it("switches the seven notices, and names where they go", () => {

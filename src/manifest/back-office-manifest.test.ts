@@ -8,7 +8,7 @@
 import { describe, expect, it } from "vitest";
 
 import { validateManifest } from "../testing/manifest/index.ts";
-import { buildManifest, LATER_STAFF_ROUTES, STAFF_ROUTES } from "./build.ts";
+import { buildManifest } from "./build.ts";
 import { EMAIL_EN } from "./emails.ts";
 import { EMAIL_TRANSLATIONS } from "./email-words.ts";
 import { LOCALES } from "./labels.ts";
@@ -143,15 +143,21 @@ describe("Holiday calendars", () => {
   });
 });
 
-describe("the back office's pages, declared for later", () => {
-  it("installs none of them yet, and grants none", () => {
+describe("the back office's pages", () => {
+  it("installs and grants each one whose screen has shipped", () => {
+    for (const ref of ["clients-time", "clients-expenses", "clients-suppliers", "clients-studio-dates", "clients-running-costs"]) {
+      expect(manifest.pages.map((p) => p.ref)).toContain(ref);
+      expect(PAGE_REFS).toContain(ref);
+    }
+  });
+
+  it("installs none still declared for later, and grants none", () => {
     const refs = LATER_PAGES.map((p) => p.ref);
-    expect(refs).toEqual(["clients-time", "clients-expenses", "clients-suppliers", "clients-studio-dates", "clients-running-costs"]);
+    expect(refs).toEqual([]);
     for (const ref of refs) {
       expect(manifest.pages.map((p) => p.ref)).not.toContain(ref);
       expect(PAGE_REFS).not.toContain(ref);
     }
-    for (const path of Object.values(LATER_STAFF_ROUTES)) expect(Object.values(STAFF_ROUTES)).not.toContain(path);
   });
 
   it("validates with every one of them switched on", () => {

@@ -1,1 +1,517 @@
 /* The emails area's own layout. Shared pieces are in primitives.css; tokens in tokens.css. */
+
+.emails {
+  container: emails / inline-size;
+}
+.emails-title {
+  font-size: var(--text-hero);
+}
+.emails-lead {
+  margin: 8px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fg-muted);
+  text-wrap: pretty;
+}
+
+/* the two rows of emails */
+.em-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.em-tab-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.em-tab-label {
+  flex: 0 0 92px;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+}
+.em-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 29px;
+  padding: 0 11px;
+  border-radius: 9px;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  background: transparent;
+  color: var(--fg-subtle);
+}
+.em-tab[aria-pressed="true"] {
+  background: var(--surface);
+  color: var(--fg);
+  box-shadow: 0 1px 3px rgba(20, 20, 35, 0.14);
+}
+
+/* the language and the three ways to look at it */
+.em-toolbar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.em-lang {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.em-lang-label {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+}
+.em-lang-select {
+  height: 33px;
+  padding-inline: 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--fg);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.em-modes {
+  display: flex;
+  gap: 3px;
+  margin-inline-start: auto;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 3px;
+}
+.em-mode {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 27px;
+  padding: 0 11px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  background: transparent;
+  color: var(--fg-subtle);
+}
+.em-mode[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+.em-mode:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* the email beside the rules */
+.em-cols {
+  display: grid;
+  gap: 14px;
+  align-items: start;
+  grid-template-columns: minmax(0, 1fr);
+}
+@container emails (min-width: 940px) {
+  .em-cols {
+    grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.8fr);
+  }
+}
+.em-side {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.em-panel {
+  overflow: hidden;
+}
+.em-head {
+  margin: 0;
+  padding: 14px 16px;
+  border-block-end: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.em-head-row {
+  display: flex;
+  align-items: baseline;
+  gap: 11px;
+}
+.em-head-row dt {
+  flex: 0 0 62px;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+}
+.em-head-row dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.em-head-mono {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--fg);
+  text-align: start;
+  unicode-bidi: isolate;
+}
+.em-head-subject {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--fg);
+}
+.em-canvas {
+  padding: clamp(20px, 3vw, 34px) clamp(16px, 3vw, 30px);
+  background: var(--surface-2);
+}
+
+/* the email itself */
+.em-card {
+  max-width: 520px;
+  margin: 0 auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  color: var(--fg);
+}
+.em-card--narrow {
+  max-width: 336px;
+}
+.em-brand {
+  padding: 22px 24px 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.em-brand .brand-mark {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 800;
+  overflow: hidden;
+  flex: 0 0 auto;
+}
+.em-brand .brand-mark img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.em-brand-name {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.035em;
+}
+.em-body {
+  padding: 20px 24px 24px;
+}
+.em-rich {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+.em-lead {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--fg);
+}
+.em-para {
+  margin: 0;
+  font-size: 14.5px;
+  line-height: 1.7;
+  font-weight: 500;
+  color: var(--fg-muted);
+  text-wrap: pretty;
+  white-space: pre-line;
+}
+.em-code {
+  align-self: flex-start;
+  padding: 10px 16px;
+  border-radius: 11px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  color: var(--fg);
+}
+.em-quote {
+  padding: 11px 14px;
+  border-radius: 11px;
+  background: var(--surface-2);
+  border-inline-start: 3px solid var(--border-strong);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.6;
+  color: var(--fg);
+  text-wrap: pretty;
+  white-space: pre-line;
+}
+.em-rows {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  overflow: hidden;
+}
+.em-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 13px;
+  border-block-end: 1px solid var(--border);
+}
+.em-row:last-child {
+  border-block-end: none;
+}
+.em-row-icon {
+  flex: 0 0 auto;
+  color: var(--fg-subtle);
+}
+.em-row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.em-row-a {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--fg);
+  overflow-wrap: anywhere;
+}
+.em-row-b {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-subtle);
+}
+.em-row-c {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--fg);
+  white-space: nowrap;
+  unicode-bidi: isolate;
+}
+.em-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: 11px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.em-box-label {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+}
+.em-box-line {
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.55;
+  color: var(--fg);
+}
+.em-box-line--mono {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+}
+.em-cta {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 20px;
+  border-radius: 12px;
+  border: none;
+  background: var(--accent);
+  color: var(--accent-fg);
+  font: inherit;
+  font-size: 14.5px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.em-link {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+[dir="rtl"] .em-flip {
+  transform: scaleX(-1);
+}
+.em-after {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  font-weight: 500;
+  color: var(--fg-subtle);
+  text-wrap: pretty;
+}
+.em-sign {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--fg-muted);
+}
+.em-plain {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+.em-plain-line {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-weight: 400;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--fg-muted);
+}
+.em-plain-line--link {
+  font-weight: 600;
+  color: var(--accent);
+}
+.em-plain-line--foot {
+  font-size: 11px;
+  color: var(--fg-subtle);
+}
+.em-foot {
+  padding: 15px 24px;
+  border-block-start: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.em-url {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--fg-subtle);
+  overflow-wrap: anywhere;
+  text-align: start;
+}
+.em-foot-text {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--fg-subtle);
+  text-wrap: pretty;
+}
+
+/* when it goes out, and trying it */
+.em-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 14px 16px;
+  border-block-end: 1px solid var(--border);
+  color: var(--fg-subtle);
+}
+.em-panel-head h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--fg);
+}
+.em-rules {
+  list-style: none;
+  margin: 0;
+  padding: 15px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+.em-rule {
+  display: flex;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.6;
+  color: var(--fg-muted);
+  text-wrap: pretty;
+}
+.em-rule-icon {
+  flex: 0 0 auto;
+  margin-block-start: 3px;
+  color: var(--fg-subtle);
+}
+.em-try {
+  padding: 15px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+.em-try-title {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+}
+.em-try-body {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.6;
+  color: var(--fg-muted);
+  text-wrap: pretty;
+}
+.em-try-note {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.55;
+  color: var(--fg-subtle);
+  text-wrap: pretty;
+}
+@container emails (max-width: 520px) {
+  .em-tab-label {
+    flex-basis: 100%;
+  }
+  .em-modes {
+    margin-inline-start: 0;
+  }
+}

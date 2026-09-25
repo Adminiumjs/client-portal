@@ -1386,6 +1386,9 @@ export const DEMO_RULES: DemoRules = {
     "messages": [
       "client_key"
     ],
+    "running_costs": [
+      "client_key"
+    ],
     "events": [
       "client_key"
     ]

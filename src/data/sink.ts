@@ -226,6 +226,36 @@ export function sessionSink(transport: SessionTransport, tableOf: Readonly<Recor
       const reply = await raw<{ values?: Record<string, unknown> }>(`/api/v1/add-ons/${encodeURIComponent(addOnKey)}/settings`, "PUT", JSON.stringify({ values }), "application/json");
       return reply.values ?? {};
     },
+    /*
+     * An email template as it stands in Adminium (`GET /api/v1/email-templates/:key/:locale`,
+     * any signed-in person), and a test send of a document through it
+     * (`POST /api/v1/email-templates/:id/test-send`, a settings manager's).
+     */
+    async emailTemplate(key, locale) {
+      try {
+        const reply = await raw<{ id?: string; name?: string; document?: { subject?: string; preheader?: string; blocks?: { id?: string; block?: string; data?: Record<string, unknown> }[]; footer?: string } }>(
+          `/api/v1/email-templates/${encodeURIComponent(key)}/${encodeURIComponent(locale)}`,
+          "GET",
+        );
+        if (typeof reply.id !== "string" || reply.document === undefined) return null;
+        const doc = reply.document;
+        return {
+          id: reply.id,
+          name: reply.name ?? key,
+          subject: doc.subject ?? "",
+          preheader: doc.preheader ?? "",
+          blocks: (doc.blocks ?? []).map((b, i) => ({ id: b.id ?? String(i), block: b.block ?? "", data: b.data ?? {} })),
+          footer: doc.footer ?? "",
+        };
+      } catch (error) {
+        if (asSinkError(error).status === 404) return null;
+        throw error;
+      }
+    },
+    async testEmail(templateId, to, document) {
+      const reply = await raw<{ queued?: number }>(`/api/v1/email-templates/${encodeURIComponent(templateId)}/test-send`, "POST", JSON.stringify({ to, document }), "application/json");
+      return { queued: reply.queued ?? 0 };
+    },
   };
 }
 

@@ -174,6 +174,34 @@ export interface DeskWrites {
    * until its world does).
    */
   addOnSettings?(addOnKey: string): Promise<AddOnSettings | null>;
+  /**
+   * One of Adminium's email templates as it stands (the operator may have
+   * edited it in Email Templates), by its key and Adminium's locale id
+   * (`en_US`); null when there is none. Any signed-in staff member may read
+   * one. Absent where no Adminium keeps them (the demo).
+   */
+  emailTemplate?(key: string, locale: string): Promise<EmailTemplateDoc | null>;
+  /**
+   * Send an email document once, as a test, through Adminium's Email
+   * Templates test send (a person who manages Adminium's settings). The desk
+   * only ever passes the studio's own address and a document with no live
+   * link in it. Absent where nothing sends email (the demo).
+   */
+  testEmail?(templateId: string, to: readonly string[], document: EmailDocument): Promise<{ queued: number }>;
+}
+
+/** An email as Adminium's templates keep it: a subject, a preheader, its blocks and a footer. */
+export interface EmailDocument {
+  subject: string;
+  preheader: string;
+  blocks: { id: string; block: string; data: Record<string, unknown> }[];
+  footer: string;
+}
+
+/** A stored email template: its id (for a test send), its name, and its document. */
+export interface EmailTemplateDoc extends EmailDocument {
+  id: string;
+  name: string;
 }
 
 // ── the clients' side ───────────────────────────────────────────────────────

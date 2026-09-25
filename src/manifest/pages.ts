@@ -320,7 +320,6 @@ const SPECS: PageSpec[] = [
     icon: "wallet",
     order: 6,
     table: "running_costs",
-    later: true,
     config: form([title("label"), f("monthly_amount", { control: "currency" }), f("position", { control: "stepper" })]),
   },
 ];

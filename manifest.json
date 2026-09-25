@@ -62,11 +62,13 @@
         "clients": "/clients",
         "invoices": "/invoices",
         "chasing": "/chasing",
+        "money": "/money",
         "expenses": "/expenses",
         "suppliers": "/suppliers",
         "time": "/time",
         "terms": "/terms",
-        "settings": "/settings"
+        "settings": "/settings",
+        "archive": "/archive"
       }
     },
     {
@@ -9046,6 +9048,23 @@
               "zh-TW": "順序"
             },
             "default": 0
+          },
+          {
+            "ref": "client_key",
+            "type": "text",
+            "maxLength": 36,
+            "nullable": true,
+            "unique": true,
+            "label": {
+              "en-US": "Action key",
+              "de-DE": "Aktionsschlüssel",
+              "fr-FR": "Clé d’action",
+              "da-DK": "Handlingsnøgle",
+              "cs-CZ": "Klíč akce",
+              "ar-EG": "مفتاح الإجراء",
+              "zh-CN": "操作键",
+              "zh-TW": "操作鍵"
+            }
           }
         ]
       },
@@ -12172,6 +12191,56 @@
           ]
         }
       }
+    },
+    {
+      "ref": "clients-running-costs",
+      "template": "page-crud",
+      "title": {
+        "key": "mft.clients.running.costs",
+        "fallback": "Running costs"
+      },
+      "titles": {
+        "de-DE": "Laufende Kosten",
+        "fr-FR": "Frais fixes",
+        "da-DK": "Faste udgifter",
+        "cs-CZ": "Provozní náklady",
+        "ar-EG": "تكاليف التشغيل",
+        "zh-CN": "固定开支",
+        "zh-TW": "固定開支"
+      },
+      "nav": {
+        "group": "manage",
+        "icon": "wallet",
+        "order": 6
+      },
+      "bindings": {
+        "rows": "running_costs"
+      },
+      "config": {
+        "form": {
+          "v": 2,
+          "sections": [
+            {
+              "id": "s1",
+              "fields": [
+                {
+                  "column": "label",
+                  "control": "title",
+                  "span": 2
+                },
+                {
+                  "column": "monthly_amount",
+                  "control": "currency"
+                },
+                {
+                  "column": "position",
+                  "control": "stepper"
+                }
+              ]
+            }
+          ]
+        }
+      }
     }
   ],
   "roles": [
@@ -12269,6 +12338,7 @@
         "page:@clients-expenses:view",
         "page:@clients-suppliers:view",
         "page:@clients-studio-dates:view",
+        "page:@clients-running-costs:view",
         "table:@settings:read_pii",
         "table:@people:read_pii",
         "table:@rates:read_pii",
@@ -12499,6 +12569,8 @@
         "page:@clients-suppliers:edit",
         "page:@clients-studio-dates:view",
         "page:@clients-studio-dates:edit",
+        "page:@clients-running-costs:view",
+        "page:@clients-running-costs:edit",
         "table:@settings:read_pii",
         "table:@people:read_pii",
         "table:@rates:read_pii",

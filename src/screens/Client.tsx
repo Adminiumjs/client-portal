@@ -10,7 +10,7 @@
  * number, terms and tax rate — new documents take them from then on.
  */
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Eye, FilePlus, FileText, Files, FolderKanban, IdCard, NotebookPen, PencilLine, Plus, ReceiptText, ScrollText } from "lucide-react";
+import { ArrowLeft, Eye, FilePlus, FileText, Files, FolderKanban, IdCard, Mail, NotebookPen, PencilLine, Plus, ReceiptText, ScrollText } from "lucide-react";
 
 import { Alert, Avatar, Button, DayText, Pill, StatusPill, When, type StatusWord } from "../components/ui.tsx";
 import type { Id, Instant } from "../data/types.ts";
@@ -243,6 +243,10 @@ export default function ClientRecord() {
               <Fact k={t("clients.record.terms")}>{client.terms === null ? t("clients.record.studios") : t("clients.record.theirs", { value: t(`invoices.terms.${client.terms}`) })}</Fact>
               <Fact k={t("clients.record.tax")}>{client.tax_rate === null ? t("clients.record.studios") : t("clients.record.theirs", { value: `${number(Number(client.tax_rate), { maximumFractionDigits: 3 })} %` })}</Fact>
             </dl>
+            <button type="button" className="btn ol-gi btn--wide cr-email-link" onClick={() => go("emails")}>
+              <Mail size={15} aria-hidden="true" />
+              {t("clients.record.seeEmails")}
+            </button>
           </section>
 
           <section className="card cr-panel" aria-labelledby="cr-notes-h">

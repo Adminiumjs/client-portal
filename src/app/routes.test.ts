@@ -65,7 +65,7 @@ describe("the surfaces' navigation", () => {
 
 describe("the studio's sidebar", () => {
   it("shows this release's screens only, Settings for managers", () => {
-    expect(SIDEBAR.map((i) => i.view)).toEqual(["home", "enquiries", "proposals", "projects", "clients", "invoices", "chasing", "settings"]);
+    expect(SIDEBAR.map((i) => i.view)).toEqual(["home", "schedule", "capacity", "enquiries", "proposals", "projects", "clients", "invoices", "chasing", "money", "expenses", "suppliers", "time", "settings", "archive"]);
     expect(SIDEBAR.find((i) => i.view === "settings")?.managerOnly).toBe(true);
   });
 

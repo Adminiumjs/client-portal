@@ -13,7 +13,7 @@ import { settle, type Variant } from "./browser.ts";
 import { localeOf, say } from "./words.ts";
 
 /** The sidebar's items, in its order (`app/routes.ts` SIDEBAR). */
-const NAV = ["home", "schedule", "capacity", "enquiries", "proposals", "projects", "clients", "invoices", "chasing", "expenses", "suppliers", "time", "settings"] as const;
+const NAV = ["home", "schedule", "capacity", "enquiries", "proposals", "projects", "clients", "invoices", "chasing", "money", "expenses", "suppliers", "time", "settings", "archive"] as const;
 type NavView = (typeof NAV)[number];
 
 export const screenOf = (page: Page, screen: string) => page.locator(`[data-screen="${screen}"]`).first();
@@ -150,7 +150,7 @@ export function deskStops(checks: { home?(d: Desk): Promise<void>; chasing?(d: D
     {
       name: "notfound",
       go: async (d) => {
-        await d.page.goto(`${DESK}archive`);
+        await d.page.goto(`${DESK}nowhere`);
         await d.shows("notfound");
       },
     },

@@ -545,6 +545,7 @@ export interface RunningCost {
   label: string;
   monthly_amount: Decimal;
   position: number;
+  client_key: string | null;
 }
 
 export type StudioEventKind = "call" | "press" | "away";
@@ -654,6 +655,6 @@ export const NULLABLE: Readonly<Record<TableRef, readonly string[]>> = {
   invoice_lines: ["description", "rate", "discount", "currency", "quote_id", "share_pct", "amount", "client_id", "time_entry_id", "expense_id", "client_key"],
   payments: ["number_seq", "number", "currency", "method_note", "recorded_by", "recorded_at", "void_reason", "voided_by", "voided_at", "client_id", "client_key"],
   messages: ["created_at", "skip_reason", "to", "language", "client_id", "proposal_id", "invoice_id", "payment_id", "project_id", "deliverable_id", "enquiry_id", "subject_override", "body_override", "approved_by", "due", "sent_at", "error", "effect_at", "effect_error", "client_key"],
-  running_costs: [],
+  running_costs: ["client_key"],
   events: ["to_date", "person_id", "client_key"],
 };

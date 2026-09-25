@@ -1,1 +1,449 @@
 /* The money area's own layout. Shared pieces are in primitives.css; tokens in tokens.css. */
+
+.money-page {
+  container: money / inline-size;
+}
+.money-title {
+  font-size: var(--text-hero);
+}
+.money-lead {
+  margin: 8px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fg-muted);
+  text-wrap: pretty;
+}
+.money-links {
+  display: flex;
+  gap: 9px;
+  flex-wrap: wrap;
+  margin-block-start: 12px;
+}
+.money-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 13px;
+  border-radius: 10px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--fg);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* the four figures: 4 across on a wide page, 2 on a middling one, 1 on a phone */
+.money-kpis {
+  display: grid;
+  gap: 13px;
+  grid-template-columns: minmax(0, 1fr);
+}
+@container money (min-width: 620px) {
+  .money-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@container money (min-width: 980px) {
+  .money-kpis {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+.money-kpi {
+  border-radius: 14px;
+  padding: 15px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.money-kpi-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+}
+.money-kpi-value {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  unicode-bidi: isolate;
+}
+.money-kpi-sub {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--fg-subtle);
+  text-wrap: pretty;
+}
+.money-tone--fg {
+  color: var(--fg);
+}
+.money-tone--danger {
+  color: var(--danger);
+}
+.money-tone--warn {
+  color: var(--warn);
+}
+.money-tone--pos {
+  color: var(--pos);
+}
+
+/* the chart beside the two small panels */
+.money-cols {
+  display: grid;
+  gap: 14px;
+  align-items: start;
+  grid-template-columns: minmax(0, 1fr);
+}
+@container money (min-width: 900px) {
+  .money-cols {
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  }
+}
+.money-side {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.money-panel {
+  overflow: hidden;
+}
+.money-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+  padding: 14px 16px;
+  border-block-end: 1px solid var(--border);
+  color: var(--fg-subtle);
+}
+.money-panel-head h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--fg);
+}
+.money-legend {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-inline-start: auto;
+}
+.money-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--fg-subtle);
+}
+.money-swatch {
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+}
+.money-swatch--invoiced {
+  background: var(--surface-3);
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+}
+.money-swatch--collected {
+  background: var(--accent);
+}
+.money-chart-body {
+  padding: 18px 16px 14px;
+}
+.money-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: clamp(6px, 1.4vw, 14px);
+  height: 168px;
+}
+.money-bar {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 2px 0;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  color: var(--fg-subtle);
+}
+.money-bar--on {
+  background: var(--surface-2);
+  color: var(--fg);
+}
+.money-bar-pair {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 3px;
+}
+.money-bar-fill {
+  flex: 1;
+  min-width: 0;
+  max-width: 22px;
+  display: block;
+  border-radius: 5px 5px 0 0;
+}
+.money-bar-fill--invoiced {
+  background: var(--surface-3);
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+}
+.money-bar-fill--collected {
+  background: var(--accent);
+}
+.money-bar-label {
+  font-size: 11.5px;
+  font-weight: 700;
+}
+.money-bar--on .money-bar-label {
+  font-weight: 800;
+}
+
+/* one month, itemised */
+.money-drill {
+  margin-block-start: 16px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  overflow: hidden;
+}
+.money-drill-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 11px 14px;
+  background: var(--surface-2);
+  border-block-end: 1px solid var(--border);
+}
+.money-drill-title {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.money-drill-sum {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--fg-subtle);
+  margin-inline-start: auto;
+  unicode-bidi: isolate;
+}
+.money-drill-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.money-drill-row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  padding: 11px 14px;
+  border: none;
+  border-block-end: 1px solid var(--border);
+  background: transparent;
+  color: var(--fg);
+  cursor: pointer;
+  text-align: start;
+  font: inherit;
+}
+.money-drill-list li:last-child .money-drill-row {
+  border-block-end: none;
+}
+.money-drill-icon {
+  flex: 0 0 auto;
+  color: var(--fg-subtle);
+}
+.money-drill-icon--pos {
+  color: var(--pos);
+}
+.money-drill-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.money-drill-what {
+  font-size: 13px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.money-drill-sub {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--fg-subtle);
+  overflow-wrap: anywhere;
+}
+.money-drill-amount {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--fg-muted);
+  white-space: nowrap;
+  unicode-bidi: isolate;
+}
+.money-drill-amount--pos {
+  color: var(--pos);
+}
+.money-drill-empty {
+  padding: 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.6;
+  color: var(--fg-subtle);
+  text-wrap: pretty;
+}
+.money-note {
+  margin: 14px 0 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.6;
+  color: var(--fg-subtle);
+  text-wrap: pretty;
+}
+
+/* still owed */
+.money-aging {
+  padding: 14px 16px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+.money-bucket {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  width: 100%;
+  padding: 11px 13px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--fg);
+  cursor: pointer;
+  text-align: start;
+  font: inherit;
+}
+.money-bucket-label {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+}
+.money-bucket-amount {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  unicode-bidi: isolate;
+  color: var(--danger);
+}
+.money-bucket--current .money-bucket-amount {
+  color: var(--fg);
+}
+.money-bucket--d30 .money-bucket-amount {
+  color: var(--warn);
+}
+.money-bucket--empty .money-bucket-amount {
+  color: var(--fg-subtle);
+}
+.money-bucket-count {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fg-subtle);
+}
+
+/* what it costs to open the door */
+.money-costs-add {
+  margin-inline-start: auto;
+}
+.money-costs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.money-cost {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 16px;
+  border-block-end: 1px solid var(--border);
+}
+.money-cost-label {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg-muted);
+  overflow-wrap: anywhere;
+}
+.money-cost-amount {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--fg);
+  white-space: nowrap;
+  unicode-bidi: isolate;
+}
+.money-cost-edit {
+  width: 26px;
+  height: 26px;
+  margin-block: -5px;
+  flex: 0 0 auto;
+}
+.money-cost--total {
+  padding: 13px 16px;
+  background: var(--surface-2);
+  border-block-end: none;
+}
+.money-cost--total .money-cost-label {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--fg);
+}
+.money-cost--total .money-cost-amount {
+  font-size: 14.5px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.money-costs-none {
+  padding: 13px 16px;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.6;
+  color: var(--fg-subtle);
+  border-block-end: 1px solid var(--border);
+}
+
+/* the running-cost sheet */
+.money-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.money-sheet-amount {
+  font-family: var(--font-mono);
+}

@@ -153,10 +153,12 @@ export const SIDEBAR: readonly SidebarItem[] = [
   { view: "clients", labelKey: "nav.clients", icon: "users-round", children: ["client"] },
   { view: "invoices", labelKey: "nav.invoices", icon: "receipt-text", children: ["invoice", "print"], badge: "invoices" },
   { view: "chasing", labelKey: "nav.chasing", icon: "bell-ring", children: [], badge: "chasing" },
+  { view: "money", labelKey: "nav.money", icon: "chart-no-axes-column", children: [] },
   { view: "expenses", labelKey: "nav.expenses", icon: "wallet", children: [] },
   { view: "suppliers", labelKey: "nav.suppliers", icon: "truck", children: [] },
   { view: "time", labelKey: "nav.time", icon: "timer", children: [] },
-  { view: "settings", labelKey: "nav.settings", icon: "settings", children: ["terms"], managerOnly: true },
+  { view: "settings", labelKey: "nav.settings", icon: "settings", children: ["terms", "emails"], managerOnly: true },
+  { view: "archive", labelKey: "nav.archive", icon: "archive", children: [] },
 ];
 
 /** The sidebar item a view lights. */

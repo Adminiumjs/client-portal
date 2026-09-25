@@ -171,7 +171,7 @@ export const COLUMNS: Record<string, Record<string, Fill>> = {
   invoice_lines: { document_id: REQUIRED, position: 0, description: null, qty: 1, rate: null, discount_kind: "amount", discount: null, currency: null, quote_id: null, share_pct: null, amount: null, client_id: null, time_entry_id: null, expense_id: null, client_key: null },
   payments: { document_id: REQUIRED, number_seq: null, number: null, amount: REQUIRED, currency: null, method: "bank-transfer", method_note: null, paid_on: REQUIRED, recorded_by: null, recorded_at: null, voided: false, void_reason: null, voided_by: null, voided_at: null, client_id: null, client_key: null },
   messages: { kind: REQUIRED, status: "queued", created_at: null, skip_reason: null, to: null, language: null, client_id: null, proposal_id: null, invoice_id: null, payment_id: null, project_id: null, deliverable_id: null, enquiry_id: null, subject_override: null, body_override: null, approved_by: null, due: null, sent_at: null, error: null, effect_at: null, effect_error: null, client_key: null },
-  running_costs: { label: REQUIRED, monthly_amount: REQUIRED, position: 0 },
+  running_costs: { label: REQUIRED, monthly_amount: REQUIRED, position: 0, client_key: null },
   events: { date: REQUIRED, to_date: null, title: REQUIRED, kind: "call", person_id: null, client_key: null },
 };
 
