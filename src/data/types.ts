@@ -180,6 +180,7 @@ export interface Enquiry {
   status: EnquiryStatus;
   parked_until: Day | null;
   client_id: Id | null;
+  proposal_id: Id | null;
   received_at: Instant | null;
   client_key: string | null;
 }
@@ -458,6 +459,7 @@ export interface Message {
   id: Id;
   kind: MessageKind;
   status: MessageStatus;
+  created_at: Instant | null;
   skip_reason: MessageSkipReason | null;
   to: string | null;
   language: string | null;
@@ -517,7 +519,7 @@ export const COLUMN_KINDS = {
   brief_questions: { id: "int", position: "int", active: "bool" },
   clients: { id: "int", tax_rate: "decimal", created_at: "instant" },
   client_notes: { id: "int", client_id: "int", at: "instant" },
-  enquiries: { id: "int", number_seq: "int", parked_until: "day", client_id: "int", received_at: "instant" },
+  enquiries: { id: "int", number_seq: "int", parked_until: "day", client_id: "int", proposal_id: "int", received_at: "instant" },
   proposals: { id: "int", number_seq: "int", valid_until: "day", tax_rate: "decimal", subtotal: "decimal", tax: "decimal", total: "decimal", sent_at: "instant", decided_at: "instant", client_id: "int", terms_version_id: "int", revision_of: "int", signed_at: "instant", new_price_asked: "bool", new_price_asked_at: "instant" },
   proposal_lines: { id: "int", document_id: "int", position: "int", qty: "decimal", rate: "decimal", discount: "decimal", amount: "decimal", client_id: "int" },
   projects: { id: "int", number_seq: "int", client_id: "int", proposal_id: "int", started_on: "day", done_on: "day", share_expires_on: "day", share_stopped: "bool", share_stopped_at: "instant", handover_sent: "bool", handover_sent_at: "instant" },
@@ -532,7 +534,7 @@ export const COLUMN_KINDS = {
   invoices: { id: "int", number_seq: "int", issued_on: "day", due_on: "day", tax_rate: "decimal", subtotal: "decimal", tax: "decimal", total: "decimal", paid: "decimal", balance: "decimal", sent_at: "instant", voided_at: "instant", from_quote_id: "int", share_pct: "decimal", client_id: "int", project_id: "int", proposal_id: "int", client_paid_amount: "decimal", client_paid_on: "day", client_paid: "bool", client_paid_at: "instant" },
   invoice_lines: { id: "int", document_id: "int", position: "int", qty: "decimal", rate: "decimal", discount: "decimal", quote_id: "int", share_pct: "decimal", amount: "decimal", client_id: "int" },
   payments: { id: "int", document_id: "int", number_seq: "int", amount: "decimal", paid_on: "day", recorded_at: "instant", voided: "bool", voided_at: "instant", client_id: "int" },
-  messages: { id: "int", client_id: "int", proposal_id: "int", invoice_id: "int", payment_id: "int", project_id: "int", deliverable_id: "int", enquiry_id: "int", due: "instant", sent_at: "instant", effect_at: "instant" },
+  messages: { id: "int", created_at: "instant", client_id: "int", proposal_id: "int", invoice_id: "int", payment_id: "int", project_id: "int", deliverable_id: "int", enquiry_id: "int", due: "instant", sent_at: "instant", effect_at: "instant" },
 } as const satisfies Record<TableRef, Record<string, "int" | "decimal" | "bool" | "day" | "instant">>;
 
 /** The columns a row may leave empty, per table. */
@@ -545,7 +547,7 @@ export const NULLABLE: Readonly<Record<TableRef, readonly string[]>> = {
   brief_questions: ["hint"],
   clients: ["trade", "phone", "address", "tax_number", "terms", "tax_rate", "language", "tint", "client_key"],
   client_notes: ["by", "at"],
-  enquiries: ["number_seq", "number", "business", "email", "trade", "budget", "start_when", "source", "fit", "body", "parked_until", "client_id", "received_at", "client_key"],
+  enquiries: ["number_seq", "number", "business", "email", "trade", "budget", "start_when", "source", "fit", "body", "parked_until", "client_id", "proposal_id", "received_at", "client_key"],
   proposals: ["number_seq", "number", "valid_until", "currency", "tax_name", "tax_rate", "subtotal", "tax", "total", "sent_at", "decided_at", "withdraw_reason", "scope", "terms_version_id", "revision_of", "signed_name", "signed_email", "signed_at", "fingerprint", "accepted_how", "decline_note", "new_price_asked_at", "client_key"],
   proposal_lines: ["description", "rate", "discount", "currency", "amount", "client_id", "client_key"],
   projects: ["number_seq", "number", "proposal_id", "pause_note", "started_on", "done_on", "share_token", "share_expires_on", "share_stopped_at", "handover_notes", "handover_sent_at", "client_key"],
@@ -560,5 +562,5 @@ export const NULLABLE: Readonly<Record<TableRef, readonly string[]>> = {
   invoices: ["number_seq", "number", "issued_on", "terms", "due_on", "currency", "tax_name", "tax_rate", "subtotal", "tax", "total", "paid", "balance", "ladder", "sent_at", "void_reason", "voided_at", "voided_by", "from_quote_id", "share_pct", "project_id", "proposal_id", "stage", "title", "client_paid_note", "client_paid_amount", "client_paid_on", "client_paid", "client_paid_at", "client_key"],
   invoice_lines: ["description", "rate", "discount", "currency", "quote_id", "share_pct", "amount", "client_id", "client_key"],
   payments: ["number_seq", "number", "currency", "method_note", "recorded_by", "recorded_at", "void_reason", "voided_by", "voided_at", "client_id", "client_key"],
-  messages: ["skip_reason", "to", "language", "client_id", "proposal_id", "invoice_id", "payment_id", "project_id", "deliverable_id", "enquiry_id", "subject_override", "body_override", "approved_by", "due", "sent_at", "error", "effect_at", "effect_error", "client_key"],
+  messages: ["created_at", "skip_reason", "to", "language", "client_id", "proposal_id", "invoice_id", "payment_id", "project_id", "deliverable_id", "enquiry_id", "subject_override", "body_override", "approved_by", "due", "sent_at", "error", "effect_at", "effect_error", "client_key"],
 };

@@ -145,7 +145,7 @@ describe("what the form saves", () => {
     const draft = toProposalDraft(form)!;
     const sent = ok(await act.sendProposal(draft, { replacedReason: "Replaced." }));
     expect(trail()).toEqual(["insert clients", "insert proposals", "insert proposal_lines", "update enquiries", "update proposals"]);
-    expect(studio.writes[3]!.values).toEqual({ client_id: sent.client_id, status: "proposal" });
+    expect(studio.writes[3]!.values).toEqual({ client_id: sent.client_id, proposal_id: sent.id, status: "proposal" });
     expect(studio.writes[4]!.values).toEqual({ status: "sent" });
     expect([sent.status, sent.subtotal, sent.tax, sent.total]).toEqual(["sent", "1200.50", "102.04", "1302.54"]);
   });

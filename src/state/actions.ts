@@ -327,7 +327,7 @@ function proposalSaveSteps(draft: ProposalDraft): Step[] {
   const enquiryId = draft.enquiryId ?? null;
   // The enquiry moves on the proposal's FIRST save only, never before it exists.
   if (enquiryId !== null && draftId === null) {
-    steps.push({ name: "enquiry", run: (ctx) => update("enquiries", enquiryId, { client_id: clientId(ctx), status: "proposal" }) });
+    steps.push({ name: "enquiry", run: (ctx) => update("enquiries", enquiryId, { client_id: clientId(ctx), proposal_id: ctx.result<Proposal>("proposal").id, status: "proposal" }) });
   }
   return steps;
 }

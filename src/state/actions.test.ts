@@ -70,7 +70,7 @@ describe("the composer", () => {
   it("starts a proposal from an enquiry: the client, the proposal, its lines — the enquiry moves last", async () => {
     const proposal = ok(await act.saveProposal(fromEnquiry()));
     expect(trail()).toEqual(["insert clients", "insert proposals", "insert proposal_lines", "insert proposal_lines", "update enquiries"]);
-    expect(studio.writes[4]!.values).toEqual({ client_id: proposal.client_id, status: "proposal" });
+    expect(studio.writes[4]!.values).toEqual({ client_id: proposal.client_id, proposal_id: proposal.id, status: "proposal" });
     expect(new Set(keys()).size).toBe(4);
     // Totals are the server's, read back after the lines: 1200 + (600 − 50) = 1750, plus 8.5 %.
     expect(proposal).toMatchObject({ subtotal: "1750.00", tax: "148.75", total: "1898.75", number: "PRO-1143" });

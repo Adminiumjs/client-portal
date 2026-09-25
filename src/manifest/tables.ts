@@ -490,6 +490,7 @@ export const TABLES: Table[] = [
       ),
       date("parked_until", "Parked until", opt),
       fk("client_id", "clients", "Client", true),
+      fk("proposal_id", "proposals", "Proposal", true),
       at("received_at", "Received", { ...opt, rules: stamp("now", onCreate) }),
       clientKey,
     ],
@@ -793,6 +794,7 @@ export const TABLES: Table[] = [
         { held: "Waiting for approval", queued: "Going out", sent: "Sent", failed: "Not sent", skipped: "Skipped" },
         { default: "queued", tones: { held: "warn", queued: "info", sent: "pos", failed: "danger", skipped: "neutral" } },
       ),
+      at("created_at", "Created", { ...opt, rules: stamp("now", onCreate) }),
       choice(
         "skip_reason",
         "Why it was skipped",

@@ -2043,6 +2043,22 @@
             "nullable": true
           },
           {
+            "ref": "proposal_id",
+            "type": "fk",
+            "references": "proposals",
+            "label": {
+              "en-US": "Proposal",
+              "de-DE": "Angebot",
+              "fr-FR": "Proposition",
+              "da-DK": "Tilbud",
+              "cs-CZ": "Nabídka",
+              "ar-EG": "العرض",
+              "zh-CN": "提案",
+              "zh-TW": "提案"
+            },
+            "nullable": true
+          },
+          {
             "ref": "received_at",
             "type": "timestamptz",
             "label": {
@@ -7475,6 +7491,27 @@
                   "failed": "danger",
                   "skipped": "neutral"
                 }
+              }
+            }
+          },
+          {
+            "ref": "created_at",
+            "type": "timestamptz",
+            "label": {
+              "en-US": "Created",
+              "de-DE": "Angelegt",
+              "fr-FR": "Créé",
+              "da-DK": "Oprettet",
+              "cs-CZ": "Vytvořeno",
+              "ar-EG": "أُنشئ",
+              "zh-CN": "创建时间",
+              "zh-TW": "建立時間"
+            },
+            "nullable": true,
+            "rules": {
+              "stamp": {
+                "set": "now",
+                "on": "create"
               }
             }
           },
