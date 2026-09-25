@@ -8381,6 +8381,7 @@
                 "metricFormat": "currency",
                 "deltaMode": "none",
                 "showSparkline": false,
+                "href": "/p/clients-invoices?f.status=eq:sent&f.balance=gt:0&f.due_on=gte:today-30&f.due_on=lt:today",
                 "binding": {
                   "kind": "table-query",
                   "source": {
@@ -8439,6 +8440,7 @@
                 "metricFormat": "currency",
                 "deltaMode": "none",
                 "showSparkline": false,
+                "href": "/p/clients-invoices?f.status=eq:sent&f.balance=gt:0&f.due_on=gte:today-60&f.due_on=lt:today-30",
                 "binding": {
                   "kind": "table-query",
                   "source": {
@@ -8497,6 +8499,7 @@
                 "metricFormat": "currency",
                 "deltaMode": "none",
                 "showSparkline": false,
+                "href": "/p/clients-invoices?f.status=eq:sent&f.balance=gt:0&f.due_on=gte:today-3649&f.due_on=lt:today-60",
                 "binding": {
                   "kind": "table-query",
                   "source": {
@@ -8557,7 +8560,7 @@
                 "metricFormat": "plain",
                 "deltaMode": "none",
                 "showSparkline": false,
-                "href": "/p/clients-messages?f.status=eq:held&f.kind=in:invoice-rung-1,invoice-rung-2,invoice-rung-3&f.due=lte:today",
+                "href": "/p/clients-messages?f.status=eq:held&f.kind=in:invoice-rung-1,invoice-rung-2,invoice-rung-3&f.due=before:now",
                 "binding": {
                   "kind": "table-query",
                   "source": {
@@ -8723,7 +8726,7 @@
                 "metricFormat": "plain",
                 "deltaMode": "none",
                 "showSparkline": false,
-                "href": "/p/clients-enquiries",
+                "href": "/p/clients-enquiries?f.status=eq:new",
                 "binding": {
                   "kind": "table-query",
                   "source": {
