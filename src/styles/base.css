@@ -1,15 +1,15 @@
 /*
- * Base styles: self-hosted fonts, a light reset, the handful of theme
- * variables the comp derives but tokens.css doesn't ship, the comp's keyframes
- * and `ol-*` behaviour classes, the reduced-motion guard, and the 900px media
- * query that replaces the comp's JS width breakpoint.
+ * The base: the self-hosted fonts, a light reset, the design's keyframes and
+ * its behaviour classes (hover, press, focus), reduced motion, and the
+ * helpers every screen uses (mono runs, screen-reader-only text).
  *
- * Import order in main.tsx: tokens.css → base.css → components.css → screens.
+ * Import order (main.tsx): tokens → base → frame → primitives → each area's
+ * stylesheet. Everything positional uses LOGICAL properties (inline-start and
+ * -end, padding-inline, margin-block), so the whole page mirrors under
+ * <html dir="rtl"> with no stylesheet of its own.
  *
- * Everything positional uses CSS LOGICAL properties (inline-start/end,
- * padding-inline, margin-block) rather than left/right/top/bottom, so the
- * whole layout mirrors when <html dir="rtl"> is stamped by the i18n provider
- * and no RTL-specific stylesheet is needed.
+ * The design renders `line-height: normal` unless it says otherwise, so the
+ * body does too.
  */
 
 /* Manrope — variable weight, latin + latin-ext. Arabic and CJK fall through to
@@ -55,37 +55,6 @@
     U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 
-/* --- extra theme vars the comp derives but tokens.css doesn't ship --- */
-:root {
-  --surface-header: rgba(255, 255, 255, 0.82);
-  --on-tint: rgba(25, 25, 32, 0.62);
-  --scrim-modal: rgba(10, 10, 15, 0.55);
-  --scrim-sheet: rgba(10, 10, 15, 0.5);
-  --shadow-modal: 0 28px 70px rgba(10, 10, 20, 0.4);
-  --shadow-toast: 0 12px 34px rgba(10, 10, 20, 0.32);
-  --shadow-hover: 0 16px 34px -18px rgba(20, 20, 40, 0.34);
-  --shadow-tile-hover: 0 16px 34px -20px rgba(20, 20, 40, 0.3);
-  --gutter: clamp(16px, 3.4vw, 32px);
-  --sidebar-w: 232px;
-  --topbar-h: 62px;
-  /* z-scale: toast > modal > sheet > dock > header. */
-  --z-header: 40;
-  --z-dock: 50;
-  --z-sheet: 60;
-  --z-modal: 70;
-  --z-toast: 80;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --surface-header: rgba(20, 20, 25, 0.8);
-    --on-tint: rgba(244, 244, 246, 0.7);
-  }
-}
-:root[data-theme="dark"] {
-  --surface-header: rgba(20, 20, 25, 0.8);
-  --on-tint: rgba(244, 244, 246, 0.7);
-}
-
 /* --- reset --- */
 * {
   box-sizing: border-box;
@@ -98,8 +67,10 @@ body {
 body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
   background: var(--bg);
   color: var(--fg);
+  line-height: normal;
   min-height: 100vh;
 }
 #root {
@@ -108,6 +79,7 @@ body {
 a {
   text-decoration: none;
   color: var(--accent);
+  font-weight: 700;
 }
 a:hover {
   filter: brightness(1.12);
@@ -117,11 +89,13 @@ textarea,
 select,
 button {
   font-family: inherit;
-  /* `start` rather than `left` so form text mirrors under dir="rtl". */
   text-align: start;
 }
 button {
   cursor: pointer;
+}
+button:disabled {
+  cursor: not-allowed;
 }
 textarea {
   resize: vertical;
@@ -130,26 +104,25 @@ img,
 svg {
   max-width: 100%;
 }
+h1,
+h2,
+h3,
+p {
+  text-wrap: pretty;
+}
 ::selection {
   background: color-mix(in srgb, var(--accent) 22%, transparent);
 }
-:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
 
-/*
- * Mono runs stay left-to-right even inside an RTL paragraph: an amount, a time
- * or a date reads the same in every language, and letting the bidi algorithm
- * reorder its digits and separators is how "09:35" becomes "35:09".
- */
+/* --- helpers --- */
+
+/* An amount, a number or a date reads left to right in every language. */
 .ol-mono {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   direction: ltr;
   unicode-bidi: isolate;
 }
-
 .ol-sr-only {
   position: absolute;
   width: 1px;
@@ -161,181 +134,127 @@ svg {
   white-space: nowrap;
   border: 0;
 }
-
-/* --- scrollbars --- */
-.ol-scroll::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+.ol-hide-scroll {
+  scrollbar-width: none;
 }
-.ol-scroll::-webkit-scrollbar-thumb {
-  background: var(--border-strong);
-  border-radius: 8px;
-  border: 3px solid transparent;
-  background-clip: padding-box;
-}
-.ol-scroll::-webkit-scrollbar-track {
-  background: transparent;
+.ol-hide-scroll::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
 }
 
-/* --- keyframes --- */
+/* --- the design's motion --- */
 @keyframes ol-fade {
-  from {
-    opacity: 0;
-    transform: translateY(9px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
+  from { opacity: 0; transform: translateY(9px); }
+  to { opacity: 1; transform: none; }
 }
 @keyframes ol-pop {
-  from {
-    opacity: 0;
-    transform: translateY(8px) scale(0.985);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
+  from { opacity: 0; transform: translateY(9px) scale(0.985); }
+  to { opacity: 1; transform: none; }
 }
 @keyframes ol-scrim {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
-@keyframes ol-sheet {
-  from {
-    opacity: 0;
-    /* Logical: the sheet always enters from the inline start edge. */
-    transform: translateX(calc(-102% * var(--ol-dir, 1)));
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
+@keyframes ol-slide {
+  from { opacity: 0; transform: translateX(-102%); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes ol-slide-rtl {
+  from { opacity: 0; transform: translateX(102%); }
+  to { opacity: 1; transform: none; }
 }
 @keyframes ol-drop {
-  from {
-    opacity: 0;
-    transform: translateY(-6px) scale(0.98);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: none; }
 }
-@keyframes ol-shimmer {
-  from {
-    background-position: -500px 0;
-  }
-  to {
-    background-position: 500px 0;
-  }
+@keyframes ol-spin {
+  to { transform: rotate(360deg); }
 }
-
-/* The sheet slides in from the correct edge in both writing directions. */
-[dir="rtl"] {
-  --ol-dir: -1;
-}
-
-/* --- behaviour classes --- */
 .ol-screen {
-  animation: ol-fade 0.3s cubic-bezier(0.2, 0.7, 0.3, 1);
+  animation: ol-fade 0.26s cubic-bezier(0.2, 0.7, 0.3, 1);
 }
+
+/* --- the design's behaviour classes --- */
 .ol-card {
-  transition:
-    box-shadow 0.18s ease,
-    border-color 0.18s ease,
-    transform 0.16s ease;
+  transition: box-shadow 0.18s ease, border-color 0.18s ease, transform 0.16s ease;
 }
 .ol-card:hover {
   transform: translateY(-3px);
-  box-shadow: var(--shadow-hover);
-  border-color: var(--border-strong);
+  box-shadow: var(--shadow-hover) !important;
+  border-color: var(--border-strong) !important;
 }
 .ol-btn {
-  transition:
-    filter 0.13s ease,
-    transform 0.1s ease,
-    background 0.13s ease,
-    border-color 0.13s ease;
+  transition: filter 0.13s ease, transform 0.1s ease, background 0.14s ease, border-color 0.14s ease, color 0.14s ease;
 }
 .ol-btn:hover:not(:disabled) {
-  filter: brightness(1.08);
+  filter: brightness(1.07);
 }
 .ol-btn:active:not(:disabled) {
   transform: scale(0.97);
 }
-.ol-fld {
-  transition:
-    border-color 0.14s ease,
-    box-shadow 0.14s ease;
+.ol-gi {
+  transition: background 0.13s ease, color 0.13s ease, border-color 0.13s ease, transform 0.1s ease;
 }
-.ol-fld:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
-  outline: none;
+.ol-gi:hover:not(:disabled) {
+  background: var(--surface-2) !important;
+  color: var(--fg) !important;
 }
-.ol-chip {
-  transition:
-    background 0.12s ease,
-    color 0.12s ease,
-    border-color 0.12s ease,
-    transform 0.1s ease;
-}
-.ol-chip:active:not(:disabled) {
+.ol-gi:active:not(:disabled) {
   transform: scale(0.97);
 }
-.ol-skel {
-  height: 44px;
-  border-radius: 11px;
-  background: linear-gradient(
-    90deg,
-    var(--surface-2),
-    var(--surface-3) 50%,
-    var(--surface-2)
-  );
-  background-size: 1000px 100%;
-  animation: ol-shimmer 1.35s linear infinite;
+.ol-chip {
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease, transform 0.1s ease;
+}
+.ol-chip:active {
+  transform: scale(0.96);
+}
+.ol-btn:focus-visible,
+.ol-gi:focus-visible,
+.ol-chip:focus-visible,
+.ol-row:focus-visible,
+.ol-nav:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-soft), 0 0 0 1px var(--accent);
+}
+.ol-row {
+  transition: background 0.13s ease;
+}
+.ol-row:hover {
+  background: var(--surface-2) !important;
+}
+.ol-fld {
+  transition: border-color 0.14s ease, box-shadow 0.14s ease;
+}
+.ol-fld:focus {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px var(--accent-soft) !important;
+  outline: none;
+}
+.ol-nav:hover {
+  background: var(--surface-2) !important;
+  color: var(--fg) !important;
+}
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
-/* --- responsive helpers: the comp's single JS breakpoint, as CSS --- */
-.ol-wide-only {
-  display: inline-flex;
-}
-.ol-narrow-only {
-  display: none;
-}
-@media (max-width: 899.98px) {
-  .ol-wide-only {
-    display: none;
-  }
-  .ol-narrow-only {
-    display: inline-flex;
-  }
-}
-
-/* --- reduced motion --- */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
-    animation-duration: 0.001ms !important;
+    animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
-    transition-duration: 0.001ms !important;
-    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
   }
-  .ol-card:hover {
-    transform: none;
+}
+
+@media print {
+  @page {
+    margin: 0;
   }
-  .ol-btn:active,
-  .ol-chip:active {
-    transform: none;
-  }
-  .ol-skel {
-    animation: none;
+  .ol-noprint {
+    display: none !important;
   }
 }

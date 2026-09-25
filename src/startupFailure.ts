@@ -14,8 +14,8 @@
 import { MESSAGES } from "./i18n/messages/index.ts";
 import { dirFor, type LocaleTag } from "./i18n/locales.ts";
 
-/** This app's name as a failure screen says it: the product's, never a practice's. */
-const PRODUCT = "Clinic Desk";
+/** This app's name as a failure screen says it: the product's, never a studio's. */
+const PRODUCT = "Client Portal";
 
 /** This app's own explanations, by key. */
 export type StartupDetailKey = "startup.noConfig" | "startup.noBookingKey" | "startup.noServer" | "startup.deskUnread";

@@ -25,6 +25,8 @@ import {
 } from "react";
 
 import { tenantCurrency } from "./ambient.ts";
+import { formatMoney } from "../lib/money.ts";
+import type { Decimal } from "../data/types.ts";
 
 import {
   DEFAULT_LOCALE,
@@ -61,40 +63,40 @@ interface I18nValue {
   dir: "ltr" | "rtl";
   setLocale: (t: LocaleTag) => void;
   t: TFunction;
-  /** Currency is a property of the money, not of the reader's language. */
-  money: (value: number, currency?: string) => string;
+  /**
+   * An amount as Adminium stored it (a decimal string, "1950.00"), in the
+   * page's language, with its currency's own minor units (JPY none, KWD three).
+   * Display only: see `lib/money.ts`. The currency is the document's, else the
+   * studio's.
+   */
+  money: (value: Decimal | number | null | undefined, currency?: string | null) => string;
   number: (n: number, opts?: Intl.NumberFormatOptions) => string;
   date: (d: Date | number, opts?: Intl.DateTimeFormatOptions) => string;
 }
 
 const I18nContext = createContext<I18nValue | null>(null);
 
-/*
- * THE HOST'S LOCALE, when there is a host (29-app-surfaces.md D11).
+/**
+ * The locale the Adminium host frame pushed, and the live setter that applies
+ * it (29 D8).
  *
- * Blended into the Adminium dashboard, this app must not have its own language
- * control — the dashboard owns that axis and pushes it down over the bridge.
- * Two controls for one setting is the drift bug 28-T44 already shipped once.
- *
- * Deliberately NOT persisted: the pushed value is the operator's dashboard
- * preference, not a choice made in this app, and writing it to this app's
- * storage key would make it stick after the app is opened standalone.
+ * Module scope because it arrives from the embed bridge BEFORE React mounts —
+ * the host hands over its locale during the handshake — and again later when an
+ * operator switches language in the dashboard. Neither is persisted: the host's
+ * language is the host's setting, and writing it here would leave the app stuck
+ * in it once opened standalone.
  */
 let hostLocale: LocaleTag | null = null;
-let applyLocale: ((tag: LocaleTag) => void) | null = null;
+let applyLocale: ((t: LocaleTag) => void) | null = null;
 
-/**
- * Set the locale from outside React. Safe to call BEFORE the provider mounts —
- * which is the normal case, since the bridge handshake completes before the
- * first render so the first paint is already in the right language.
- */
 export function setHostLocale(tag: string): void {
   if (!isLocaleTag(tag)) return; // an unknown tag leaves the app's own default
   hostLocale = tag;
   applyLocale?.(tag);
 }
 
-function initialLocale(): LocaleTag {
+/** The language the page opens in: the host's, else the one chosen before, else the browser's. */
+export function initialLocale(): LocaleTag {
   if (hostLocale !== null) return hostLocale;
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -111,20 +113,20 @@ export function I18nProvider({ children }: { children: ReactNode }) {
 
   // Stamp <html> so CSS logical properties resolve and screen readers announce
   // the right language. This is the single switch that turns RTL on.
-  useEffect(() => {
-    const el = document.documentElement;
-    el.setAttribute("lang", LOCALES[locale].tag);
-    el.setAttribute("dir", dir);
-  }, [locale, dir]);
-
-  // Register the un-persisted setter for `setHostLocale`, so a theme/language
-  // flip in the dashboard restyles this frame live rather than on next load.
+  // Register the un-persisted setter for `setHostLocale`, so a language flip in
+  // the dashboard restyles this frame live rather than on next load.
   useEffect(() => {
     applyLocale = setLocaleState;
     return () => {
       applyLocale = null;
     };
   }, []);
+
+  useEffect(() => {
+    const el = document.documentElement;
+    el.setAttribute("lang", LOCALES[locale].tag);
+    el.setAttribute("dir", dir);
+  }, [locale, dir]);
 
   const setLocale = useCallback((next: LocaleTag) => {
     setLocaleState(next);
@@ -141,7 +143,11 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     const pr = new Intl.PluralRules(locale);
     const nf = new Intl.NumberFormat(locale);
 
-    const t: TFunction = (key, params, count) => {
+    const lookup = (
+      key: string,
+      params?: Record<string, string | number>,
+      count?: number,
+    ): string => {
       let raw = bundle[key] ?? fallback[key] ?? key;
 
       if (count !== undefined && raw.includes("|")) {
@@ -161,17 +167,14 @@ export function I18nProvider({ children }: { children: ReactNode }) {
       );
     };
 
+    const t: TFunction = (key, params, count) => lookup(key, params, count);
+
     return {
       locale,
       dir,
       setLocale,
       t,
-      money: (v, currency = tenantCurrency()) =>
-        new Intl.NumberFormat(locale, {
-          style: "currency",
-          currency,
-          maximumFractionDigits: 0,
-        }).format(v),
+      money: (v, currency) => formatMoney(v, currency ?? tenantCurrency(), locale),
       number: (n, opts) =>
         opts ? new Intl.NumberFormat(locale, opts).format(n) : nf.format(n),
       date: (d, opts) => new Intl.DateTimeFormat(locale, opts).format(d),
