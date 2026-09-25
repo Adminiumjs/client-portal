@@ -19,6 +19,8 @@ const sum = (rows: readonly Row[], column: string) => money(rows.reduce((total, 
 const daysFrom = (from: string, to: string) => Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY);
 const shiftDay = (day: string, days: number) => new Date(Date.parse(`${day}T00:00:00Z`) + days * DAY).toISOString().slice(0, 10);
 const monthOf = (day: string) => day.slice(0, 7);
+/** A stored boolean, however the engine spells it (SQLite and MySQL keep 1 / 0). */
+const truthy = (value: unknown) => value === true || value === 1 || value === "1" || value === "t" || value === "true";
 const monthsBack = (day: string, back: number) => {
   const [y, m] = day.split("-").map(Number) as [number, number];
   return new Date(Date.UTC(y, m - 1 - back, 1)).toISOString().slice(0, 7);
@@ -34,7 +36,7 @@ export function overview(rows: Rows, now: number, zone: string) {
   const late = (i: Row) => daysFrom(String(i["due_on"]), today);
   const overdue = owing.filter((i) => late(i) > 0);
   const band = (from: number, to: number) => owing.filter((i) => late(i) >= from && late(i) <= to);
-  const payments = rows["payments"]!.filter((p) => p["voided"] !== true);
+  const payments = rows["payments"]!.filter((p) => !truthy(p["voided"]));
   const thisMonth = payments.filter((p) => monthOf(String(p["paid_on"])) === monthOf(today));
   const waiting = rows["proposals"]!.filter((p) => p["status"] === "sent" && String(p["valid_until"]) >= today);
   const projects = rows["projects"]!;

@@ -1,0 +1,138 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# The Client Portal's own checks — beside `ci.yml`, which is the fleet's
+# synced workflow (build, the suite, the manifest) and is never hand-edited.
+#
+# What only this repo needs, and why each is here:
+#
+#   the contract   `src/contract/contract.test.ts`: this repo's manifest and
+#                  sample installed on a BUILT Adminium with the Invoices &
+#                  Receipts add-on, on SQLite, Postgres and MySQL — install,
+#                  the sample at 28 July, every invoice's totals, a payment
+#                  race, a void and its reminders, a client's sign-in link and
+#                  sealed acceptance, the sample removed. It skips without the
+#                  two checkouts; here `ADMINIUM_REQUIRE_CONTRACT=1` makes a
+#                  skip a failure, so it cannot go quietly green.
+#   drift          the copies this repo keeps of other repos' files — the
+#                  lexicon and the add-on's shapes (add-ons), the manifest
+#                  validator (Adminium), and the demo's printed copies, drawn
+#                  again by the add-on at the pinned commit — each fails when
+#                  it no longer matches its source.
+#   the builds     both hosted sides and the website's demo (`demo.json`).
+#
+# The add-ons checkout is taken at the commit the demo's printed copies are
+# pinned to (`src/demo/printed/pin.json`), so the contract and the printed
+# copies are held to one add-on. Both product checkouts are moved out of the
+# workspace before the suite runs: vitest collects every `*.test.ts` under the
+# repo root, and the products' own suites are not this repo's to run.
+
+name: contract
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  contract:
+    name: three-engine contract & drift
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1"
+          --health-interval 5s --health-timeout 5s --health-retries 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: The add-on commit the demo's printed copies are pinned to
+        id: pin
+        run: echo "commit=$(node -p "require('./src/demo/printed/pin.json').commit")" >> "$GITHUB_OUTPUT"
+
+      - name: Check out Adminium
+        uses: actions/checkout@v4
+        with:
+          repository: MoSofi/Adminium
+          path: .adminium-product
+
+      - name: Check out the add-ons, at the pin
+        uses: actions/checkout@v4
+        with:
+          repository: Adminiumjs/add-ons
+          ref: ${{ steps.pin.outputs.commit }}
+          path: .add-ons
+
+      # The e2e boot script serves the built server and the built dashboard, on
+      # the engine it is asked for — the same composition `adminium start` runs.
+      - name: Build Adminium (the server, the dashboard, the e2e boot)
+        run: |
+          cd .adminium-product
+          corepack enable
+          pnpm install --frozen-lockfile
+          pnpm turbo run build --filter="@adminium/e2e..."
+
+      - name: Build the add-ons
+        run: |
+          cd .add-ons
+          npm ci
+          npm run build
+
+      - name: Move both checkouts out of the workspace
+        run: |
+          mv "$GITHUB_WORKSPACE/.adminium-product" "$RUNNER_TEMP/adminium-product"
+          mv "$GITHUB_WORKSPACE/.add-ons" "$RUNNER_TEMP/add-ons"
+
+      - name: Types
+        run: npx tsc -b
+
+      - name: The suite, with the contract on three engines and the printed copies redrawn
+        env:
+          ADMINIUM_REPO: ${{ runner.temp }}/adminium-product
+          ADD_ONS_REPO: ${{ runner.temp }}/add-ons
+          ADMINIUM_REQUIRE_CONTRACT: "1"
+          ADMINIUM_REQUIRE_VALIDATOR: "true"
+          TEST_POSTGRES_URL: postgres://postgres:postgres@127.0.0.1:5432/postgres
+          TEST_MYSQL_URL: mysql://root@127.0.0.1:3306
+        run: npx vitest run
+
+      - name: The copies of other repos' files
+        env:
+          ADMINIUM_REPO: ${{ runner.temp }}/adminium-product
+          ADD_ONS_REPO: ${{ runner.temp }}/add-ons
+        run: |
+          node scripts/sync-lexicon.mjs --check
+          node scripts/sync-shapes.mjs --check
+          node scripts/sync-manifest-validator.mjs --check
+          node scripts/untranslated.mjs --check
+
+      - name: Both hosted sides, and the website's demo
+        run: |
+          npm run build:surface
+          npm run build:demo
+          test -f dist/demo.json

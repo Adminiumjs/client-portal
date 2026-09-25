@@ -335,8 +335,9 @@ export const TABLES: Table[] = [
       text("singleton", 16, "Settings row", { unique: true, default: "studio", rules: { options: { values: [{ value: "studio" }] } } }),
       text("name", 120, "Studio name", opt),
       text("mark", 255, "Studio mark", opt),
-      text("reply_to", 254, "Reply-to address", { ...opt, rules: { validation: { format: "email" } } }),
-      text("phone", 40, "Phone", opt),
+      // The studio's own address and number, which its clients read: a business's, not personal data.
+      text("reply_to", 254, "Reply-to address", { ...opt, rules: { personal: false, validation: { format: "email" } } }),
+      text("phone", 40, "Phone", { ...opt, rules: { personal: false } }),
       text("website", 200, "Website", { ...opt, rules: { validation: { format: "url" } } }),
       text("sign_off", 500, "How we sign off", opt),
       int("hours_per_day", "Hours in a working day", { default: 6 }),

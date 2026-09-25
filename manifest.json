@@ -413,6 +413,7 @@
             },
             "nullable": true,
             "rules": {
+              "personal": false,
               "validation": {
                 "format": "email"
               }
@@ -432,7 +433,10 @@
               "zh-CN": "电话",
               "zh-TW": "電話"
             },
-            "nullable": true
+            "nullable": true,
+            "rules": {
+              "personal": false
+            }
           },
           {
             "ref": "website",

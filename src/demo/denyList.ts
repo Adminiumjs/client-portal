@@ -10,13 +10,14 @@
  *
  * NEVER, in any build: wording the design drew that the product must not
  * say — a promise the link does not keep, a guess about whose file it is, a
- * clock stuck at one minute, a version written into a sentence.
+ * feature said to be missing from "this preview", a client's history made
+ * up, a clock stuck at one minute, a version written into a sentence.
  */
 import { DEMO_BUNDLE } from "./sample.ts";
 import { DEMO_MESSAGES } from "./strings.ts";
 
 /** Wording no build may carry. */
-export const COPY_DENY_LIST = ["does not expire", "belongs to someone else", "11:04", "(v3)"] as const;
+export const COPY_DENY_LIST = ["does not expire", "belongs to someone else", "not in this preview", "partner since", "11:04", "(v3)"] as const;
 
 const rowsOf = (ref: string) => DEMO_BUNDLE.tables.find((t) => t.ref === ref)?.rows ?? [];
 const text = (value: unknown): string | null => (typeof value === "string" && value.length >= 6 ? value : null);
