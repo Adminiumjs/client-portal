@@ -28,12 +28,17 @@ type Entry = SurfaceNavEntry<View> & { labelKey: MessageKey };
 
 export const SURFACE_NAV = [
   { id: "home", path: "", view: "home", side: "staff", icon: "house", labelKey: "nav.home" },
+  { id: "schedule", path: "schedule", view: "schedule", side: "staff", icon: "calendar-days", labelKey: "nav.schedule" },
+  { id: "capacity", path: "capacity", view: "capacity", side: "staff", icon: "gauge", labelKey: "nav.capacity" },
   { id: "enquiries", path: "enquiries", view: "enquiries", side: "staff", icon: "inbox", labelKey: "nav.enquiries" },
   { id: "proposals", path: "proposals", view: "proposals", side: "staff", icon: "file-text", labelKey: "nav.proposals" },
   { id: "projects", path: "projects", view: "projects", side: "staff", icon: "folder-kanban", labelKey: "nav.projects" },
   { id: "clients", path: "clients", view: "clients", side: "staff", icon: "users-round", labelKey: "nav.clients" },
   { id: "invoices", path: "invoices", view: "invoices", side: "staff", icon: "receipt-text", labelKey: "nav.invoices" },
   { id: "chasing", path: "chasing", view: "chasing", side: "staff", icon: "bell-ring", labelKey: "nav.chasing" },
+  { id: "expenses", path: "expenses", view: "expenses", side: "staff", icon: "wallet", labelKey: "nav.expenses" },
+  { id: "suppliers", path: "suppliers", view: "suppliers", side: "staff", icon: "truck", labelKey: "nav.suppliers" },
+  { id: "time", path: "time", view: "time", side: "staff", icon: "timer", labelKey: "nav.time" },
   { id: "terms", path: "terms", view: "terms", side: "staff", icon: "signature", labelKey: "nav.terms" },
   { id: "settings", path: "settings", view: "settings", side: "staff", icon: "settings", labelKey: "nav.settings" },
   /*
@@ -59,7 +64,7 @@ export const SURFACE_NAV = [
  * and the dead ends are where a failure lands.
  */
 export const SURFACE_EXTRAS = {
-  staff: ["proposal", "composer", "project", "review", "handover", "client", "invoice", "print", "notfound", "time", "expenses", "suppliers", "scoping", "schedule", "capacity", "money", "archive", "emails"],
+  staff: ["proposal", "composer", "project", "review", "handover", "client", "invoice", "print", "notfound", "scoping", "money", "archive", "emails"],
   customer: ["review", "expired", "notavailable", "notfound", "enquire"],
 } as const satisfies Record<"staff" | "customer", readonly View[]>;
 

@@ -1,1 +1,452 @@
-/* The schedule area's own layout. Shared pieces are in primitives.css; tokens in tokens.css. */
+/* The schedule area's own layout: the month's heading and arrows, the three
+ * figures, the month grid and its day panel, and "Next, in order" — plus the
+ * "Add a date" sheet's pair of fields. Shared pieces are in primitives.css;
+ * tokens in tokens.css. Logical properties only (the page may be right to
+ * left). */
+
+.sch-screen {
+  container: schscreen / inline-size;
+}
+[dir="rtl"] .sch-flip {
+  transform: scaleX(-1);
+}
+
+/* ── the heading ──────────────────────────────────────────────────────────── */
+.sch-head {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.sch-head-text {
+  flex: 1;
+  min-width: 220px;
+}
+.sch-title {
+  margin: 0;
+  font-size: var(--text-hero);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+}
+.sch-lead {
+  margin: 8px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fg-muted);
+  text-wrap: pretty;
+}
+.sch-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.sch-arrow {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--fg-muted);
+}
+.sch-month {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  min-width: 104px;
+  text-align: center;
+}
+.sch-add {
+  height: 38px;
+  padding: 0 15px;
+  font-size: 13px;
+}
+
+/* ── the three figures ────────────────────────────────────────────────────── */
+.sch-stats {
+  display: grid;
+  gap: 13px;
+  grid-template-columns: minmax(0, 1fr);
+}
+@container schscreen (min-width: 760px) {
+  .sch-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.sch-stat {
+  border-radius: 14px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.sch-stat-k {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+}
+.sch-stat-v {
+  font-family: var(--font-mono);
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  color: var(--fg);
+}
+.sch-stat-sub {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-subtle);
+  text-wrap: pretty;
+}
+
+/* ── the month ────────────────────────────────────────────────────────────── */
+.sch-cal {
+  overflow: hidden;
+}
+.sch-heads,
+.sch-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+.sch-heads {
+  border-block-end: 1px solid var(--border);
+}
+.sch-headcell {
+  padding: 9px 10px;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+  text-align: start;
+  border-inline-end: 1px solid var(--border);
+}
+.sch-headcell:nth-child(7) {
+  border-inline-end: none;
+}
+.sch-head-narrow {
+  display: none;
+}
+@container schscreen (max-width: 559px) {
+  .sch-head-short {
+    display: none;
+  }
+  .sch-head-narrow {
+    display: inline;
+  }
+  .sch-headcell {
+    padding: 9px 6px;
+  }
+}
+.sch-cell {
+  min-height: 74px;
+  padding: 7px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow: hidden;
+  min-width: 0;
+  text-align: start;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  background: transparent;
+  border: 0 solid var(--border);
+  border-inline-end-width: 1px;
+  border-block-end-width: 1px;
+  border-radius: 0;
+}
+@container schscreen (min-width: 700px) {
+  .sch-cell {
+    min-height: 96px;
+  }
+}
+.sch-cell:nth-child(7n) {
+  border-inline-end-width: 0;
+}
+.sch-cell--last {
+  border-block-end-width: 0;
+}
+.sch-cell--weekend,
+.sch-cell--out {
+  background: var(--surface-2);
+}
+.sch-cell--out {
+  cursor: default;
+}
+.sch-cell[aria-pressed="true"] {
+  background: var(--accent-soft);
+}
+.sch-num {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--fg-muted);
+  align-self: flex-start;
+}
+.sch-num--today {
+  font-weight: 600;
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-radius: 6px;
+  padding: 1px 5px;
+}
+.sch-item {
+  display: block;
+  max-width: 100%;
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1.35;
+  padding: 3px 5px;
+  border-radius: 5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sch-tone--now,
+.sch-tone--call {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.sch-tone--milestone {
+  background: var(--info-soft);
+  color: var(--info);
+}
+.sch-tone--payment {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.sch-tone--press {
+  background: var(--pos-soft);
+  color: var(--pos);
+}
+.sch-tone--away,
+.sch-tone--holiday {
+  background: var(--surface-3);
+  color: var(--fg-subtle);
+}
+@container schscreen (max-width: 559px) {
+  .sch-cell {
+    padding: 6px 4px;
+  }
+  .sch-item {
+    font-size: 9.5px;
+    padding: 2px 3px;
+  }
+}
+
+/* The day's panel, under the grid. */
+.sch-day {
+  border-block-start: 1px solid var(--border);
+  padding: 15px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--surface-2);
+}
+.sch-day-head {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  flex-wrap: wrap;
+}
+.sch-day-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.sch-day-sub {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--fg-subtle);
+}
+.sch-day-close {
+  margin-inline-start: auto;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--fg-subtle);
+}
+.sch-day-item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 11px 13px;
+  border-radius: 11px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--fg);
+  cursor: pointer;
+  text-align: start;
+  font: inherit;
+}
+.sch-day-item-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+.sch-day-item-title {
+  font-size: 13px;
+  font-weight: 700;
+}
+.sch-day-item-sub {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--fg-subtle);
+}
+.sch-chev {
+  color: var(--fg-subtle);
+  flex: 0 0 auto;
+}
+.sch-day-note {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.6;
+  color: var(--fg-muted);
+  text-wrap: pretty;
+}
+.sch-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+.sch-row .sch-dot {
+  width: 8px;
+  height: 8px;
+}
+.sch-dot--now,
+.sch-dot--call {
+  background: var(--accent);
+}
+.sch-dot--milestone {
+  background: var(--info);
+}
+.sch-dot--payment {
+  background: var(--danger);
+}
+.sch-dot--press {
+  background: var(--pos);
+}
+.sch-dot--away,
+.sch-dot--holiday {
+  background: var(--fg-subtle);
+}
+
+/* ── next, in order ───────────────────────────────────────────────────────── */
+.sch-next {
+  overflow: hidden;
+}
+.sch-next-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 14px 16px;
+  border-block-end: 1px solid var(--border);
+}
+.sch-next-icon {
+  color: var(--fg-subtle);
+}
+.sch-next-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.sch-next-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.sch-next-list li:last-child .sch-row {
+  border-block-end: none;
+}
+.sch-row {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  width: 100%;
+  padding: 12px 16px;
+  border: none;
+  border-block-end: 1px solid var(--border);
+  background: transparent;
+  color: var(--fg);
+  cursor: pointer;
+  text-align: start;
+  font: inherit;
+}
+.sch-row-when {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--fg-muted);
+  flex: 0 0 auto;
+  min-width: 78px;
+  white-space: nowrap;
+}
+.sch-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+.sch-row-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--fg);
+}
+.sch-row-sub {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--fg-subtle);
+}
+.sch-row-tag {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+  flex: 0 0 auto;
+}
+.sch-next-none {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0;
+  padding: 14px 16px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--fg-muted);
+}
+@container schscreen (max-width: 479px) {
+  .sch-row {
+    flex-wrap: wrap;
+    gap: 6px 11px;
+  }
+  .sch-row-when {
+    flex: 0 0 auto;
+  }
+  .sch-row-main {
+    flex: 1 1 100%;
+    order: 3;
+  }
+  .sch-row-tag {
+    margin-inline-start: auto;
+  }
+}
+
+/* A day in the grid is a plain button: the ring draws inside its borders. */
+.sch-cell:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--accent);
+}

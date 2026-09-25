@@ -13,7 +13,7 @@ import { settle, type Variant } from "./browser.ts";
 import { localeOf, say } from "./words.ts";
 
 /** The sidebar's items, in its order (`app/routes.ts` SIDEBAR). */
-const NAV = ["home", "enquiries", "proposals", "projects", "clients", "invoices", "chasing", "settings"] as const;
+const NAV = ["home", "schedule", "capacity", "enquiries", "proposals", "projects", "clients", "invoices", "chasing", "expenses", "suppliers", "time", "settings"] as const;
 type NavView = (typeof NAV)[number];
 
 export const screenOf = (page: Page, screen: string) => page.locator(`[data-screen="${screen}"]`).first();

@@ -271,7 +271,6 @@ const SPECS: PageSpec[] = [
     icon: "timer",
     order: 9,
     table: "time_entries",
-    later: true,
     config: form(
       [f("project_id", { control: "reference" }), f("milestone_id", { control: "reference" }), f("person_id", { control: "reference" }), f("date", { control: "date" }), f("hours", { control: "number" })],
       [wide("note", "text")],
@@ -285,7 +284,6 @@ const SPECS: PageSpec[] = [
     icon: "shopping-bag",
     order: 10,
     table: "expenses",
-    later: true,
     config: form(
       [title("what"), f("date", { control: "date" }), f("amount", { control: "currency" }), f("supplier_id", { control: "reference" })],
       [f("project_id", { control: "reference" }), f("client_id", { control: "reference" }), toggle("rebill"), f("receipt", { control: "attachments" })],
@@ -299,7 +297,6 @@ const SPECS: PageSpec[] = [
     icon: "truck",
     order: 11,
     table: "suppliers",
-    later: true,
     config: form(
       [title("name"), f("kind", { control: "select" }), f("contact"), f("email", { control: "email" }), f("phone", { control: "phone" }), wide("address", "text")],
       [f("lead_time"), f("typical_cost"), toggle("would_use_again"), wide("note")],
@@ -313,7 +310,6 @@ const SPECS: PageSpec[] = [
     icon: "calendar-days",
     order: 12,
     table: "events",
-    later: true,
     config: form([title("title"), f("kind", { control: "segmented" }), f("date", { control: "date" }), f("to_date", { control: "date" }), f("person_id", { control: "reference" })]),
   },
   {

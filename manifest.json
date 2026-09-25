@@ -54,12 +54,17 @@
       "placement": "external",
       "routes": {
         "home": "/",
+        "schedule": "/schedule",
+        "capacity": "/capacity",
         "enquiries": "/enquiries",
         "proposals": "/proposals",
         "projects": "/projects",
         "clients": "/clients",
         "invoices": "/invoices",
         "chasing": "/chasing",
+        "expenses": "/expenses",
+        "suppliers": "/suppliers",
+        "time": "/time",
         "terms": "/terms",
         "settings": "/settings"
       }
@@ -11885,6 +11890,288 @@
           ]
         }
       }
+    },
+    {
+      "ref": "clients-time",
+      "template": "page-crud",
+      "title": {
+        "key": "mft.clients.time",
+        "fallback": "Time"
+      },
+      "titles": {
+        "de-DE": "Zeit",
+        "fr-FR": "Temps",
+        "da-DK": "Tid",
+        "cs-CZ": "Čas",
+        "ar-EG": "الوقت",
+        "zh-CN": "工时",
+        "zh-TW": "工時"
+      },
+      "nav": {
+        "group": "records",
+        "icon": "timer",
+        "order": 9
+      },
+      "bindings": {
+        "rows": "time_entries"
+      },
+      "config": {
+        "form": {
+          "v": 2,
+          "sections": [
+            {
+              "id": "s1",
+              "fields": [
+                {
+                  "column": "project_id",
+                  "control": "reference"
+                },
+                {
+                  "column": "milestone_id",
+                  "control": "reference"
+                },
+                {
+                  "column": "person_id",
+                  "control": "reference"
+                },
+                {
+                  "column": "date",
+                  "control": "date"
+                },
+                {
+                  "column": "hours",
+                  "control": "number"
+                }
+              ]
+            },
+            {
+              "id": "s2",
+              "fields": [
+                {
+                  "column": "note",
+                  "control": "text",
+                  "span": 2
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "ref": "clients-expenses",
+      "template": "page-crud",
+      "title": {
+        "key": "mft.clients.expenses",
+        "fallback": "Expenses"
+      },
+      "titles": {
+        "de-DE": "Ausgaben",
+        "fr-FR": "Dépenses",
+        "da-DK": "Udgifter",
+        "cs-CZ": "Výdaje",
+        "ar-EG": "المصروفات",
+        "zh-CN": "支出",
+        "zh-TW": "支出"
+      },
+      "nav": {
+        "group": "records",
+        "icon": "shopping-bag",
+        "order": 10
+      },
+      "bindings": {
+        "rows": "expenses"
+      },
+      "config": {
+        "form": {
+          "v": 2,
+          "sections": [
+            {
+              "id": "s1",
+              "fields": [
+                {
+                  "column": "what",
+                  "control": "title",
+                  "span": 2
+                },
+                {
+                  "column": "date",
+                  "control": "date"
+                },
+                {
+                  "column": "amount",
+                  "control": "currency"
+                },
+                {
+                  "column": "supplier_id",
+                  "control": "reference"
+                }
+              ]
+            },
+            {
+              "id": "s2",
+              "fields": [
+                {
+                  "column": "project_id",
+                  "control": "reference"
+                },
+                {
+                  "column": "client_id",
+                  "control": "reference"
+                },
+                {
+                  "column": "rebill",
+                  "control": "toggle-row"
+                },
+                {
+                  "column": "receipt",
+                  "control": "attachments"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "ref": "clients-suppliers",
+      "template": "page-master-detail",
+      "title": {
+        "key": "mft.clients.suppliers",
+        "fallback": "Suppliers"
+      },
+      "titles": {
+        "de-DE": "Lieferanten",
+        "fr-FR": "Fournisseurs",
+        "da-DK": "Leverandører",
+        "cs-CZ": "Dodavatelé",
+        "ar-EG": "المورّدون",
+        "zh-CN": "供应商",
+        "zh-TW": "供應商"
+      },
+      "nav": {
+        "group": "records",
+        "icon": "truck",
+        "order": 11
+      },
+      "bindings": {
+        "rows": "suppliers"
+      },
+      "config": {
+        "form": {
+          "v": 2,
+          "sections": [
+            {
+              "id": "s1",
+              "fields": [
+                {
+                  "column": "name",
+                  "control": "title",
+                  "span": 2
+                },
+                {
+                  "column": "kind",
+                  "control": "select"
+                },
+                {
+                  "column": "contact"
+                },
+                {
+                  "column": "email",
+                  "control": "email"
+                },
+                {
+                  "column": "phone",
+                  "control": "phone"
+                },
+                {
+                  "column": "address",
+                  "control": "text",
+                  "span": 2
+                }
+              ]
+            },
+            {
+              "id": "s2",
+              "fields": [
+                {
+                  "column": "lead_time"
+                },
+                {
+                  "column": "typical_cost"
+                },
+                {
+                  "column": "would_use_again",
+                  "control": "toggle-row"
+                },
+                {
+                  "column": "note",
+                  "control": "textarea",
+                  "span": 2
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "ref": "clients-studio-dates",
+      "template": "page-crud",
+      "title": {
+        "key": "mft.clients.studio.dates",
+        "fallback": "Studio dates"
+      },
+      "titles": {
+        "de-DE": "Studiotermine",
+        "fr-FR": "Dates du studio",
+        "da-DK": "Studiodatoer",
+        "cs-CZ": "Termíny studia",
+        "ar-EG": "مواعيد الاستوديو",
+        "zh-CN": "工作室日程",
+        "zh-TW": "工作室日程"
+      },
+      "nav": {
+        "group": "records",
+        "icon": "calendar-days",
+        "order": 12
+      },
+      "bindings": {
+        "rows": "events"
+      },
+      "config": {
+        "form": {
+          "v": 2,
+          "sections": [
+            {
+              "id": "s1",
+              "fields": [
+                {
+                  "column": "title",
+                  "control": "title",
+                  "span": 2
+                },
+                {
+                  "column": "kind",
+                  "control": "segmented"
+                },
+                {
+                  "column": "date",
+                  "control": "date"
+                },
+                {
+                  "column": "to_date",
+                  "control": "date"
+                },
+                {
+                  "column": "person_id",
+                  "control": "reference"
+                }
+              ]
+            }
+          ]
+        }
+      }
     }
   ],
   "roles": [
@@ -11978,6 +12265,10 @@
         "page:@clients-people:view",
         "page:@clients-rates:view",
         "page:@clients-brief-questions:view",
+        "page:@clients-time:view",
+        "page:@clients-expenses:view",
+        "page:@clients-suppliers:view",
+        "page:@clients-studio-dates:view",
         "table:@settings:read_pii",
         "table:@people:read_pii",
         "table:@rates:read_pii",
@@ -12200,6 +12491,14 @@
         "page:@clients-terms:edit",
         "page:@clients-brief-questions:view",
         "page:@clients-brief-questions:edit",
+        "page:@clients-time:view",
+        "page:@clients-time:edit",
+        "page:@clients-expenses:view",
+        "page:@clients-expenses:edit",
+        "page:@clients-suppliers:view",
+        "page:@clients-suppliers:edit",
+        "page:@clients-studio-dates:view",
+        "page:@clients-studio-dates:edit",
         "table:@settings:read_pii",
         "table:@people:read_pii",
         "table:@rates:read_pii",

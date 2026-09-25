@@ -238,7 +238,11 @@ async function bootDesk(): Promise<void> {
   setStaffToken(() => csrf);
 
   const [desk, { onSignedOut }] = await Promise.all([import("./state/desk.ts"), import("./state/outcome.ts")]);
-  desk.useDesk.setState({ me: desk.meOf(staff.user, staff.access) });
+  desk.useDesk.setState({
+    me: desk.meOf(staff.user, staff.access),
+    // The attached add-ons' public settings (Holiday calendars' days …), as the staff config carries them.
+    addOns: Object.fromEntries(Object.entries(staff.addOns).map(([key, addOn]) => [key, { values: addOn.settings, declared: Object.keys(addOn.settings) }])),
+  });
   desk.setDeskReads(sessionDeskReads(transport, (ref) => desk.can(ref, "read")));
   desk.setDeskWrites(sessionSink(transport, tables, { csrfToken: () => csrf }));
   onSignedOut(() => useUi.setState({ signedOut: true }));

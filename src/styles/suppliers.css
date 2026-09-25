@@ -1,1 +1,512 @@
-/* The suppliers area's own layout. Shared pieces are in primitives.css; tokens in tokens.css. */
+/* The suppliers area's own layout: where the money went, the kind filters, the
+ * form in place, the address book and one supplier beside it. The three sums
+ * and the fields are Expenses' (`ex-kpi`, `ex-fld`, `ex-input`). Logical
+ * properties only (the page may be right to left). Mono figures at 600. */
+
+.sup-screen {
+  gap: 16px;
+  container: supscreen / inline-size;
+}
+@container supscreen (min-width: 760px) {
+  .sup-kpis {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.sup-kpi {
+  padding: 14px 15px;
+  gap: 5px;
+}
+.sup-kpi .ex-kpi-sub {
+  font-size: 11.5px;
+}
+.sup-kpi-v {
+  font-size: 20px;
+  letter-spacing: -0.03em;
+}
+.sup-kpi-v--quiet {
+  color: var(--fg-subtle);
+}
+.sup-kpi-name {
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--fg);
+  overflow-wrap: anywhere;
+}
+
+/* ── section heads ────────────────────────────────────────────────────────── */
+.sup-where,
+.sup-book,
+.sup-card,
+.sup-bought,
+.sup-form {
+  overflow: hidden;
+}
+.sup-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 13px 16px;
+  border-block-end: 1px solid var(--border);
+  color: var(--fg-subtle);
+}
+.sup-h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--fg);
+}
+.sup-head-aside {
+  margin-inline-start: auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--fg-subtle);
+}
+
+/* ── where the money went ─────────────────────────────────────────────────── */
+.sup-bar-row {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) 84px;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  padding: 11px 16px;
+  border: none;
+  border-block-end: 1px solid var(--border);
+  background: transparent;
+  cursor: pointer;
+  text-align: start;
+  font: inherit;
+  color: var(--fg);
+}
+.sup-bar-row:last-child {
+  border-block-end: none;
+}
+.sup-bar-row[aria-pressed="true"] {
+  background: var(--accent-soft);
+}
+.sup-bar-k {
+  font-size: 12.5px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sup-bar {
+  display: block;
+  height: 9px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  overflow: hidden;
+}
+.sup-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+}
+.sup-bar-fill--none {
+  background: var(--surface-3);
+}
+.sup-bar-v {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-weight: 600;
+  text-align: end;
+}
+
+/* ── filters and "Add a supplier" ─────────────────────────────────────────── */
+.sup-filter-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.sup-add {
+  margin-inline-start: auto;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 33px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px dashed var(--border-strong);
+  background: transparent;
+  color: var(--fg-muted);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* ── the form ─────────────────────────────────────────────────────────────── */
+.sup-form {
+  border-color: var(--border-strong);
+}
+.sup-form-body {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  padding: 14px 16px;
+}
+.sup-form-grid {
+  display: grid;
+  gap: 11px;
+  grid-template-columns: minmax(0, 1fr);
+}
+@container supscreen (min-width: 760px) {
+  .sup-form-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .sup-fld--wide {
+    grid-column: span 3;
+  }
+}
+.sup-form .ex-input {
+  background: var(--surface-2);
+}
+.sup-textarea {
+  height: auto;
+  padding: 11px 12px;
+  border-radius: 11px;
+  line-height: 1.6;
+  resize: vertical;
+}
+.sup-remove.btn {
+  margin-inline-start: auto;
+}
+
+/* ── the book and one supplier ────────────────────────────────────────────── */
+.sup-cols {
+  display: grid;
+  gap: 14px;
+  align-items: start;
+  grid-template-columns: minmax(0, 1fr);
+}
+@container supscreen (min-width: 940px) {
+  .sup-cols {
+    grid-template-columns: minmax(260px, 0.8fr) minmax(0, 1.4fr);
+  }
+}
+.sup-list,
+.sup-buys {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.sup-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 11px;
+  align-items: center;
+  width: 100%;
+  padding: 11px 16px;
+  border: none;
+  border-block-end: 1px solid var(--border);
+  background: transparent;
+  cursor: pointer;
+  text-align: start;
+  font: inherit;
+  color: var(--fg);
+}
+.sup-row[aria-current="true"] {
+  background: var(--accent-soft);
+}
+.sup-ini {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+  background: var(--surface-3);
+  color: var(--fg-muted);
+}
+.sup-ini--big {
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  font-size: 15px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.sup-row-main {
+  display: flex;
+  flex-direction: column;
+  /* Each line sits at the row's start, whichever way its own words run. */
+  align-items: flex-start;
+  gap: 3px;
+  min-width: 0;
+}
+.sup-row-main > span {
+  max-width: 100%;
+}
+.sup-row-name {
+  font-size: 13.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sup-row-sub {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--fg-subtle);
+  text-wrap: pretty;
+}
+.sup-row-v {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-weight: 600;
+  text-align: end;
+}
+.sup-foot {
+  padding: 13px 16px;
+  background: var(--surface-2);
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.6;
+  color: var(--fg-subtle);
+  text-wrap: pretty;
+}
+.sup-quiet {
+  margin: 0;
+  padding: 14px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.6;
+  color: var(--fg-subtle);
+  border-block-end: 1px solid var(--border);
+  text-wrap: pretty;
+}
+.sup-quiet--pad {
+  padding: 18px 16px;
+}
+
+.sup-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.sup-card {
+  border-color: var(--border-strong);
+}
+.sup-card-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 15px 16px;
+  border-block-end: 1px solid var(--border);
+}
+.sup-card-names {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.28;
+  min-width: 0;
+}
+.sup-card-name {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+.sup-card-kind {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-subtle);
+}
+.sup-card-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-inline-start: auto;
+}
+.sup-act {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
+  color: var(--fg);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: none;
+}
+.sup-act--icon {
+  width: 32px;
+  padding: 0;
+  justify-content: center;
+}
+.sup-fields {
+  margin: 0;
+}
+.sup-field {
+  display: grid;
+  grid-template-columns: minmax(110px, 0.7fr) minmax(0, 1.5fr);
+  gap: 12px;
+  align-items: baseline;
+  padding: 11px 16px;
+  border-block-end: 1px solid var(--border);
+}
+.sup-field dt {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+}
+.sup-field dd {
+  margin: 0;
+  /* As every text run on a right-to-left page: its own first letter sets its direction. */
+  unicode-bidi: plaintext;
+  text-align: start;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--fg);
+  text-wrap: pretty;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.sup-field dd.sup-field-v--mono {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-weight: 600;
+  direction: ltr;
+  unicode-bidi: isolate;
+  text-align: start;
+}
+[dir="rtl"] .sup-field dd {
+  text-align: right;
+}
+.sup-field dd.sup-field-v--pre {
+  white-space: pre-line;
+}
+.sup-field dd.sup-field-v--quiet {
+  font-weight: 600;
+  color: var(--fg-muted);
+}
+.sup-record {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  border-block-end: 1px solid var(--border);
+}
+.sup-record-pill {
+  font-size: 11px;
+}
+.sup-record-note {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--fg-subtle);
+  text-wrap: pretty;
+  min-width: 0;
+}
+.sup-again {
+  margin-inline-start: auto;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 30px;
+  padding: 0 11px;
+  border-radius: 9px;
+  border: 1px solid var(--border-strong);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  background: var(--surface-2);
+  color: var(--fg-muted);
+}
+.sup-again--on {
+  background: var(--pos-soft);
+  color: var(--pos);
+}
+.sup-note {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  background: var(--surface-2);
+}
+.sup-note .sup-textarea {
+  background: var(--surface);
+}
+.sup-note-state {
+  min-height: 1em;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--fg-subtle);
+}
+.sup-buy {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) auto auto;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  padding: 12px 16px;
+  border: none;
+  border-block-end: 1px solid var(--border);
+  background: transparent;
+  cursor: pointer;
+  text-align: start;
+  font: inherit;
+  color: var(--fg);
+}
+.sup-buy-date {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--fg-subtle);
+}
+.sup-buy-what {
+  font-size: 13px;
+  font-weight: 700;
+  text-wrap: pretty;
+}
+.sup-buy-v {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: end;
+}
+.sup-buy-pill {
+  font-size: 10.5px;
+}
+.sup-buy-pill--to-pass-on {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+.sup-buy-pill--passed-on {
+  background: var(--pos-soft);
+  color: var(--pos);
+}
+@container supscreen (max-width: 520px) {
+  .sup-buy {
+    grid-template-columns: 52px minmax(0, 1fr) auto;
+  }
+  .sup-buy-pill {
+    grid-column: 2 / -1;
+    justify-self: start;
+  }
+  .sup-field {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+}

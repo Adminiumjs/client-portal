@@ -145,12 +145,17 @@ export interface SidebarItem {
  */
 export const SIDEBAR: readonly SidebarItem[] = [
   { view: "home", labelKey: "nav.home", icon: "house", children: [] },
+  { view: "schedule", labelKey: "nav.schedule", icon: "calendar-days", children: [] },
+  { view: "capacity", labelKey: "nav.capacity", icon: "gauge", children: [] },
   { view: "enquiries", labelKey: "nav.enquiries", icon: "inbox", children: [], badge: "enquiries" },
   { view: "proposals", labelKey: "nav.proposals", icon: "file-text", children: ["proposal", "composer", "scoping"], badge: "proposals" },
   { view: "projects", labelKey: "nav.projects", icon: "folder-kanban", children: ["project", "review", "handover"] },
   { view: "clients", labelKey: "nav.clients", icon: "users-round", children: ["client"] },
   { view: "invoices", labelKey: "nav.invoices", icon: "receipt-text", children: ["invoice", "print"], badge: "invoices" },
   { view: "chasing", labelKey: "nav.chasing", icon: "bell-ring", children: [], badge: "chasing" },
+  { view: "expenses", labelKey: "nav.expenses", icon: "wallet", children: [] },
+  { view: "suppliers", labelKey: "nav.suppliers", icon: "truck", children: [] },
+  { view: "time", labelKey: "nav.time", icon: "timer", children: [] },
   { view: "settings", labelKey: "nav.settings", icon: "settings", children: ["terms"], managerOnly: true },
 ];
 

@@ -37,12 +37,17 @@ const ENV = {
 /** The desk's screens, as the address bar names them. */
 export const STAFF_ROUTES = {
   home: "/",
+  schedule: "/schedule",
+  capacity: "/capacity",
   enquiries: "/enquiries",
   proposals: "/proposals",
   projects: "/projects",
   clients: "/clients",
   invoices: "/invoices",
   chasing: "/chasing",
+  expenses: "/expenses",
+  suppliers: "/suppliers",
+  time: "/time",
   terms: "/terms",
   settings: "/settings",
 };
@@ -54,12 +59,7 @@ export const STAFF_ROUTES = {
  * `STAFF_ROUTES` (and `surface-nav.ts`) as they ship.
  */
 export const LATER_STAFF_ROUTES = {
-  time: "/time",
-  expenses: "/expenses",
-  suppliers: "/suppliers",
   scoping: "/scoping",
-  schedule: "/schedule",
-  capacity: "/capacity",
   money: "/money",
   archive: "/archive",
   emails: "/emails",

@@ -1,1 +1,479 @@
-/* The expenses area's own layout. Shared pieces are in primitives.css; tokens in tokens.css. */
+/* The expenses area's own layout: the three sums, the purchases (the form in
+ * place, the rows, the foot) and the purchase sheet. The suppliers screen
+ * reuses the sums and the fields. Shared pieces are in primitives.css; tokens
+ * in tokens.css. Logical properties only (the page may be right to left).
+ * Mono figures are drawn at 600, as the design renders them. */
+
+.ex-screen {
+  gap: 16px;
+  container: exscreen / inline-size;
+}
+.ex-screen .screen-lead,
+.sup-screen .screen-lead {
+  margin: 8px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fg-muted);
+  text-wrap: pretty;
+}
+.sup-screen .screen-lead {
+  max-width: 66ch;
+}
+
+/* ── the three sums ───────────────────────────────────────────────────────── */
+.ex-kpis {
+  display: grid;
+  gap: 13px;
+  grid-template-columns: minmax(0, 1fr);
+}
+@container exscreen (min-width: 760px) {
+  .ex-kpis {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.ex-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 15px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  min-width: 0;
+}
+.ex-kpi-k {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+}
+.ex-kpi-v {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  color: var(--fg);
+}
+.ex-kpi-v--warn {
+  color: var(--warn);
+}
+.ex-kpi-v--pos {
+  color: var(--pos);
+}
+.ex-kpi-sub {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-subtle);
+  text-wrap: pretty;
+}
+
+/* ── the purchases ────────────────────────────────────────────────────────── */
+.ex-list {
+  overflow: hidden;
+}
+.ex-list-head {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  flex-wrap: wrap;
+  padding: 13px 16px;
+  border-block-end: 1px solid var(--border);
+  color: var(--fg-subtle);
+}
+.ex-list-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--fg);
+}
+.ex-add.btn {
+  margin-inline-start: auto;
+  border-radius: 10px;
+  padding: 0 12px;
+  background: var(--surface-2);
+}
+.ex-empty {
+  padding: 8px 16px;
+  border-block-end: 1px solid var(--border);
+}
+.ex-loading {
+  margin: 10px 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg-subtle);
+}
+
+/* the form, in place */
+.ex-form {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  padding: 14px 16px;
+  border-block-end: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.ex-form-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr);
+}
+@container exscreen (min-width: 700px) {
+  .ex-form-grid {
+    grid-template-columns: minmax(0, 1.6fr) 140px minmax(0, 1.1fr);
+  }
+}
+.ex-fld {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.ex-fld-k {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+}
+.ex-input {
+  height: 38px;
+  padding-inline: 11px;
+  border-radius: 10px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--fg);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  min-width: 0;
+  width: 100%;
+}
+select.ex-input {
+  padding-inline: 10px;
+}
+.ex-input--mono {
+  font-family: var(--font-mono);
+}
+.ex-input[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+.ex-input:disabled {
+  opacity: 0.6;
+}
+.ex-file {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding-inline: 11px;
+  border-radius: 10px;
+  border: 1px dashed var(--border-strong);
+  background: var(--surface);
+  color: var(--fg-muted);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  min-width: 0;
+}
+.ex-file--chosen {
+  border-style: solid;
+  color: var(--fg);
+}
+.ex-file:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.ex-file-input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  width: 100%;
+  cursor: pointer;
+}
+.ex-file-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ex-form-err {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--danger);
+}
+.ex-form-actions {
+  display: flex;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+
+/* the rows */
+.ex-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.ex-row {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) 100px;
+  gap: 7px 13px;
+  align-items: center;
+  padding: 12px 16px;
+  border-block-end: 1px solid var(--border);
+}
+@container exscreen (min-width: 700px) {
+  .ex-row {
+    grid-template-columns: 52px minmax(0, 1fr) 100px 108px;
+    gap: 13px;
+  }
+}
+.ex-date {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--fg-subtle);
+}
+.ex-main {
+  display: flex;
+  flex-direction: column;
+  /* Each line sits at the row's start, whichever way its own words run. */
+  align-items: flex-start;
+  gap: 3px;
+  min-width: 0;
+}
+.ex-what {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  max-width: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: start;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--fg);
+  text-wrap: pretty;
+}
+.ex-what:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.ex-what:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.ex-receipt {
+  display: inline-flex;
+  color: var(--fg-subtle);
+}
+.ex-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.ex-who {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--fg-subtle);
+}
+.ex-amt {
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+  font-weight: 600;
+  text-align: end;
+  color: var(--fg);
+}
+.ex-tag {
+  grid-column: 2 / -1;
+  justify-self: start;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 11px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+@container exscreen (min-width: 700px) {
+  .ex-tag {
+    grid-column: auto;
+    justify-self: stretch;
+  }
+}
+.ex-tag--to-pass-on {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+.ex-tag--passed-on {
+  background: var(--pos-soft);
+  color: var(--pos);
+}
+.ex-tag--ours {
+  background: var(--surface-2);
+  color: var(--fg-subtle);
+  cursor: default;
+}
+.ex-tag:disabled {
+  cursor: progress;
+}
+.ex-problem {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 16px;
+  border-block-end: 1px solid var(--border);
+}
+
+/* the foot */
+.ex-foot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 14px 16px;
+  background: var(--surface-2);
+}
+.ex-foot-label {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+.ex-foot-amt {
+  margin-inline-start: auto;
+  font-family: var(--font-mono);
+  font-size: 14.5px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+/* ── the purchase sheet ───────────────────────────────────────────────────── */
+.ex-sh {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.ex-sh-facts {
+  margin: 0;
+  display: grid;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.ex-sh-facts > div {
+  display: grid;
+  grid-template-columns: minmax(96px, 0.7fr) minmax(0, 1.5fr);
+  gap: 12px;
+  align-items: baseline;
+  padding: 10px 13px;
+  border-block-end: 1px solid var(--border);
+}
+.ex-sh-facts > div:last-child {
+  border-block-end: none;
+}
+.ex-sh-facts dt {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+}
+.ex-sh-facts dd {
+  margin: 0;
+  unicode-bidi: plaintext;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--fg);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+[dir="rtl"] .ex-sh-facts dd {
+  text-align: right;
+}
+.ex-sh-facts dd.money {
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+.ex-sh-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.ex-sh-standing {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 13px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.ex-sh-standing p,
+.ex-sh-confirm p {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.55;
+  color: var(--fg-muted);
+  text-wrap: pretty;
+}
+.ex-sh-standing--to-pass-on {
+  background: var(--warn-soft);
+}
+.ex-sh-standing--passed-on {
+  background: var(--pos-soft);
+}
+.ex-sh-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 13px;
+  border-radius: 12px;
+  border: 1px solid var(--danger);
+}
+.ex-sh-block,
+.ex-sh-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.ex-sh-block .btn {
+  align-self: flex-start;
+}
+.ex-sh-row {
+  display: flex;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+.ex-sh-pair {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+.ex-sh-hint {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-subtle);
+}
