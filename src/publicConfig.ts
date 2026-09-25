@@ -103,11 +103,11 @@ export async function resolveSurfaceConfig(
     if (!res.ok) return null;
     const doc: unknown = await res.json();
     if (doc === null || typeof doc !== "object") return null;
-    const key = (doc as { publishableKey?: unknown }).publishableKey;
-    if (typeof key !== "string" || key === "") return null;
     // Carried on the customer document too: a mapped storefront domain renders
     // the operator's name, not the sample's.
     setAppName((doc as { appName?: unknown }).appName as string | null | undefined);
+    const key = (doc as { publishableKey?: unknown }).publishableKey;
+    if (typeof key !== "string" || key === "") return null;
     const served = (doc as { baseUrl?: unknown }).baseUrl;
     const baseUrl =
       typeof served === "string" && served !== ""
