@@ -117,13 +117,25 @@ function matches(row: ResolvedRow, filter: Filter): boolean {
   if (filter.op === "not_null") return value !== null && value !== undefined;
   if (value === null || value === undefined) return false;
   const same = (a: unknown, b: unknown) => (typeof b === "number" ? Number(a) === b : a === b);
+  /** Order two values as the engine would: instants as instants, days as days, numbers as numbers. */
+  const order = (a: unknown, b: unknown): number => {
+    if (b instanceof Date) return Date.parse(String(a)) - b.getTime();
+    if (typeof b === "number") return Number(a) - b;
+    return String(a) < String(b) ? -1 : String(a) > String(b) ? 1 : 0;
+  };
   switch (filter.op) {
     case "eq":
       return same(value, filter.value);
     case "neq":
       return !same(value, filter.value);
     case "gt":
-      return Number(value) > Number(filter.value);
+      return order(value, filter.value) > 0;
+    case "gte":
+      return order(value, filter.value) >= 0;
+    case "lt":
+      return order(value, filter.value) < 0;
+    case "lte":
+      return order(value, filter.value) <= 0;
     case "in":
       return (filter.value as unknown[]).some((v) => same(value, v));
     default:
@@ -352,7 +364,7 @@ describe.each([
 // ── where a card leads ──────────────────────────────────────────────────────
 
 const PAGES = manifest.pages as { ref: string; template: string; bindings?: { rows?: string } }[];
-/** The link-narrowing words a records list reads. */
+/** The link-narrowing words a list reads. */
 const LINK_OPS = ["eq", "neq", "in", "gt", "gte", "lt", "lte", "before", "after", "month", "set", "unset"];
 
 /** Each card's links, as `[card, href]`. */
@@ -380,8 +392,8 @@ describe("where the Overview’s cards lead", () => {
       const target = PAGES.find((p) => p.ref === ref);
       expect(target, `${card} → ${ref}`).toBeDefined();
       for (const { column, raw } of pieces) {
-        // Only a records list reads a narrowing from its address.
-        expect(target!.template, `${card}: ${ref} reads no narrowing`).toBe("page-crud");
+        // A records list, an inbox or a master-detail list reads a narrowing from its address.
+        expect(["page-crud", "page-queue-inbox", "page-master-detail"], `${card}: ${ref} reads no narrowing`).toContain(target!.template);
         expect(LINK_OPS, `${card}: ${raw}`).toContain(raw.split(":")[0]);
         expect(() => typeOf(target!.bindings!.rows!, column), `${card}: ${column}`).not.toThrow();
       }
@@ -393,10 +405,18 @@ describe("where the Overview’s cards lead", () => {
     expect(href("kpi-overdue")).toBe("/p/clients-invoices?f.status=eq:sent&f.balance=gt:0&f.due_on=before:today");
     expect(href("kpi-proposals")).toBe("/p/clients-proposals?f.status=eq:sent&f.valid_until=gte:today");
     expect(href("kpi-collected")).toBe("/p/clients-payments?f.voided=eq:false&f.paid_on=month:this");
-    expect(href("needs-chase")).toBe("/p/clients-messages?f.status=eq:held&f.kind=in:invoice-rung-1,invoice-rung-2,invoice-rung-3&f.due=lte:today");
+    expect(href("needs-chase")).toBe("/p/clients-messages?f.status=eq:held&f.kind=in:invoice-rung-1,invoice-rung-2,invoice-rung-3&f.due=before:now");
     expect(href("needs-paid")).toBe("/p/clients-invoices?f.status=eq:sent&f.balance=gt:0&f.client_paid_at=set");
-    // A late band's figure cannot be said as a narrowing, so it opens nothing.
-    expect(["owed-30", "owed-60", "owed-older"].map(href)).toEqual([undefined, undefined, undefined]);
+    expect(href("needs-enquiries")).toBe("/p/clients-enquiries?f.status=eq:new");
+    // Each late band opens the invoices due in its own days.
+    expect(["owed-30", "owed-60", "owed-older"].map(href)).toEqual([
+      "/p/clients-invoices?f.status=eq:sent&f.balance=gt:0&f.due_on=gte:today-30&f.due_on=lt:today",
+      "/p/clients-invoices?f.status=eq:sent&f.balance=gt:0&f.due_on=gte:today-60&f.due_on=lt:today-30",
+      "/p/clients-invoices?f.status=eq:sent&f.balance=gt:0&f.due_on=gte:today-3649&f.due_on=lt:today-60",
+    ]);
+    // Every card that counts something opens a list, now that every count can be said as one.
+    const counting = ITEMS.filter((card) => card.widget !== "chart-bar" && card.widget !== "mini-table");
+    expect(counting.filter((card) => card.config.href === undefined).map((card) => card.i)).toEqual([]);
   });
 });
 
@@ -453,30 +473,66 @@ describe.skipIf(!available)("the Overview, put through the product’s own schem
     }
   });
 
-  it("links with narrowings the product uses whole — none left out", async () => {
+  /** A link's narrowing as the product works it out, at `now`. */
+  async function narrowingOf(href: string, now: number) {
     const { resolveLinkFilters } = await load<{
-      resolveLinkFilters: (options: unknown) => { filters: { column: string; raw: string; status: string; reason?: string }[] };
+      resolveLinkFilters: (options: unknown) => { where: Filter | { and: Filter[] } | null; filters: { column: string; raw: string; status: string; reason?: string }[] };
     }>(LINK_FILTERS);
     const logical: Record<string, string> = { int: "integer", fk: "integer", decimal: "decimal", text: "text", enum: "enum", date: "date", timestamptz: "timestamptz", bool: "boolean" };
+    const { ref, pieces } = parse(href);
+    const tableRef = PAGES.find((p) => p.ref === ref)!.bindings!.rows!;
+    const columns = new Map(
+      TABLES.find((t) => t.ref === tableRef)!.columns.map((c) => [
+        c.ref,
+        { name: c.ref, logicalType: logical[c.type] ?? "unknown", nullable: true, isPrimaryKey: false, masked: false, secret: false, textish: c.type === "text" },
+      ]),
+    );
+    const resolved = resolveLinkFilters({
+      pieces,
+      table: { id: tableRef, schema: "", name: tableRef, primaryKey: ["id"], readOnly: false, table: {}, columns },
+      canReadPii: true,
+      dialect: "postgres",
+      timezone: ZONE,
+      now: new Date(now),
+    });
+    return { table: tableRef, ...resolved };
+  }
+
+  it("links with narrowings the product uses whole — none left out", async () => {
     for (const [card, href] of LINKS) {
-      const { ref, pieces } = parse(href);
-      if (pieces.length === 0) continue;
-      const tableRef = PAGES.find((p) => p.ref === ref)!.bindings!.rows!;
-      const columns = new Map(
-        TABLES.find((t) => t.ref === tableRef)!.columns.map((c) => [
-          c.ref,
-          { name: c.ref, logicalType: logical[c.type] ?? "unknown", nullable: true, isPrimaryKey: false, masked: false, secret: false, textish: c.type === "text" },
-        ]),
-      );
-      const resolved = resolveLinkFilters({
-        pieces,
-        table: { id: tableRef, schema: "", name: tableRef, primaryKey: ["id"], readOnly: false, table: {}, columns },
-        canReadPii: true,
-        dialect: "postgres",
-        timezone: ZONE,
-        now: new Date("2026-07-28T14:00:00Z"),
-      });
+      if (parse(href).pieces.length === 0) continue;
+      const resolved = await narrowingOf(href, Date.parse("2026-07-28T14:00:00Z"));
       expect(resolved.filters.filter((filter) => filter.status !== "applied"), `${card}: ${href}`).toEqual([]);
     }
+  });
+
+  it.each([
+    ["on the design’s day", Date.parse("2026-07-28T14:00:00Z")],
+    ["on Saturday 3 October 2026", Date.parse("2026-10-03T12:00:00Z")],
+    ["on 31 December 2026, late", Date.parse("2027-01-01T04:00:00Z")],
+  ])("opens, from every card, exactly the rows the card counts — %s", async (_, now) => {
+    const rows = resolveSample(bundle, { now, zone: ZONE, locale: "en-US", currency: "USD" });
+    // Rows on every edge a card draws: an invoice due on each band's first and
+    // last day, and a chase rung due a minute either side of this moment.
+    const today = studioDay(new Date(now).toISOString());
+    rows["invoices"]!.push(
+      ...[0, -1, -30, -31, -60, -61, -3649, -3650].map((back, index) => ({ id: 900 + index, status: "sent", balance: 10, due_on: shiftDays(today, back), client_paid_at: null })),
+    );
+    rows["messages"]!.push(
+      { id: 900, kind: "invoice-rung-2", status: "held", due: new Date(now - 60_000).toISOString() },
+      { id: 901, kind: "invoice-rung-2", status: "held", due: new Date(now + 60_000).toISOString() },
+    );
+    let compared = 0;
+    for (const [card, href] of LINKS) {
+      const query = item(card).config.binding!;
+      const { table, where } = await narrowingOf(href, now);
+      if (parse(href).pieces.length === 0 || table !== query.source.name) continue;
+      const conditions = where === null ? [] : "and" in where ? where.and : [where];
+      const listed = rows[table]!.filter((row) => conditions.every((condition) => matches(row, condition))).map((row) => row["id"]);
+      const counted = rowsOf(rows, { ...query, limit: undefined }, now).map((row) => row["id"]);
+      expect(listed.sort(), `${card}: ${href}`).toEqual(counted.sort());
+      compared += 1;
+    }
+    expect(compared).toBeGreaterThanOrEqual(20);
   });
 });

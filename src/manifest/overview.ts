@@ -29,10 +29,10 @@
  *   - "waiting" proposals are sent and still in date (valid today or later);
  *   - "collected" counts payments by the day they arrived, a voided one never.
  *
- * A card that leads somewhere opens its list already narrowed to what the
- * card counts (`?f.<column>=<op>:<value>`); the list says so above its rows,
- * and each narrowing can be taken off. A card whose count cannot be said as
- * such a narrowing opens nothing rather than a list that looks like it.
+ * A card that leads somewhere opens its list already narrowed to exactly what
+ * the card counts (`?f.<column>=<op>:<value>`, days counted from the studio's
+ * today as `today-30`, a moment as `now`); the list says so above its rows,
+ * and each narrowing can be taken off.
  *
  * A card's title is written in every language the app speaks (`words.ts`);
  * the page shows the reader's. A card has no subtitle: a subtitle is one
@@ -192,27 +192,28 @@ const ITEMS: Json[] = [
     // Due today is not yet late.
     binding: metric("invoices", sum("balance", "owed"), { filters: OWING, window: fromToday("due_on") }),
   }),
-  // The three late bands open nothing: a list can be narrowed to "before
-  // today", not to "between 31 and 60 days ago", and a wider list under a
-  // band's figure would not be the list the figure counts.
+  // A late band opens the invoices due in its own days: from so many days ago
+  // up to (not including) the band's nearer edge.
   card("owed-30", "kpi-stat-tile-compact", [3, 6, 3, 3], "Owed · 1–30 days late", {
     ...MONEY,
+    href: page("clients-invoices", ...OWING_LINK, ["due_on", "gte:today-30"], ["due_on", "lt:today"]),
     binding: metric("invoices", sum("balance", "owed"), { filters: OWING, window: days("due_on", 30, 1) }),
   }),
   card("owed-60", "kpi-stat-tile-compact", [0, 9, 3, 3], "Owed · 31–60 days late", {
     ...MONEY,
+    href: page("clients-invoices", ...OWING_LINK, ["due_on", "gte:today-60"], ["due_on", "lt:today-30"]),
     binding: metric("invoices", sum("balance", "owed"), { filters: OWING, window: days("due_on", 30, 31) }),
   }),
   card("owed-older", "kpi-stat-tile-compact", [3, 9, 3, 3], "Owed · over 60 days late", {
     ...MONEY,
+    href: page("clients-invoices", ...OWING_LINK, ["due_on", "gte:today-3649"], ["due_on", "lt:today-60"]),
     binding: metric("invoices", sum("balance", "owed"), { filters: OWING, window: days("due_on", 3589, 61) }),
   }),
 
   // What needs a partner.
   card("needs-chase", "kpi-stat-card", [6, 6, 3, 3], "Chase reminders to approve", {
     iconName: "bell-ring", iconTone: "warn", ...COUNT,
-    // A list narrows by day, so it shows the rungs due by the end of today.
-    href: page("clients-messages", ["status", "eq:held"], ["kind", `in:${RUNGS.join(",")}`], ["due", "lte:today"]),
+    href: page("clients-messages", ["status", "eq:held"], ["kind", `in:${RUNGS.join(",")}`], ["due", "before:now"]),
     // Held for a partner, and its day has come; a rung still to wake waits.
     binding: metric("messages", count("chase"), { filters: [eq("status", "held"), oneOf("kind", RUNGS)], window: untilNow("due") }),
   }),
@@ -228,9 +229,7 @@ const ITEMS: Json[] = [
   }),
   card("needs-enquiries", "kpi-stat-card", [9, 9, 3, 3], "New enquiries", {
     iconName: "inbox", ...COUNT,
-    // The enquiries inbox reads no narrowing from its address: it opens as
-    // it is, the new ones first.
-    href: page("clients-enquiries"),
+    href: page("clients-enquiries", ["status", "eq:new"]),
     binding: metric("enquiries", count("new"), { filters: [eq("status", "new")] }),
   }),
 
