@@ -1,1 +1,595 @@
-/* The review area's own layout. Shared pieces are in primitives.css; tokens in tokens.css. */
+/*
+ * The deliverable review (plus the version and approval sheets and the file
+ * picker they share): the head line, the stage with the drawn file and its
+ * pins, the versions, what was said, and the client's side.
+ * Logical properties only — except a pin's place, which is a point on the
+ * artwork and so measured from the drawing's own left edge in every language.
+ */
+
+.rv-page {
+  container: rvpage / inline-size;
+}
+.rv-headline {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  flex-wrap: wrap;
+}
+.rv-headline .prj-back {
+  height: 32px;
+  border-radius: 10px;
+}
+.rv-file {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-muted);
+  overflow-wrap: anywhere;
+}
+.rv-title {
+  margin: 0;
+}
+.rv-cols {
+  display: grid;
+  gap: 14px;
+  align-items: start;
+  grid-template-columns: minmax(0, 1fr);
+}
+@container rvpage (min-width: 900px) {
+  .rv-cols {
+    grid-template-columns: minmax(0, 1.2fr) minmax(300px, 0.85fr);
+  }
+}
+.rv-main {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.rv-stage-card,
+.rv-panel {
+  overflow: hidden;
+  min-width: 0;
+}
+.rv-said {
+  align-self: start;
+}
+
+/* the toolbar: version chips, compare, the version's line */
+.rv-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+  padding: 11px 13px;
+  border-block-end: 1px solid var(--border);
+}
+.rv-chips {
+  display: flex;
+  gap: 3px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 3px;
+  flex-wrap: wrap;
+}
+.rv-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 29px;
+  padding: 0 11px;
+  border-radius: 9px;
+  border: none;
+  cursor: pointer;
+  font-size: 12.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  background: transparent;
+  color: var(--fg-subtle);
+}
+.rv-chips .rv-chip {
+  font-family: var(--font-mono);
+}
+.rv-chip[aria-pressed="true"] {
+  background: var(--surface);
+  color: var(--fg);
+  box-shadow: 0 1px 3px rgba(20, 20, 35, 0.14);
+}
+.rv-chip:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.rv-compare {
+  height: 30px;
+  font-size: 12px;
+  border-color: var(--border);
+  color: var(--fg-muted);
+}
+.rv-compare[aria-pressed="true"] {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: transparent;
+}
+.rv-compare:disabled {
+  opacity: 0.4;
+}
+.rv-vmeta {
+  margin-inline-start: auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--fg-subtle);
+}
+.rv-hint {
+  padding: 9px 14px;
+  border-block-end: 1px solid var(--border);
+  background: var(--surface-2);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--fg-subtle);
+  text-wrap: pretty;
+}
+
+/* the stage */
+.rv-stages {
+  padding: 16px;
+  display: grid;
+  gap: 13px;
+  grid-template-columns: minmax(0, 1fr);
+}
+.rv-stages--two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.rv-figure {
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  overflow: hidden;
+  background: var(--surface-2);
+  min-width: 0;
+}
+.rv-stage {
+  position: relative;
+  border-block-end: 1px solid var(--border);
+  background: var(--surface-3);
+}
+/* A long document scrolls inside the stage; its pins scroll with it. */
+.rv-scroll {
+  max-height: min(72vh, 760px);
+  overflow: auto;
+}
+.rv-drawing {
+  position: relative;
+  line-height: 0;
+}
+.rv-drawing--pins {
+  cursor: crosshair;
+}
+.rv-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  user-select: none;
+}
+.rv-pdf {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-height: 220px;
+  background: #fff;
+}
+.rv-pdf canvas,
+.rv-pdf-page {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.rv-drawing-wait {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  line-height: normal;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--fg-subtle);
+  background: var(--surface-2);
+}
+.rv-more-pages {
+  margin: 0;
+  padding: 9px 12px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--fg-subtle);
+  border-block-start: 1px solid var(--border);
+}
+.rv-tag {
+  position: absolute;
+  inset-block-end: 10px;
+  inset-inline-start: 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--fg-muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 4px 8px;
+  border-radius: 7px;
+  line-height: normal;
+  pointer-events: none;
+}
+/* A pin's place is a point on the artwork: measured from its own left, in every language. */
+.rv-pin {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  background: var(--fg);
+  color: var(--bg);
+  box-shadow: 0 2px 8px rgba(10, 10, 25, 0.35);
+  cursor: default;
+}
+.rv-pin--new {
+  background: var(--accent);
+  color: var(--accent-fg);
+  cursor: pointer;
+}
+.rv-pin--new:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-soft), 0 0 0 1px var(--accent);
+}
+.rv-card-file {
+  aspect-ratio: 16 / 9;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 18px;
+  text-align: center;
+  line-height: normal;
+}
+.rv-stage--compact .rv-card-file {
+  aspect-ratio: 4 / 3;
+}
+.rv-card-icon {
+  color: var(--fg-subtle);
+  opacity: 0.8;
+}
+.rv-card-name {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--fg);
+  overflow-wrap: anywhere;
+}
+.rv-card-size {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--fg-subtle);
+}
+.rv-card-why {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-subtle);
+  max-width: 40ch;
+  text-wrap: pretty;
+}
+.rv-card-open {
+  text-decoration: none;
+  margin-block-start: 4px;
+}
+.rv-caption {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.rv-caption-by {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+}
+.rv-caption-note {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.6;
+  color: var(--fg-muted);
+  text-wrap: pretty;
+}
+
+/* versions */
+.rv-history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.rv-history-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 16px;
+  border: none;
+  border-block-end: 1px solid var(--border);
+  cursor: pointer;
+  text-align: start;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+}
+.rv-history li:last-child .rv-history-row {
+  border-block-end: none;
+}
+.rv-history-row[aria-current="true"] {
+  background: var(--surface-2);
+}
+.rv-history-v {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+}
+.rv-history-main {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+.rv-history-note {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rv-history-meta {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--fg-subtle);
+}
+.rv-history-eye {
+  flex: 0 0 auto;
+  color: var(--fg-subtle);
+}
+[dir="rtl"] .rv-history-go {
+  transform: scaleX(-1);
+}
+
+/* what was said */
+.rv-count {
+  margin-inline-start: auto;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--fg-subtle);
+}
+.rv-said-body {
+  padding: 15px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+.rv-thread {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+.rv-note {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 12px 13px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.rv-note--studio {
+  background: var(--accent-soft);
+}
+.rv-note-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.rv-note-head .avatar {
+  border-radius: 7px !important;
+  font-size: 10px !important;
+}
+.rv-note--studio .avatar {
+  background: var(--accent) !important;
+  color: var(--accent-fg) !important;
+  border-color: transparent;
+}
+.rv-note-who {
+  font-size: 12.5px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+.rv-note-pin {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--fg-muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+.rv-note-at {
+  margin-inline-start: auto;
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--fg-subtle);
+}
+.rv-note-body {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.65;
+  font-weight: 500;
+  color: var(--fg-muted);
+  text-wrap: pretty;
+  white-space: pre-line;
+}
+.rv-quiet {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg-subtle);
+}
+.rv-write {
+  border-radius: 12px;
+}
+.rv-row {
+  display: flex;
+  gap: 9px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.rv-rule {
+  height: 1px;
+  background: var(--border);
+}
+.rv-kicker {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+}
+.rv-approved {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 11px;
+  background: var(--pos-soft);
+  color: var(--fg);
+  font-size: 12.5px;
+  font-weight: 700;
+}
+.rv-approved svg {
+  flex: 0 0 auto;
+  color: var(--pos);
+}
+
+/* ── the file picker (sheets) ─────────────────────────────────────────────── */
+.up-modes {
+  display: flex;
+  gap: 3px;
+  align-self: flex-start;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 3px;
+  flex-wrap: wrap;
+}
+.up-mode {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 27px;
+  padding: 0 11px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  background: transparent;
+  color: var(--fg-subtle);
+}
+.up-mode[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+.up-drop {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 128px;
+  padding: 18px;
+  border-radius: 13px;
+  border: 2px dashed var(--border-strong);
+  background: var(--surface-2);
+  cursor: pointer;
+  text-align: center;
+  color: var(--fg-subtle);
+}
+.up-drop--over {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.up-drop--bad {
+  border-color: var(--danger);
+}
+.up-drop:focus-within {
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.up-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+}
+.up-drop-main {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--fg);
+}
+.up-drop-choose {
+  color: var(--accent);
+}
+.up-drop-sub {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--fg-subtle);
+}
+.up-drop-name {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--fg);
+  overflow-wrap: anywhere;
+}
+.up-drop-mono {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+}
+.up-link {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 500;
+  direction: ltr;
+}
+.psh-how {
+  align-self: flex-start;
+}

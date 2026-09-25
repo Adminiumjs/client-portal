@@ -24,6 +24,7 @@
   "dependencies": {
     "@adminiumjs/public-client": "0.3.0",
     "lucide-react": "^0.462.0",
+    "pdfjs-dist": "6.3.289",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "zustand": "^5.0.2"
