@@ -39,11 +39,15 @@ export function missing(): string | null {
   return null;
 }
 
+/** `CONTRACT_ENGINES=postgres,mysql` runs only those (a machine with few free ports runs them one at a time). */
+const ONLY = (process.env["CONTRACT_ENGINES"] ?? "").split(",").map((e) => e.trim()).filter((e) => e !== "");
+const wanted = (engine: Engine) => ONLY.length === 0 || ONLY.includes(engine);
+
 /** The engines this run can reach: SQLite always, the others with their URLs. */
 export const ENGINES: [Engine, boolean][] = [
-  ["sqlite", true],
-  ["postgres", (process.env["TEST_POSTGRES_URL"] ?? "") !== ""],
-  ["mysql", (process.env["TEST_MYSQL_URL"] ?? "") !== ""],
+  ["sqlite", wanted("sqlite")],
+  ["postgres", wanted("postgres") && (process.env["TEST_POSTGRES_URL"] ?? "") !== ""],
+  ["mysql", wanted("mysql") && (process.env["TEST_MYSQL_URL"] ?? "") !== ""],
 ];
 
 // ── the packages, as an operator uploads them ───────────────────────────────
@@ -196,8 +200,8 @@ export async function boot(engine: Engine, port: number, now: number, options: {
     E2E_SMTP_PORT: String(port + 1),
     E2E_SINK_PORT: String(port + 2),
     E2E_FAKE_LLM_PORT: "0",
-    // Its own database, so a contract never meets another run's rows.
-    E2E_DATABASE: options.database ?? `cp_contract_${engine}`,
+    // Its own database, so a contract never meets another run's rows (`CONTRACT_DB_SUFFIX` keeps two checkouts' runs apart).
+    E2E_DATABASE: options.database ?? `cp_contract_${engine}${process.env["CONTRACT_DB_SUFFIX"] ?? ""}`,
     CONTRACT_NOW: String(now),
     NODE_OPTIONS: `${process.env["NODE_OPTIONS"] ?? ""} --import=${pathToFileURL(fileURLToPath(new URL("./clock.mjs", import.meta.url))).href}`.trim(),
   };
@@ -296,6 +300,25 @@ export class Caller {
   async signIn(email: string, password: string): Promise<void> {
     ok(await this.post("/api/v1/auth/login", { email, password }));
     this.csrf = ok(await this.get<{ data: { csrfToken: string } }>("/api/v1/bootstrap")).data.csrfToken;
+  }
+
+  /** The session this caller holds, for a desk that speaks to the same server through its own transport. */
+  session(): { cookie: string; csrfToken: string } {
+    return { cookie: this.cookie, csrfToken: this.csrf };
+  }
+
+  /**
+   * A `fetch` that goes to this server with this caller's session: what the
+   * desk's own transport and sink are handed, so the desk's code runs
+   * unchanged against the contract's Adminium.
+   */
+  fetchAs(): typeof fetch {
+    return (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const headers = new Headers(init?.headers);
+      if (this.cookie !== "") headers.set("cookie", this.cookie);
+      headers.set("origin", this.base);
+      return fetch(new URL(String(input), this.base), { ...init, headers });
+    }) as typeof fetch;
   }
 
   get = <T = unknown>(path: string, extra?: Record<string, string>) => this.send<T>("GET", path, undefined, extra);

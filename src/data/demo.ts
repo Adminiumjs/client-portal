@@ -99,10 +99,10 @@ export const DEMO_ROWS: Seed = {
   ],
   milestones: [
     { id: 1, project_id: 1, title: "Structure and dielines", due_on: "2026-06-26", state: "done", done_at: "2026-06-25T15:00:00.000Z", position: 0 },
-    { id: 2, project_id: 1, title: "Artwork", due_on: "2026-07-31", state: "now", position: 1 },
-    { id: 3, project_id: 1, title: "Print and hand over", due_on: "2026-08-21", state: "next", position: 2 },
-    { id: 4, project_id: 2, title: "Window sketches", due_on: "2026-07-30", state: "now", position: 0 },
-    { id: 5, project_id: 2, title: "Install", due_on: "2026-08-07", state: "next", position: 1 },
+    { id: 2, project_id: 1, title: "Artwork", due_on: "2026-07-31", state: "now", estimated_days: "3", position: 1 },
+    { id: 3, project_id: 1, title: "Print and hand over", due_on: "2026-08-21", state: "next", estimated_days: "2", position: 2 },
+    { id: 4, project_id: 2, title: "Window sketches", due_on: "2026-07-30", state: "now", estimated_days: "1.5", position: 0 },
+    { id: 5, project_id: 2, title: "Install", due_on: "2026-08-07", state: "next", estimated_days: "1", position: 1 },
     { id: 6, project_id: 3, title: "Card design", due_on: "2026-06-10", state: "done", done_at: "2026-06-09T12:00:00.000Z", position: 0 },
     { id: 7, project_id: 4, title: "Mark", due_on: "2026-03-01", state: "done", done_at: "2026-02-27T12:00:00.000Z", position: 0 },
   ],
@@ -159,5 +159,28 @@ export const DEMO_ROWS: Seed = {
     { id: 2, kind: "invoice-rung-2", status: "held", to: "amara@hearth.example", client_id: 1, invoice_id: 4, due: "2026-07-27T13:00:00.000Z" },
     { id: 3, kind: "invoice-rung-3", status: "held", to: "amara@hearth.example", client_id: 1, invoice_id: 4, due: "2026-08-10T13:00:00.000Z" },
     { id: 4, kind: "invoice-rung-3", status: "held", to: "priya@marigold.example", client_id: 3, invoice_id: 5, due: "2026-07-26T13:00:00.000Z" },
+  ],
+  // ── the back office ──
+  suppliers: [
+    { id: 1, number: "SUP-01", name: "Kestrel Press", kind: "print", contact: "Ray Kestrel", email: "ray@kestrelpress.example", lead_time: "Five working days", typical_cost: "Litho, from $340 a run", would_use_again: true },
+    { id: 2, number: "SUP-02", name: "Halyard Courier", kind: "courier", contact: null, email: "book@halyard.example", lead_time: "Same day", typical_cost: "$24 a city drop", would_use_again: true },
+  ],
+  expenses: [
+    { id: 1, number: "EX-001", date: "2026-07-22", what: "Proof prints, twelve sheets", amount: "86.40", client_id: 2, project_id: 1, supplier_id: 1, rebill: true, receipt: null },
+    { id: 2, number: "EX-002", date: "2026-07-19", what: "Courier, samples to Cleo", amount: "24.00", client_id: 2, project_id: 1, supplier_id: 2, rebill: true, receipt: null },
+    { id: 3, number: "EX-003", date: "2026-07-08", what: "Image library, monthly", amount: "29.00", client_id: null, project_id: null, supplier_id: null, rebill: false, receipt: null },
+  ],
+  time_entries: [
+    { id: 1, project_id: 1, client_id: 2, milestone_id: 2, person_id: 1, date: "2026-07-27", hours: "3.50", note: "Box artwork, second pass" },
+    { id: 2, project_id: 1, client_id: 2, milestone_id: 2, person_id: 2, date: "2026-07-24", hours: "2.00", note: "Dieline check with the printer" },
+    { id: 3, project_id: 2, client_id: 1, milestone_id: 4, person_id: 1, date: "2026-07-23", hours: "4.00", note: "Window sketches A and B" },
+  ],
+  running_costs: [
+    { id: 1, label: "Studio rent", monthly_amount: "1450.00", position: 0 },
+    { id: 2, label: "Software and fonts", monthly_amount: "610.00", position: 1 },
+  ],
+  events: [
+    { id: 1, date: "2026-07-30", to_date: null, title: "Press check, notebook boxes", kind: "press", person_id: null },
+    { id: 2, date: "2026-08-10", to_date: "2026-08-12", title: "Tomas away", kind: "away", person_id: 2 },
   ],
 };

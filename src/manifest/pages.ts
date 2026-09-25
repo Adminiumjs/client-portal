@@ -50,6 +50,12 @@ interface PageSpec {
   table?: string;
   feature?: string;
   config: Record<string, unknown>;
+  /**
+   * Declared, and not installed yet: the back office's record pages wait for
+   * the desk's own screens for the same rows, so nothing shows before the
+   * screen that explains it. Taking the flag off installs the page.
+   */
+  later?: true;
 }
 
 const SPECS: PageSpec[] = [
@@ -255,20 +261,100 @@ const SPECS: PageSpec[] = [
     table: "brief_questions",
     config: form([wide("question", "title"), f("key"), wide("hint", "text"), f("kind", { control: "segmented" }), toggle("active"), f("position", { control: "stepper" })]),
   },
+
+  // ── the back office (declared; installed once the desk's screens for them ship) ──
+  {
+    ref: "clients-time",
+    template: "page-crud",
+    title: "Time",
+    group: "records",
+    icon: "timer",
+    order: 9,
+    table: "time_entries",
+    later: true,
+    config: form(
+      [f("project_id", { control: "reference" }), f("milestone_id", { control: "reference" }), f("person_id", { control: "reference" }), f("date", { control: "date" }), f("hours", { control: "number" })],
+      [wide("note", "text")],
+    ),
+  },
+  {
+    ref: "clients-expenses",
+    template: "page-crud",
+    title: "Expenses",
+    group: "records",
+    icon: "shopping-bag",
+    order: 10,
+    table: "expenses",
+    later: true,
+    config: form(
+      [title("what"), f("date", { control: "date" }), f("amount", { control: "currency" }), f("supplier_id", { control: "reference" })],
+      [f("project_id", { control: "reference" }), f("client_id", { control: "reference" }), toggle("rebill"), f("receipt", { control: "attachments" })],
+    ),
+  },
+  {
+    ref: "clients-suppliers",
+    template: "page-master-detail",
+    title: "Suppliers",
+    group: "records",
+    icon: "truck",
+    order: 11,
+    table: "suppliers",
+    later: true,
+    config: form(
+      [title("name"), f("kind", { control: "select" }), f("contact"), f("email", { control: "email" }), f("phone", { control: "phone" }), wide("address", "text")],
+      [f("lead_time"), f("typical_cost"), toggle("would_use_again"), wide("note")],
+    ),
+  },
+  {
+    ref: "clients-studio-dates",
+    template: "page-crud",
+    title: "Studio dates",
+    group: "records",
+    icon: "calendar-days",
+    order: 12,
+    table: "events",
+    later: true,
+    config: form([title("title"), f("kind", { control: "segmented" }), f("date", { control: "date" }), f("to_date", { control: "date" }), f("person_id", { control: "reference" })]),
+  },
+  {
+    ref: "clients-running-costs",
+    template: "page-crud",
+    title: "Running costs",
+    group: "manage",
+    icon: "wallet",
+    order: 6,
+    table: "running_costs",
+    later: true,
+    config: form([title("label"), f("monthly_amount", { control: "currency" }), f("position", { control: "stepper" })]),
+  },
 ];
 
-export function pages(): unknown[] {
-  return SPECS.map((spec) => ({
-    ref: spec.ref,
-    template: spec.template,
-    title: { key: `mft.${spec.ref.replaceAll("-", ".")}`, fallback: spec.title },
-    titles: titles(spec.title),
-    nav: { group: spec.group, icon: spec.icon, order: spec.order },
-    ...(spec.table === undefined ? {} : { bindings: { rows: spec.table } }),
-    ...(spec.feature === undefined ? {} : { feature: spec.feature }),
-    config: spec.config,
-  }));
+/** The pages this release installs. */
+const SHOWN = SPECS.filter((spec) => spec.later !== true);
+
+/** A page as the manifest carries it. */
+const pageOf = (spec: PageSpec) => ({
+  ref: spec.ref,
+  template: spec.template,
+  title: { key: `mft.${spec.ref.replaceAll("-", ".")}`, fallback: spec.title },
+  titles: titles(spec.title),
+  nav: { group: spec.group, icon: spec.icon, order: spec.order },
+  ...(spec.table === undefined ? {} : { bindings: { rows: spec.table } }),
+  ...(spec.feature === undefined ? {} : { feature: spec.feature }),
+  config: spec.config,
+});
+
+/**
+ * The manifest's pages: those this release installs, or — `withLater`, for
+ * the test that proves they will install when switched on — every page
+ * declared.
+ */
+export function pages(withLater = false): unknown[] {
+  return (withLater ? SPECS : SHOWN).map(pageOf);
 }
 
-/** Every page's ref, in order (the roles grant them by name). */
-export const PAGE_REFS = SPECS.map((spec) => spec.ref);
+/** Every installed page's ref, in order (the roles grant them by name). */
+export const PAGE_REFS = SHOWN.map((spec) => spec.ref);
+
+/** The pages declared for later: each with the table it will show. */
+export const LATER_PAGES = SPECS.filter((spec) => spec.later === true).map((spec) => ({ ref: spec.ref, table: spec.table ?? null, title: spec.title }));

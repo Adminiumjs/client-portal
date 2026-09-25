@@ -43,6 +43,15 @@ import Print from "../screens/Print.tsx";
 import Chasing from "../screens/Chasing.tsx";
 import Terms from "../screens/Terms.tsx";
 import Settings from "../screens/Settings.tsx";
+import Time from "../screens/Time.tsx";
+import Expenses from "../screens/Expenses.tsx";
+import Suppliers from "../screens/Suppliers.tsx";
+import Scoping from "../screens/Scoping.tsx";
+import Schedule from "../screens/Schedule.tsx";
+import Capacity from "../screens/Capacity.tsx";
+import Money from "../screens/Money.tsx";
+import Archive from "../screens/Archive.tsx";
+import Emails from "../screens/Emails.tsx";
 import NotFound from "../screens/NotFound.tsx";
 
 import ClientFind from "../screens/client/Find.tsx";
@@ -57,6 +66,7 @@ import ClientBrief from "../screens/client/Brief.tsx";
 import ClientHandover from "../screens/client/Handover.tsx";
 import ClientExpired from "../screens/client/Expired.tsx";
 import ClientNotAvailable from "../screens/client/NotAvailable.tsx";
+import ClientEnquire from "../screens/client/Enquire.tsx";
 import ClientNotFound from "../screens/client/NotFound.tsx";
 
 const DESK_SCREENS = {
@@ -77,6 +87,15 @@ const DESK_SCREENS = {
   chasing: Chasing,
   terms: Terms,
   settings: Settings,
+  time: Time,
+  expenses: Expenses,
+  suppliers: Suppliers,
+  scoping: Scoping,
+  schedule: Schedule,
+  capacity: Capacity,
+  money: Money,
+  archive: Archive,
+  emails: Emails,
   notfound: NotFound,
 } satisfies Record<StaffView, ComponentType>;
 
@@ -93,6 +112,7 @@ const CLIENT_SCREENS = {
   handover: ClientHandover,
   expired: ClientExpired,
   notavailable: ClientNotAvailable,
+  enquire: ClientEnquire,
   notfound: ClientNotFound,
 } satisfies Record<CustomerView, ComponentType>;
 

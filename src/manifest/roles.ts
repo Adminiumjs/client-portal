@@ -2,10 +2,12 @@
  * Who may do what, enforced by Adminium on every read and write.
  *
  *   studio          runs the desk: enquiries, proposals, projects, reviews,
- *                   handovers, invoices, payments and the chase reminders. It
- *                   reads the studio's set-up and never changes it (settings,
- *                   people, the rate card, the terms, the brief questions),
- *                   voids nothing and deletes nothing;
+ *                   handovers, invoices, payments and the chase reminders,
+ *                   and the back office — time, purchases, suppliers and the
+ *                   studio's dates. It reads the studio's set-up and never
+ *                   changes it (settings, people, the rate card, the terms,
+ *                   the brief questions, the running costs), voids nothing
+ *                   and deletes nothing;
  *   studio-manager  everything, the set-up and the Invoices & Receipts
  *                   add-on's own settings included; voids an invoice or a
  *                   payment, discards a draft, and reopens a finished project.
@@ -25,8 +27,8 @@ const pii = (table: string) => `table:@${table}:read_pii`;
 
 const EVERY_TABLE = TABLES.map((t) => t.ref);
 
-/** The studio's set-up: read by the desk, changed by a manager. */
-const SET_UP = ["settings", "people", "rates", "terms_versions", "terms_clauses", "brief_questions"];
+/** The studio's set-up: read by the desk, changed by a manager (what it costs to open the door among it). */
+const SET_UP = ["settings", "people", "rates", "terms_versions", "terms_clauses", "brief_questions", "running_costs"];
 const DESK_WRITES = EVERY_TABLE.filter((table) => !SET_UP.includes(table));
 const DESK_PAGES = PAGE_REFS.filter((page) => !["clients-settings", "clients-terms"].includes(page));
 

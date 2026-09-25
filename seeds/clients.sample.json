@@ -3086,6 +3086,7 @@
             "@day": -46,
             "@time": "17:00"
           },
+          "estimated_days": 1,
           "position": 0
         },
         {
@@ -3113,6 +3114,7 @@
             "@day": -28,
             "@time": "17:00"
           },
+          "estimated_days": 2,
           "position": 1
         },
         {
@@ -3136,6 +3138,7 @@
             "@day": 1
           },
           "state": "now",
+          "estimated_days": 3,
           "position": 2
         },
         {
@@ -3159,6 +3162,7 @@
             "@day": 17
           },
           "state": "next",
+          "estimated_days": 5,
           "position": 3
         },
         {
@@ -3182,6 +3186,7 @@
             "@day": 31
           },
           "state": "next",
+          "estimated_days": 2,
           "position": 4
         },
         {
@@ -3236,6 +3241,7 @@
             "@day": -12,
             "@time": "17:00"
           },
+          "estimated_days": 1.5,
           "position": 1
         },
         {
@@ -3259,6 +3265,7 @@
             "@day": 3
           },
           "state": "now",
+          "estimated_days": 4,
           "position": 2
         },
         {
@@ -3282,6 +3289,7 @@
             "@day": 21
           },
           "state": "next",
+          "estimated_days": 2,
           "position": 3
         },
         {
@@ -3359,6 +3367,7 @@
             "@day": 10
           },
           "state": "next",
+          "estimated_days": 4,
           "position": 2
         },
         {
@@ -3382,6 +3391,7 @@
             "@day": 24
           },
           "state": "next",
+          "estimated_days": 1.5,
           "position": 3
         },
         {
@@ -3440,6 +3450,7 @@
             "@dom": 29,
             "@time": "17:00"
           },
+          "estimated_days": 2,
           "position": 1
         },
         {
@@ -3469,6 +3480,7 @@
             "@dom": 18,
             "@time": "17:00"
           },
+          "estimated_days": 1,
           "position": 2
         }
       ]
@@ -4727,6 +4739,1061 @@
       ]
     },
     {
+      "ref": "suppliers",
+      "rows": [
+        {
+          "@label": "supplier:kestrel",
+          "number_seq": null,
+          "number": "SUP-S01",
+          "name": "Kestrel Press",
+          "kind": "print",
+          "contact": "Ray Kestrel",
+          "email": "ray@kestrelpress.example",
+          "phone": "+1 (503) 555-0204",
+          "address": "Unit 7, Kestrel Yard\nPortland, OR 97210",
+          "lead_time": {
+            "@t": {
+              "en-US": "Five working days",
+              "de-DE": "Fünf Arbeitstage",
+              "fr-FR": "Cinq jours ouvrés",
+              "da-DK": "Fem arbejdsdage",
+              "cs-CZ": "Pět pracovních dnů",
+              "ar-EG": "خمسة أيام عمل",
+              "zh-CN": "五个工作日",
+              "zh-TW": "五個工作天"
+            }
+          },
+          "typical_cost": {
+            "@t": {
+              "en-US": "Litho, from $340 a run",
+              "de-DE": "Offset, ab 340 $ je Auflage",
+              "fr-FR": "Offset, à partir de 340 $ le tirage",
+              "da-DK": "Offset, fra 340 $ pr. oplag",
+              "cs-CZ": "Ofset, od 340 $ za náklad",
+              "ar-EG": "أوفست، من 340 دولارًا للدفعة",
+              "zh-CN": "胶印，每批 340 美元起",
+              "zh-TW": "膠印，每批 340 美元起"
+            }
+          },
+          "note": {
+            "@t": {
+              "en-US": "Ask for Ray, not the front desk. He will match a Pantone by eye and be right.",
+              "de-DE": "Nach Ray fragen, nicht nach dem Empfang. Er trifft einen Pantone nach Auge – und liegt richtig.",
+              "fr-FR": "Demandez Ray, pas l’accueil. Il retrouve un Pantone à l’œil, et juste.",
+              "da-DK": "Spørg efter Ray, ikke receptionen. Han rammer en Pantone på øjemål – og har ret.",
+              "cs-CZ": "Ptejte se po Rayovi, ne na recepci. Pantone trefí od oka a správně.",
+              "ar-EG": "اطلب Ray لا الاستقبال. يطابق لون البانتون بالعين ويصيب.",
+              "zh-CN": "找 Ray，别找前台。他凭眼睛就能对准潘通色，而且准。",
+              "zh-TW": "找 Ray，別找櫃台。他憑眼睛就能對準潘通色，而且準。"
+            }
+          },
+          "would_use_again": true
+        },
+        {
+          "@label": "supplier:pike",
+          "number_seq": null,
+          "number": "SUP-S02",
+          "name": "Pike & Vane",
+          "kind": "signage",
+          "contact": "Joss Vane",
+          "email": "joss@pikeandvane.example",
+          "phone": "+1 (503) 555-0217",
+          "address": "14 Vane Street\nPortland, OR 97202",
+          "lead_time": {
+            "@t": {
+              "en-US": "Two to three weeks",
+              "de-DE": "Zwei bis drei Wochen",
+              "fr-FR": "Deux à trois semaines",
+              "da-DK": "To til tre uger",
+              "cs-CZ": "Dva až tři týdny",
+              "ar-EG": "من أسبوعين إلى ثلاثة",
+              "zh-CN": "两到三周",
+              "zh-TW": "兩到三週"
+            }
+          },
+          "typical_cost": {
+            "@t": {
+              "en-US": "Fascia from $1,100, fitted",
+              "de-DE": "Ladenschild ab 1.100 $, mit Montage",
+              "fr-FR": "Enseigne à partir de 1 100 $, posée",
+              "da-DK": "Facadeskilt fra 1.100 $, monteret",
+              "cs-CZ": "Štít od 1 100 $ včetně montáže",
+              "ar-EG": "لافتة الواجهة من 1,100 دولار شاملة التركيب",
+              "zh-CN": "门头招牌 1,100 美元起，含安装",
+              "zh-TW": "門頭招牌 1,100 美元起，含安裝"
+            }
+          },
+          "note": {
+            "@t": {
+              "en-US": "Wants artwork at real size with mounting notes. Send the PDF, never the source file.",
+              "de-DE": "Will die Druckdaten in Originalgröße mit Montagehinweisen. Das PDF schicken, nie die offene Datei.",
+              "fr-FR": "Veut les fichiers à taille réelle avec les notes de pose. Envoyer le PDF, jamais le fichier source.",
+              "da-DK": "Vil have filerne i fuld størrelse med monteringsnoter. Send PDF’en, aldrig kildefilen.",
+              "cs-CZ": "Chce podklady ve skutečné velikosti s poznámkami k montáži. Posílat PDF, nikdy zdrojový soubor.",
+              "ar-EG": "يريد التصميم بالمقاس الحقيقي مع ملاحظات التركيب. أرسل ملف PDF، لا الملف المصدري أبدًا.",
+              "zh-CN": "要按实际尺寸出稿并附安装说明。发 PDF，绝不发源文件。",
+              "zh-TW": "要按實際尺寸出稿並附安裝說明。發 PDF，絕不發原始檔。"
+            }
+          },
+          "would_use_again": false
+        },
+        {
+          "@label": "supplier:halyard",
+          "number_seq": null,
+          "number": "SUP-S03",
+          "name": "Halyard Courier",
+          "kind": "courier",
+          "contact": {
+            "@t": {
+              "en-US": "Dispatch desk",
+              "de-DE": "Disposition",
+              "fr-FR": "Service des expéditions",
+              "da-DK": "Ekspeditionen",
+              "cs-CZ": "Dispečink",
+              "ar-EG": "مكتب الإرسال",
+              "zh-CN": "调度台",
+              "zh-TW": "調度台"
+            }
+          },
+          "email": "book@halyard.example",
+          "phone": "+1 (503) 555-0226",
+          "address": "Halyard Depot, 3 Dock Road\nPortland, OR 97227",
+          "lead_time": {
+            "@t": {
+              "en-US": "Same day if booked before eleven",
+              "de-DE": "Am selben Tag, wenn vor elf gebucht",
+              "fr-FR": "Le jour même si réservé avant onze heures",
+              "da-DK": "Samme dag ved bestilling før elleve",
+              "cs-CZ": "Tentýž den při objednání do jedenácti",
+              "ar-EG": "في اليوم نفسه إذا حُجز قبل الحادية عشرة",
+              "zh-CN": "十一点前预约当天送达",
+              "zh-TW": "十一點前預約當天送達"
+            }
+          },
+          "typical_cost": {
+            "@t": {
+              "en-US": "$24 a city drop",
+              "de-DE": "24 $ je Stadtfahrt",
+              "fr-FR": "24 $ la course en ville",
+              "da-DK": "24 $ pr. levering i byen",
+              "cs-CZ": "24 $ za doručení po městě",
+              "ar-EG": "24 دولارًا للتوصيلة داخل المدينة",
+              "zh-CN": "市内每单 24 美元",
+              "zh-TW": "市內每單 24 美元"
+            }
+          },
+          "note": {
+            "@t": {
+              "en-US": "Cheaper than the post office for anything flat and urgent. Book online, not by phone.",
+              "de-DE": "Günstiger als die Post für alles Flache und Eilige. Online buchen, nicht telefonisch.",
+              "fr-FR": "Moins cher que la poste pour tout ce qui est plat et urgent. Réserver en ligne, pas par téléphone.",
+              "da-DK": "Billigere end posthuset til alt fladt og hastende. Bestil online, ikke over telefonen.",
+              "cs-CZ": "Levnější než pošta na všechno ploché a spěšné. Objednávat online, ne telefonem.",
+              "ar-EG": "أرخص من البريد لكل ما هو مسطح وعاجل. احجز عبر الإنترنت لا بالهاتف.",
+              "zh-CN": "寄扁平的急件比邮局便宜。网上预约，别打电话。",
+              "zh-TW": "寄扁平的急件比郵局便宜。網上預約，別打電話。"
+            }
+          },
+          "would_use_again": false
+        },
+        {
+          "@label": "supplier:coldbrook",
+          "number_seq": null,
+          "number": "SUP-S04",
+          "name": "Coldbrook Paper",
+          "kind": "paper",
+          "contact": "Nel Adisa",
+          "email": "nel@coldbrookpaper.example",
+          "phone": "+1 (503) 555-0239",
+          "address": "Coldbrook Mill, Mill Road\nPortland, OR 97203",
+          "lead_time": {
+            "@t": {
+              "en-US": "Two days on stock lines",
+              "de-DE": "Zwei Tage bei Lagerware",
+              "fr-FR": "Deux jours sur les références en stock",
+              "da-DK": "To dage på lagervarer",
+              "cs-CZ": "Dva dny u skladových položek",
+              "ar-EG": "يومان للأصناف المتوفرة",
+              "zh-CN": "现货两天",
+              "zh-TW": "現貨兩天"
+            }
+          },
+          "typical_cost": {
+            "@t": {
+              "en-US": "Samples cost nothing, boards from $52",
+              "de-DE": "Muster kosten nichts, Karton ab 52 $",
+              "fr-FR": "Échantillons offerts, cartons à partir de 52 $",
+              "da-DK": "Prøver koster intet, pap fra 52 $",
+              "cs-CZ": "Vzorky nic nestojí, lepenka od 52 $",
+              "ar-EG": "العينات بلا مقابل، والكرتون من 52 دولارًا",
+              "zh-CN": "样品不收钱，纸板 52 美元起",
+              "zh-TW": "樣品不收錢，紙板 52 美元起"
+            }
+          },
+          "note": {
+            "@t": {
+              "en-US": "Sample boxes cost nothing. Ask for the uncoated swatch book once a year and it arrives.",
+              "de-DE": "Musterkisten kosten nichts. Einmal im Jahr nach dem Musterbuch für ungestrichene Papiere fragen, dann kommt es.",
+              "fr-FR": "Les boîtes d’échantillons sont offertes. Demandez le nuancier non couché une fois par an et il arrive.",
+              "da-DK": "Prøvekasser koster intet. Bed om prøvebogen med ubestrøget papir én gang om året, så kommer den.",
+              "cs-CZ": "Krabice vzorků nic nestojí. Jednou za rok si řekněte o vzorník nenatíraných papírů a přijde.",
+              "ar-EG": "صناديق العينات بلا مقابل. اطلب كتيّب عينات الورق غير المطلي مرة في السنة فيصلك.",
+              "zh-CN": "样品盒不收钱。每年要一次非涂布纸色卡，就会寄来。",
+              "zh-TW": "樣品盒不收錢。每年要一次非塗佈紙色卡，就會寄來。"
+            }
+          },
+          "would_use_again": true
+        },
+        {
+          "@label": "supplier:bell",
+          "number_seq": null,
+          "number": "SUP-S05",
+          "name": "Bell Type Foundry",
+          "kind": "fonts",
+          "contact": {
+            "@t": {
+              "en-US": "Licensing",
+              "de-DE": "Lizenzen",
+              "fr-FR": "Service des licences",
+              "da-DK": "Licenser",
+              "cs-CZ": "Licence",
+              "ar-EG": "قسم التراخيص",
+              "zh-CN": "授权部",
+              "zh-TW": "授權部"
+            }
+          },
+          "email": "licensing@belltype.example",
+          "lead_time": {
+            "@t": {
+              "en-US": "Instant",
+              "de-DE": "Sofort",
+              "fr-FR": "Immédiat",
+              "da-DK": "Med det samme",
+              "cs-CZ": "Okamžitě",
+              "ar-EG": "فوري",
+              "zh-CN": "即时",
+              "zh-TW": "即時"
+            }
+          },
+          "typical_cost": {
+            "@t": {
+              "en-US": "$210 a weight, desktop & web",
+              "de-DE": "210 $ je Schnitt, Desktop und Web",
+              "fr-FR": "210 $ la graisse, bureau et web",
+              "da-DK": "210 $ pr. snit, desktop og web",
+              "cs-CZ": "210 $ za řez, desktop a web",
+              "ar-EG": "210 دولارات للوزن، لسطح المكتب والويب",
+              "zh-CN": "每个字重 210 美元，桌面与网页",
+              "zh-TW": "每個字重 210 美元，桌面與網頁"
+            }
+          },
+          "note": {
+            "@t": {
+              "en-US": "Two-weight minimum. The licence is client-named, so the invoice must say who it is for.",
+              "de-DE": "Mindestens zwei Schnitte. Die Lizenz läuft auf den Kunden, also muss die Rechnung sagen, für wen sie ist.",
+              "fr-FR": "Deux graisses au minimum. La licence est au nom du client, donc la facture doit dire pour qui elle est.",
+              "da-DK": "Mindst to snit. Licensen står i kundens navn, så fakturaen skal sige, hvem den er til.",
+              "cs-CZ": "Minimálně dva řezy. Licence je na jméno klienta, takže na faktuře musí stát, komu patří.",
+              "ar-EG": "وزنان على الأقل. الترخيص باسم العميل، لذا يجب أن تذكر الفاتورة لمن هو.",
+              "zh-CN": "至少两个字重。授权写客户的名字，所以发票上要写明是给谁的。",
+              "zh-TW": "至少兩個字重。授權寫客戶的名字，所以發票上要寫明是給誰的。"
+            }
+          },
+          "would_use_again": true
+        },
+        {
+          "@label": "supplier:marrow",
+          "number_seq": null,
+          "number": "SUP-S06",
+          "name": "Marrow Type",
+          "kind": "fonts",
+          "contact": "Ivo Marrow",
+          "email": "ivo@marrowtype.example",
+          "lead_time": {
+            "@t": {
+              "en-US": "Instant",
+              "de-DE": "Sofort",
+              "fr-FR": "Immédiat",
+              "da-DK": "Med det samme",
+              "cs-CZ": "Okamžitě",
+              "ar-EG": "فوري",
+              "zh-CN": "即时",
+              "zh-TW": "即時"
+            }
+          },
+          "typical_cost": {
+            "@t": {
+              "en-US": "$180 a weight, desktop",
+              "de-DE": "180 $ je Schnitt, Desktop",
+              "fr-FR": "180 $ la graisse, bureau",
+              "da-DK": "180 $ pr. snit, desktop",
+              "cs-CZ": "180 $ za řez, desktop",
+              "ar-EG": "180 دولارًا للوزن، لسطح المكتب",
+              "zh-CN": "每个字重 180 美元，桌面版",
+              "zh-TW": "每個字重 180 美元，桌面版"
+            }
+          },
+          "note": {
+            "@t": {
+              "en-US": "One person. Answers email inside a day and will cut a custom weight for a fee.",
+              "de-DE": "Eine einzelne Person. Antwortet innerhalb eines Tages und schneidet gegen Honorar einen eigenen Schnitt.",
+              "fr-FR": "Une seule personne. Répond aux e-mails dans la journée et taille une graisse sur mesure contre rémunération.",
+              "da-DK": "Én person. Svarer på mail inden for en dag og laver et særligt snit mod betaling.",
+              "cs-CZ": "Jeden člověk. Na e-maily odpovídá do druhého dne a za poplatek vyřízne řez na míru.",
+              "ar-EG": "شخص واحد. يرد على البريد خلال يوم ويصمم وزنًا خاصًا مقابل أجر.",
+              "zh-CN": "只有一个人。一天内回邮件，付费可以定制字重。",
+              "zh-TW": "只有一個人。一天內回郵件，付費可以訂製字重。"
+            }
+          },
+          "would_use_again": true
+        },
+        {
+          "@label": "supplier:fieldnote",
+          "number_seq": null,
+          "number": "SUP-S07",
+          "name": "Fieldnote Images",
+          "kind": "software",
+          "contact": {
+            "@t": {
+              "en-US": "Accounts",
+              "de-DE": "Kundenkonto",
+              "fr-FR": "Service client",
+              "da-DK": "Kundeservice",
+              "cs-CZ": "Zákaznický účet",
+              "ar-EG": "قسم الحسابات",
+              "zh-CN": "账户部",
+              "zh-TW": "帳戶部"
+            }
+          },
+          "email": "accounts@fieldnote.example",
+          "typical_cost": {
+            "@t": {
+              "en-US": "$29 a month",
+              "de-DE": "29 $ im Monat",
+              "fr-FR": "29 $ par mois",
+              "da-DK": "29 $ om måneden",
+              "cs-CZ": "29 $ měsíčně",
+              "ar-EG": "29 دولارًا شهريًا",
+              "zh-CN": "每月 29 美元",
+              "zh-TW": "每月 29 美元"
+            }
+          },
+          "note": {
+            "@t": {
+              "en-US": "Ours, not passed on. Cancel it if a quarter goes by unused.",
+              "de-DE": "Unser eigenes, wird nicht weiterberechnet. Kündigen, wenn ein Quartal ungenutzt vergeht.",
+              "fr-FR": "Pour nous, pas répercuté. À résilier si un trimestre passe sans servir.",
+              "da-DK": "Vores egen, videregives ikke. Opsig den, hvis et kvartal går uden brug.",
+              "cs-CZ": "Naše vlastní, nepřeúčtovává se. Zrušit, když čtvrtletí uplyne bez využití.",
+              "ar-EG": "لنا، لا يُحمّل على العملاء. ألغِه إذا مرّ ربع سنة دون استخدام.",
+              "zh-CN": "我们自己用，不转给客户。一个季度没用就退掉。",
+              "zh-TW": "我們自己用，不轉給客戶。一個季度沒用就退掉。"
+            }
+          },
+          "would_use_again": true
+        }
+      ]
+    },
+    {
+      "ref": "expenses",
+      "rows": [
+        {
+          "@label": "expense:040",
+          "number_seq": null,
+          "number": "EX-S040",
+          "date": {
+            "@month": -4,
+            "@dom": 9
+          },
+          "what": {
+            "@t": {
+              "en-US": "Print check at the workshop — notebook covers",
+              "de-DE": "Druckabnahme in der Werkstatt — Notizbuchumschläge",
+              "fr-FR": "Contrôle d’impression à l’atelier — couvertures de carnets",
+              "da-DK": "Trykkontrol på værkstedet — notesbogsomslag",
+              "cs-CZ": "Kontrola tisku v dílně — obálky zápisníků",
+              "ar-EG": "مراجعة الطباعة في الورشة — أغلفة الدفاتر",
+              "zh-CN": "车间看样——笔记本封面",
+              "zh-TW": "工坊看樣——筆記本封面"
+            }
+          },
+          "amount": 300,
+          "client_id": {
+            "@ref": "client:fold"
+          },
+          "supplier_id": {
+            "@ref": "supplier:kestrel"
+          },
+          "rebill": true
+        },
+        {
+          "@label": "expense:041",
+          "number_seq": null,
+          "number": "EX-S041",
+          "date": {
+            "@day": -26
+          },
+          "what": {
+            "@t": {
+              "en-US": "Board samples — 3mm and 2.5mm",
+              "de-DE": "Kartonmuster — 3 mm und 2,5 mm",
+              "fr-FR": "Échantillons de carton — 3 mm et 2,5 mm",
+              "da-DK": "Papprøver — 3 mm og 2,5 mm",
+              "cs-CZ": "Vzorky lepenky — 3 mm a 2,5 mm",
+              "ar-EG": "عينات كرتون — 3 مم و2.5 مم",
+              "zh-CN": "纸板样品——3 毫米和 2.5 毫米",
+              "zh-TW": "紙板樣品——3 公釐和 2.5 公釐"
+            }
+          },
+          "amount": 52.5,
+          "client_id": {
+            "@ref": "client:fold"
+          },
+          "project_id": {
+            "@ref": "project:02"
+          },
+          "supplier_id": {
+            "@ref": "supplier:coldbrook"
+          },
+          "rebill": true
+        },
+        {
+          "@label": "expense:042",
+          "number_seq": null,
+          "number": "EX-S042",
+          "date": {
+            "@day": -20
+          },
+          "what": {
+            "@t": {
+              "en-US": "Image library, monthly",
+              "de-DE": "Bildarchiv, monatlich",
+              "fr-FR": "Banque d’images, mensuelle",
+              "da-DK": "Billedbibliotek, månedligt",
+              "cs-CZ": "Fotobanka, měsíčně",
+              "ar-EG": "مكتبة الصور، شهريًا",
+              "zh-CN": "图库，按月",
+              "zh-TW": "圖庫，按月"
+            }
+          },
+          "amount": 29,
+          "supplier_id": {
+            "@ref": "supplier:fieldnote"
+          },
+          "rebill": false
+        },
+        {
+          "@label": "expense:043",
+          "number_seq": null,
+          "number": "EX-S043",
+          "date": {
+            "@day": -15
+          },
+          "what": {
+            "@t": {
+              "en-US": "Marrow Text — one weight, desktop",
+              "de-DE": "Marrow Text — ein Schnitt, Desktop",
+              "fr-FR": "Marrow Text — une graisse, bureau",
+              "da-DK": "Marrow Text — ét snit, desktop",
+              "cs-CZ": "Marrow Text — jeden řez, desktop",
+              "ar-EG": "Marrow Text — وزن واحد، لسطح المكتب",
+              "zh-CN": "Marrow Text——一个字重，桌面版",
+              "zh-TW": "Marrow Text——一個字重，桌面版"
+            }
+          },
+          "amount": 180,
+          "client_id": {
+            "@ref": "client:ferngrove"
+          },
+          "project_id": {
+            "@ref": "project:04"
+          },
+          "supplier_id": {
+            "@ref": "supplier:marrow"
+          },
+          "rebill": true
+        },
+        {
+          "@label": "expense:044",
+          "number_seq": null,
+          "number": "EX-S044",
+          "date": {
+            "@day": -8
+          },
+          "what": {
+            "@t": {
+              "en-US": "Courier — sleeve samples to Devi",
+              "de-DE": "Kurier — Hüllenmuster an Devi",
+              "fr-FR": "Coursier — échantillons de pochettes pour Devi",
+              "da-DK": "Kurér — omslagsprøver til Devi",
+              "cs-CZ": "Kurýr — vzorky obalů do rukou Devi",
+              "ar-EG": "بريد سريع — عينات الأغلفة إلى Devi",
+              "zh-CN": "快递——把封套样品寄给 Devi",
+              "zh-TW": "快遞——把封套樣品寄給 Devi"
+            }
+          },
+          "amount": 24,
+          "client_id": {
+            "@ref": "client:northlight"
+          },
+          "project_id": {
+            "@ref": "project:03"
+          },
+          "supplier_id": {
+            "@ref": "supplier:halyard"
+          },
+          "rebill": true
+        },
+        {
+          "@label": "expense:045",
+          "number_seq": null,
+          "number": "EX-S045",
+          "date": {
+            "@day": -6
+          },
+          "what": {
+            "@t": {
+              "en-US": "Proof prints — twelve sheets, uncoated",
+              "de-DE": "Probedrucke — zwölf Bogen, ungestrichen",
+              "fr-FR": "Épreuves — douze feuilles, papier non couché",
+              "da-DK": "Prøvetryk — tolv ark, ubestrøget",
+              "cs-CZ": "Nátisky — dvanáct archů, nenatíraný papír",
+              "ar-EG": "بروفات طباعة — اثنتا عشرة ورقة، غير مطلية",
+              "zh-CN": "打样——十二张，非涂布纸",
+              "zh-TW": "打樣——十二張，非塗佈紙"
+            }
+          },
+          "amount": 86.4,
+          "client_id": {
+            "@ref": "client:hearth"
+          },
+          "project_id": {
+            "@ref": "project:01"
+          },
+          "supplier_id": {
+            "@ref": "supplier:kestrel"
+          },
+          "rebill": true
+        },
+        {
+          "@label": "expense:046",
+          "number_seq": null,
+          "number": "EX-S046",
+          "date": {
+            "@day": -4
+          },
+          "what": {
+            "@t": {
+              "en-US": "Bell Grotesk — two weights, desktop & web",
+              "de-DE": "Bell Grotesk — zwei Schnitte, Desktop und Web",
+              "fr-FR": "Bell Grotesk — deux graisses, bureau et web",
+              "da-DK": "Bell Grotesk — to snit, desktop og web",
+              "cs-CZ": "Bell Grotesk — dva řezy, desktop a web",
+              "ar-EG": "Bell Grotesk — وزنان، لسطح المكتب والويب",
+              "zh-CN": "Bell Grotesk——两个字重，桌面与网页",
+              "zh-TW": "Bell Grotesk——兩個字重，桌面與網頁"
+            }
+          },
+          "amount": 420,
+          "client_id": {
+            "@ref": "client:ferngrove"
+          },
+          "project_id": {
+            "@ref": "project:04"
+          },
+          "supplier_id": {
+            "@ref": "supplier:bell"
+          },
+          "rebill": true
+        }
+      ]
+    },
+    {
+      "ref": "time_entries",
+      "rows": [
+        {
+          "@label": "time:01",
+          "project_id": {
+            "@ref": "project:01"
+          },
+          "milestone_id": {
+            "@ref": "ms:01:discovery"
+          },
+          "person_id": {
+            "@ref": "person:nadia"
+          },
+          "date": {
+            "@day": -47
+          },
+          "hours": 4,
+          "note": {
+            "@t": {
+              "en-US": "Audit of the old bags, boxes and signs",
+              "de-DE": "Bestandsaufnahme der alten Tüten, Schachteln und Schilder",
+              "fr-FR": "Audit des anciens sacs, boîtes et enseignes",
+              "da-DK": "Gennemgang af de gamle poser, æsker og skilte",
+              "cs-CZ": "Audit starých sáčků, krabic a cedulí",
+              "ar-EG": "مراجعة الأكياس والعلب واللافتات القديمة",
+              "zh-CN": "盘点旧纸袋、盒子和招牌",
+              "zh-TW": "盤點舊紙袋、盒子和招牌"
+            }
+          }
+        },
+        {
+          "@label": "time:02",
+          "project_id": {
+            "@ref": "project:01"
+          },
+          "milestone_id": {
+            "@ref": "ms:01:discovery"
+          },
+          "person_id": {
+            "@ref": "person:tomas"
+          },
+          "date": {
+            "@day": -46
+          },
+          "hours": 3,
+          "note": {
+            "@t": {
+              "en-US": "Shop visit and photographs",
+              "de-DE": "Besuch im Laden und Fotos",
+              "fr-FR": "Visite de la boutique et photos",
+              "da-DK": "Besøg i butikken og fotos",
+              "cs-CZ": "Návštěva obchodu a fotky",
+              "ar-EG": "زيارة المحل والتصوير",
+              "zh-CN": "到店走访和拍照",
+              "zh-TW": "到店走訪和拍照"
+            }
+          }
+        },
+        {
+          "@label": "time:03",
+          "project_id": {
+            "@ref": "project:01"
+          },
+          "milestone_id": {
+            "@ref": "ms:01:logo"
+          },
+          "person_id": {
+            "@ref": "person:nadia"
+          },
+          "date": {
+            "@day": -33
+          },
+          "hours": 6,
+          "note": {
+            "@t": {
+              "en-US": "Logo direction, three routes",
+              "de-DE": "Logo-Richtung, drei Wege",
+              "fr-FR": "Direction du logo, trois pistes",
+              "da-DK": "Logoretning, tre spor",
+              "cs-CZ": "Směr loga, tři cesty",
+              "ar-EG": "اتجاه الشعار، ثلاثة مسارات",
+              "zh-CN": "标志方向，三条路线",
+              "zh-TW": "標誌方向，三條路線"
+            }
+          }
+        },
+        {
+          "@label": "time:04",
+          "project_id": {
+            "@ref": "project:01"
+          },
+          "milestone_id": {
+            "@ref": "ms:01:logo"
+          },
+          "person_id": {
+            "@ref": "person:tomas"
+          },
+          "date": {
+            "@day": -32
+          },
+          "hours": 5,
+          "note": {
+            "@t": {
+              "en-US": "The routes set on the bag and the fascia",
+              "de-DE": "Die Wege auf Tüte und Ladenschild gesetzt",
+              "fr-FR": "Les pistes posées sur le sac et l’enseigne",
+              "da-DK": "Sporene sat på posen og facaden",
+              "cs-CZ": "Cesty vyzkoušené na sáčku a na štítu",
+              "ar-EG": "وضع المسارات على الكيس وواجهة المحل",
+              "zh-CN": "把几条路线放到纸袋和门头上",
+              "zh-TW": "把幾條路線放到紙袋和門頭上"
+            }
+          }
+        },
+        {
+          "@label": "time:05",
+          "project_id": {
+            "@ref": "project:01"
+          },
+          "milestone_id": {
+            "@ref": "ms:01:logo"
+          },
+          "person_id": {
+            "@ref": "person:nadia"
+          },
+          "date": {
+            "@day": -29
+          },
+          "hours": 3,
+          "note": {
+            "@t": {
+              "en-US": "Presenting the routes to Amara",
+              "de-DE": "Die Wege Amara vorgestellt",
+              "fr-FR": "Présentation des pistes à Amara",
+              "da-DK": "Sporene præsenteret for Amara",
+              "cs-CZ": "Představení cest Amaře",
+              "ar-EG": "عرض المسارات على Amara",
+              "zh-CN": "向 Amara 展示几条路线",
+              "zh-TW": "向 Amara 展示幾條路線"
+            }
+          }
+        },
+        {
+          "@label": "time:06",
+          "project_id": {
+            "@ref": "project:01"
+          },
+          "milestone_id": {
+            "@ref": "ms:01:wordmark"
+          },
+          "person_id": {
+            "@ref": "person:nadia"
+          },
+          "date": {
+            "@day": -1
+          },
+          "hours": 3.5,
+          "note": {
+            "@t": {
+              "en-US": "Redrew the L, tightened the ligature",
+              "de-DE": "Das L neu gezeichnet, die Ligatur gestrafft",
+              "fr-FR": "L redessiné, ligature resserrée",
+              "da-DK": "Tegnede L’et om, strammede ligaturen",
+              "cs-CZ": "Překreslené L, utažená ligatura",
+              "ar-EG": "إعادة رسم حرف L وشدّ الربط",
+              "zh-CN": "重画了 L，收紧了连字",
+              "zh-TW": "重畫了 L，收緊了連字"
+            }
+          }
+        },
+        {
+          "@label": "time:07",
+          "project_id": {
+            "@ref": "project:01"
+          },
+          "milestone_id": {
+            "@ref": "ms:01:wordmark"
+          },
+          "person_id": {
+            "@ref": "person:tomas"
+          },
+          "date": {
+            "@day": -1
+          },
+          "hours": 1.5,
+          "note": {
+            "@t": {
+              "en-US": "Proofs at 12mm and 400mm",
+              "de-DE": "Proofs in 12 mm und 400 mm",
+              "fr-FR": "Épreuves à 12 mm et 400 mm",
+              "da-DK": "Prøvetryk i 12 mm og 400 mm",
+              "cs-CZ": "Nátisky ve 12 mm a 400 mm",
+              "ar-EG": "بروفات بمقاس 12 مم و400 مم",
+              "zh-CN": "12 毫米和 400 毫米的打样",
+              "zh-TW": "12 公釐和 400 公釐的打樣"
+            }
+          }
+        },
+        {
+          "@label": "time:08",
+          "project_id": {
+            "@ref": "project:01"
+          },
+          "milestone_id": {
+            "@ref": "ms:01:wordmark"
+          },
+          "person_id": {
+            "@ref": "person:nadia"
+          },
+          "date": {
+            "@day": -4
+          },
+          "hours": 2,
+          "note": {
+            "@t": {
+              "en-US": "Call with Amara, third round notes",
+              "de-DE": "Telefonat mit Amara, Notizen zur dritten Runde",
+              "fr-FR": "Appel avec Amara, notes de la troisième série",
+              "da-DK": "Opkald med Amara, noter til tredje runde",
+              "cs-CZ": "Hovor s Amarou, poznámky ke třetímu kolu",
+              "ar-EG": "مكالمة مع Amara، ملاحظات الجولة الثالثة",
+              "zh-CN": "与 Amara 通话，第三轮意见",
+              "zh-TW": "與 Amara 通話，第三輪意見"
+            }
+          }
+        },
+        {
+          "@label": "time:09",
+          "project_id": {
+            "@ref": "project:02"
+          },
+          "milestone_id": {
+            "@ref": "ms:02:patterns"
+          },
+          "person_id": {
+            "@ref": "person:tomas"
+          },
+          "date": {
+            "@day": -14
+          },
+          "hours": 5,
+          "note": {
+            "@t": {
+              "en-US": "Pattern studies, round two",
+              "de-DE": "Musterstudien, zweite Runde",
+              "fr-FR": "Études de motifs, deuxième série",
+              "da-DK": "Mønsterstudier, anden runde",
+              "cs-CZ": "Studie vzorů, druhé kolo",
+              "ar-EG": "دراسات الأنماط، الجولة الثانية",
+              "zh-CN": "图案研究，第二轮",
+              "zh-TW": "圖案研究，第二輪"
+            }
+          }
+        },
+        {
+          "@label": "time:10",
+          "project_id": {
+            "@ref": "project:02"
+          },
+          "milestone_id": {
+            "@ref": "ms:02:patterns"
+          },
+          "person_id": {
+            "@ref": "person:nadia"
+          },
+          "date": {
+            "@day": -13
+          },
+          "hours": 4,
+          "note": {
+            "@t": {
+              "en-US": "Pattern studies, colour",
+              "de-DE": "Musterstudien, Farbe",
+              "fr-FR": "Études de motifs, couleur",
+              "da-DK": "Mønsterstudier, farve",
+              "cs-CZ": "Studie vzorů, barva",
+              "ar-EG": "دراسات الأنماط، الألوان",
+              "zh-CN": "图案研究，配色",
+              "zh-TW": "圖案研究，配色"
+            }
+          }
+        },
+        {
+          "@label": "time:11",
+          "project_id": {
+            "@ref": "project:02"
+          },
+          "milestone_id": {
+            "@ref": "ms:02:layouts"
+          },
+          "person_id": {
+            "@ref": "person:tomas"
+          },
+          "date": {
+            "@day": -5
+          },
+          "hours": 4,
+          "note": {
+            "@t": {
+              "en-US": "Dieline for the 240mm sleeve",
+              "de-DE": "Stanzkontur für die 240-mm-Hülle",
+              "fr-FR": "Tracé de découpe du fourreau de 240 mm",
+              "da-DK": "Stanselinje til 240 mm-omslaget",
+              "cs-CZ": "Výsekový obrys 240mm přebalu",
+              "ar-EG": "خط القص لغلاف 240 مم",
+              "zh-CN": "240 毫米套盒的刀线",
+              "zh-TW": "240 公釐套盒的刀線"
+            }
+          }
+        },
+        {
+          "@label": "time:12",
+          "project_id": {
+            "@ref": "project:02"
+          },
+          "milestone_id": {
+            "@ref": "ms:02:layouts"
+          },
+          "person_id": {
+            "@ref": "person:nadia"
+          },
+          "date": {
+            "@day": -6
+          },
+          "hours": 5.5,
+          "note": {
+            "@t": {
+              "en-US": "Pattern selection, four sheets",
+              "de-DE": "Musterauswahl, vier Bogen",
+              "fr-FR": "Sélection des motifs, quatre feuilles",
+              "da-DK": "Mønstervalg, fire ark",
+              "cs-CZ": "Výběr vzorů, čtyři archy",
+              "ar-EG": "اختيار الأنماط، أربع أوراق",
+              "zh-CN": "图案挑选，四张",
+              "zh-TW": "圖案挑選，四張"
+            }
+          }
+        },
+        {
+          "@label": "time:13",
+          "project_id": {
+            "@ref": "project:03"
+          },
+          "milestone_id": {
+            "@ref": "ms:03:marks"
+          },
+          "person_id": {
+            "@ref": "person:tomas"
+          },
+          "date": {
+            "@day": -22
+          },
+          "hours": 3,
+          "note": {
+            "@t": {
+              "en-US": "Second round of marks",
+              "de-DE": "Zweite Runde der Zeichen",
+              "fr-FR": "Deuxième série de marques",
+              "da-DK": "Anden runde af mærker",
+              "cs-CZ": "Druhé kolo značek",
+              "ar-EG": "الجولة الثانية من العلامات",
+              "zh-CN": "第二轮标记",
+              "zh-TW": "第二輪標記"
+            }
+          }
+        },
+        {
+          "@label": "time:14",
+          "project_id": {
+            "@ref": "project:04"
+          },
+          "milestone_id": {
+            "@ref": "ms:04:cups"
+          },
+          "person_id": {
+            "@ref": "person:nadia"
+          },
+          "date": {
+            "@month": -2,
+            "@dom": 27
+          },
+          "hours": 6,
+          "note": {
+            "@t": {
+              "en-US": "Cup marks, three sizes",
+              "de-DE": "Becherzeichen, drei Größen",
+              "fr-FR": "Marques des gobelets, trois tailles",
+              "da-DK": "Kopmærker, tre størrelser",
+              "cs-CZ": "Značky na kelímky, tři velikosti",
+              "ar-EG": "علامات الأكواب، ثلاثة مقاسات",
+              "zh-CN": "杯子标记，三个尺寸",
+              "zh-TW": "杯子標記，三個尺寸"
+            }
+          }
+        },
+        {
+          "@label": "time:15",
+          "project_id": {
+            "@ref": "project:04"
+          },
+          "milestone_id": {
+            "@ref": "ms:04:cups"
+          },
+          "person_id": {
+            "@ref": "person:tomas"
+          },
+          "date": {
+            "@month": -2,
+            "@dom": 28
+          },
+          "hours": 4,
+          "note": {
+            "@t": {
+              "en-US": "Cup wrap artwork",
+              "de-DE": "Druckdaten für die Becherbanderole",
+              "fr-FR": "Fichiers du fourreau de gobelet",
+              "da-DK": "Tryksager til kopomslaget",
+              "cs-CZ": "Podklady k obalu kelímku",
+              "ar-EG": "تصميم غلاف الكوب",
+              "zh-CN": "杯套稿件",
+              "zh-TW": "杯套稿件"
+            }
+          }
+        },
+        {
+          "@label": "time:16",
+          "project_id": {
+            "@ref": "project:04"
+          },
+          "milestone_id": {
+            "@ref": "ms:04:handoff"
+          },
+          "person_id": {
+            "@ref": "person:nadia"
+          },
+          "date": {
+            "@month": -1,
+            "@dom": 15
+          },
+          "hours": 2.5,
+          "note": {
+            "@t": {
+              "en-US": "Press check, cup wraps",
+              "de-DE": "Druckabnahme, Becherbanderolen",
+              "fr-FR": "Contrôle chez l’imprimeur, fourreaux de gobelets",
+              "da-DK": "Trykkontrol, kopomslag",
+              "cs-CZ": "Kontrola v tiskárně, obaly kelímků",
+              "ar-EG": "مراجعة في المطبعة، أغلفة الأكواب",
+              "zh-CN": "印厂看样，杯套",
+              "zh-TW": "印廠看樣，杯套"
+            }
+          }
+        },
+        {
+          "@label": "time:17",
+          "project_id": {
+            "@ref": "project:04"
+          },
+          "milestone_id": {
+            "@ref": "ms:04:handoff"
+          },
+          "person_id": {
+            "@ref": "person:tomas"
+          },
+          "date": {
+            "@month": -1,
+            "@dom": 17
+          },
+          "hours": 3,
+          "note": {
+            "@t": {
+              "en-US": "Source files and fonts for the handover",
+              "de-DE": "Quelldateien und Schriften für die Übergabe",
+              "fr-FR": "Fichiers sources et polices pour la remise",
+              "da-DK": "Kildefiler og skrifter til overdragelsen",
+              "cs-CZ": "Zdrojové soubory a písma k předání",
+              "ar-EG": "الملفات المصدرية والخطوط للتسليم",
+              "zh-CN": "交付用的源文件和字体",
+              "zh-TW": "交付用的原始檔和字型"
+            }
+          }
+        }
+      ]
+    },
+    {
       "ref": "invoices",
       "rows": [
         {
@@ -5913,7 +6980,10 @@
             }
           },
           "qty": 1,
-          "rate": 300
+          "rate": 300,
+          "expense_id": {
+            "@ref": "expense:040"
+          }
         },
         {
           "document_id": {
@@ -5997,6 +7067,9 @@
           "qty": 1,
           "quote_id": {
             "@ref": "proposal:1137"
+          },
+          "time_entry_id": {
+            "@ref": "time:14"
           }
         },
         {
@@ -6085,6 +7158,9 @@
           "qty": 1,
           "quote_id": {
             "@ref": "proposal:1138"
+          },
+          "time_entry_id": {
+            "@ref": "time:03"
           }
         },
         {
@@ -8109,6 +9185,176 @@
           "sent_at": {
             "@ago": "PT3H"
           }
+        }
+      ]
+    },
+    {
+      "ref": "running_costs",
+      "rows": [
+        {
+          "label": {
+            "@t": {
+              "en-US": "Studio rent, half of a shopfront",
+              "de-DE": "Studiomiete, halbe Ladenfläche",
+              "fr-FR": "Loyer du studio, la moitié d’une boutique",
+              "da-DK": "Husleje, halvdelen af en butik",
+              "cs-CZ": "Nájem studia, polovina obchodu",
+              "ar-EG": "إيجار الاستوديو، نصف محل",
+              "zh-CN": "工作室房租，半间店面",
+              "zh-TW": "工作室房租，半間店面"
+            }
+          },
+          "monthly_amount": 1450,
+          "position": 0
+        },
+        {
+          "label": {
+            "@t": {
+              "en-US": "Software, fonts & fulfilment",
+              "de-DE": "Software, Schriften & Versand",
+              "fr-FR": "Logiciels, polices et expéditions",
+              "da-DK": "Software, skrifter og forsendelse",
+              "cs-CZ": "Software, písma a expedice",
+              "ar-EG": "البرمجيات والخطوط والشحن",
+              "zh-CN": "软件、字体与发货",
+              "zh-TW": "軟體、字型與出貨"
+            }
+          },
+          "monthly_amount": 610,
+          "position": 1
+        },
+        {
+          "label": {
+            "@t": {
+              "en-US": "Accountant",
+              "de-DE": "Steuerberatung",
+              "fr-FR": "Comptable",
+              "da-DK": "Revisor",
+              "cs-CZ": "Účetní",
+              "ar-EG": "المحاسب",
+              "zh-CN": "会计",
+              "zh-TW": "會計"
+            }
+          },
+          "monthly_amount": 340,
+          "position": 2
+        },
+        {
+          "label": {
+            "@t": {
+              "en-US": "Insurance & sundries",
+              "de-DE": "Versicherung & Kleinkram",
+              "fr-FR": "Assurance et divers",
+              "da-DK": "Forsikring og diverse",
+              "cs-CZ": "Pojištění a drobnosti",
+              "ar-EG": "التأمين والنثريات",
+              "zh-CN": "保险与杂项",
+              "zh-TW": "保險與雜項"
+            }
+          },
+          "monthly_amount": 450,
+          "position": 3
+        }
+      ]
+    },
+    {
+      "ref": "events",
+      "rows": [
+        {
+          "date": {
+            "@day": 2
+          },
+          "title": {
+            "@t": {
+              "en-US": "Press check — Fold & Rule",
+              "de-DE": "Druckabnahme — Fold & Rule",
+              "fr-FR": "Contrôle chez l’imprimeur — Fold & Rule",
+              "da-DK": "Trykkontrol — Fold & Rule",
+              "cs-CZ": "Kontrola v tiskárně — Fold & Rule",
+              "ar-EG": "مراجعة في المطبعة — Fold & Rule",
+              "zh-CN": "印厂看样——Fold & Rule",
+              "zh-TW": "印廠看樣——Fold & Rule"
+            }
+          },
+          "kind": "press"
+        },
+        {
+          "date": {
+            "@day": 6
+          },
+          "title": {
+            "@t": {
+              "en-US": "Call with Rosa Vento",
+              "de-DE": "Telefonat mit Rosa Vento",
+              "fr-FR": "Appel avec Rosa Vento",
+              "da-DK": "Opkald med Rosa Vento",
+              "cs-CZ": "Hovor s Rosou Vento",
+              "ar-EG": "مكالمة مع Rosa Vento",
+              "zh-CN": "与 Rosa Vento 通话",
+              "zh-TW": "與 Rosa Vento 通話"
+            }
+          },
+          "kind": "call"
+        },
+        {
+          "date": {
+            "@day": 13
+          },
+          "to_date": {
+            "@day": 15
+          },
+          "title": {
+            "@t": {
+              "en-US": "Tomas away",
+              "de-DE": "Tomas ist weg",
+              "fr-FR": "Tomas absent",
+              "da-DK": "Tomas er væk",
+              "cs-CZ": "Tomas mimo",
+              "ar-EG": "Tomas غائب",
+              "zh-CN": "Tomas 不在",
+              "zh-TW": "Tomas 不在"
+            }
+          },
+          "kind": "away",
+          "person_id": {
+            "@ref": "person:tomas"
+          }
+        },
+        {
+          "date": {
+            "@day": 27
+          },
+          "title": {
+            "@t": {
+              "en-US": "Kickoff — Marigold Lane",
+              "de-DE": "Projektstart — Marigold Lane",
+              "fr-FR": "Lancement — Marigold Lane",
+              "da-DK": "Opstart — Marigold Lane",
+              "cs-CZ": "Zahájení — Marigold Lane",
+              "ar-EG": "انطلاق — Marigold Lane",
+              "zh-CN": "启动会——Marigold Lane",
+              "zh-TW": "啟動會——Marigold Lane"
+            }
+          },
+          "kind": "call"
+        },
+        {
+          "date": {
+            "@day": 36
+          },
+          "title": {
+            "@t": {
+              "en-US": "Press check — Northlight sleeves",
+              "de-DE": "Druckabnahme — Northlight-Hüllen",
+              "fr-FR": "Contrôle chez l’imprimeur — pochettes Northlight",
+              "da-DK": "Trykkontrol — Northlight-omslag",
+              "cs-CZ": "Kontrola v tiskárně — obaly Northlight",
+              "ar-EG": "مراجعة في المطبعة — أغلفة Northlight",
+              "zh-CN": "印厂看样——Northlight 封套",
+              "zh-TW": "印廠看樣——Northlight 封套"
+            }
+          },
+          "kind": "press"
         }
       ]
     }

@@ -76,7 +76,7 @@ describe("every word a person reads is in all eight languages", () => {
   it("ships every email in each language, with the English email's variables and no others", () => {
     const vars = (value: unknown): string[] => [...JSON.stringify(value).matchAll(/\{\{([A-Za-z_.]+)\}\}/g)].map((m) => m[1]!).sort();
     const templates = manifest["emailTemplates"] as { key: string; locales: Record<string, unknown> }[];
-    expect(templates).toHaveLength(19);
+    expect(templates).toHaveLength(20);
     for (const template of templates) {
       expect(Object.keys(template.locales).sort(), template.key).toEqual([...LOCALES].sort());
       const english = vars(template.locales["en-US"]);

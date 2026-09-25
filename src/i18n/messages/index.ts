@@ -30,6 +30,16 @@ import { terms } from "../strings/terms.ts";
 import { settings } from "../strings/settings.ts";
 import { sheets } from "../strings/sheets.ts";
 import { client } from "../strings/client.ts";
+import { time } from "../strings/time.ts";
+import { expenses } from "../strings/expenses.ts";
+import { suppliers } from "../strings/suppliers.ts";
+import { scoping } from "../strings/scoping.ts";
+import { schedule } from "../strings/schedule.ts";
+import { capacity } from "../strings/capacity.ts";
+import { money } from "../strings/money.ts";
+import { archive } from "../strings/archive.ts";
+import { emails } from "../strings/emails.ts";
+import { enquire } from "../strings/enquire.ts";
 
 /**
  * Parity guard. `en-US` defines the keys; the other seven must each carry a
@@ -56,6 +66,16 @@ export const AREAS = {
   settings,
   sheets,
   client,
+  time,
+  expenses,
+  suppliers,
+  scoping,
+  schedule,
+  capacity,
+  money,
+  archive,
+  emails,
+  enquire,
 } as const;
 
 /**
@@ -65,7 +85,7 @@ export const AREAS = {
  * The surface build test fails if a clients'-side module names a key outside
  * them, or if the customer bundle carries a key of any other area.
  */
-export const CUSTOMER_AREAS = { chrome, client } as const;
+export const CUSTOMER_AREAS = { chrome, client, enquire } as const;
 
 /** One lookup table per locale, flattened from some of the areas. */
 export function bundleOf(areas: readonly object[]): Record<LocaleTag, Record<string, string>> {
@@ -97,4 +117,14 @@ export type MessageKey =
   | keyof (typeof terms)["en-US"]
   | keyof (typeof settings)["en-US"]
   | keyof (typeof sheets)["en-US"]
-  | keyof (typeof client)["en-US"];
+  | keyof (typeof client)["en-US"]
+  | keyof (typeof time)["en-US"]
+  | keyof (typeof expenses)["en-US"]
+  | keyof (typeof suppliers)["en-US"]
+  | keyof (typeof scoping)["en-US"]
+  | keyof (typeof schedule)["en-US"]
+  | keyof (typeof capacity)["en-US"]
+  | keyof (typeof money)["en-US"]
+  | keyof (typeof archive)["en-US"]
+  | keyof (typeof emails)["en-US"]
+  | keyof (typeof enquire)["en-US"];

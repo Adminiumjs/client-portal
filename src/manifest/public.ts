@@ -23,6 +23,14 @@
  * Every value a client triggers but must not choose is the server's: the time
  * they signed and with which address, how a proposal was accepted, the
  * fingerprint of what they agreed to, when they said they had paid.
+ *
+ * AN ENQUIRY may be sent by anyone, from the studio's own site: a create
+ * nobody signs in for, behind the human check and the limits on such a
+ * create (so many a day from one address, so many an hour on the key, a name
+ * that is only a name). It writes the few columns a stranger may fill; it
+ * arrives as a new enquiry from the web, stamped with when it came, whatever
+ * the browser sent; and it reads nothing back but when it was received — no
+ * other enquiry, and not even its own number.
  */
 
 const verified = { level: "verified" } as const;
@@ -88,6 +96,9 @@ export const PUBLIC_KEYS = {
   // One project's handover, opened by the code in its link: no staff sign-in behind it, and it only reads.
   handover: {},
 };
+
+/** What a stranger may write on the enquiry form. */
+export const ENQUIRY_WRITABLE = ["name", "email", "business", "trade", "budget", "start_when", "body"];
 
 export const PUBLIC_ACCESS = [
   // ── the studio, to anyone ─────────────────────────────────────────────────
@@ -260,6 +271,18 @@ export const PUBLIC_ACCESS = [
     filters: [{ column: "voided", op: "eq", value: false }],
     documents: ["receipt"],
     ...under("invoices", "document_id"),
+  },
+
+  // ── an enquiry, from anyone ───────────────────────────────────────────────
+  {
+    table: "enquiries",
+    methods: ["POST"],
+    select: ["received_at"],
+    writable: ENQUIRY_WRITABLE,
+    requires: ["name", "email", "body"],
+    defaults: { status: "new", source: "web" },
+    humanCheck: true,
+    anonymous: { perValue: { columns: ["email"], n: 3 }, perKeyHour: 30, plainText: ["name"] },
   },
 
   // ── a handover, shared by link ─────────────────────────────────────────────

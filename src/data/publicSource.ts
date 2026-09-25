@@ -7,7 +7,8 @@
  * people before sign-in; after it, only the client's OWN proposals, projects,
  * invoices, payments and brief (never a list of clients); and one entry per
  * write — accept, sign, decline, ask for a new price, review a deliverable,
- * write a note, answer the brief and send it, say a payment was sent. The
+ * write a note, answer the brief and send it, say a payment was sent — and,
+ * for anyone at all, the enquiry form (a create behind the human check). The
  * browser sends only what an entry lets it write; Adminium stamps the rest
  * (who signed, when, the fingerprint, how it was approved).
  *
@@ -31,7 +32,20 @@ import { listInBrowser } from "./listInBrowser.ts";
 import { normalise, normaliseAll } from "./rows.ts";
 import { realTables } from "./tableOfRef.ts";
 import type { ListCondition } from "./snapshotPort.ts";
-import { PortError, type ClientNote, type CodeResult, type DocumentKind, type HandoverView, type Me, type PortalPort, type PrivateFile, type PublicStudio, type SentPayment, type StatementPeriod } from "./ports.ts";
+import {
+  PortError,
+  type ClientNote,
+  type CodeResult,
+  type DocumentKind,
+  type EnquiryForm,
+  type HandoverView,
+  type Me,
+  type PortalPort,
+  type PrivateFile,
+  type PublicStudio,
+  type SentPayment,
+  type StatementPeriod,
+} from "./ports.ts";
 import type { Id, TableRef, Tables } from "./types.ts";
 
 export interface PublicRefLike {
@@ -120,6 +134,8 @@ export interface PortalRefs {
   sentPayment: string;
   invoiceLines: string;
   payments: string;
+  /** The enquiry form's door; null on an install that has none (the form then says it cannot send). */
+  enquiry: string | null;
 }
 
 /** Which ref is which. Throws naming what the portal's key lacks. */
@@ -160,12 +176,19 @@ export function portalRefs(config: PublicConfigLike, tables: Record<string, stri
     sentPayment: pick("I've sent a payment", writes("invoices", "client_paid")),
     invoiceLines: pick("invoice lines", reads("invoice_lines", "amount")),
     payments: pick("payments", reads("payments", "paid_on")),
+    // Found by what it does: a create on enquiries that writes what they wrote, and reads nothing back.
+    enquiry: of("enquiries").find(([, r]) => r.writable.includes("body") && r.actions.includes("create") && !r.actions.includes("read"))?.[0] ?? null,
   };
 }
 
+const blankOrNull = (value: string | null | undefined): string | null => {
+  const text = value?.trim() ?? "";
+  return text === "" ? null : text;
+};
+
 /** The read endpoint of each table a client screen lists. */
 function readRefOf(refs: PortalRefs, table: TableRef): string {
-  const map: Partial<Record<TableRef, keyof PortalRefs>> = {
+  const map: Partial<Record<TableRef, Exclude<keyof PortalRefs, "enquiry">>> = {
     proposals: "proposals",
     proposal_lines: "proposalLines",
     terms_versions: "termsVersions",
@@ -352,6 +375,22 @@ export async function publicPortalPort(client: PortalClient, opts: PublicPortalO
           }),
         ),
       ),
+
+    sendEnquiry: (form: EnquiryForm) =>
+      guard(async () => {
+        if (refs.enquiry === null) throw new PortError("PUBLIC_REF_NOT_FOUND", "this studio takes no enquiries here", 404);
+        const row = await client.create<Record<string, unknown>>(refs.enquiry, {
+          name: form.name.trim(),
+          email: form.email.trim(),
+          body: form.body.trim(),
+          business: blankOrNull(form.business),
+          trade: blankOrNull(form.trade),
+          budget: blankOrNull(form.budget),
+          start_when: blankOrNull(form.start_when),
+        });
+        const at = (row as { received_at?: unknown } | null)?.received_at;
+        return { received_at: typeof at === "string" ? at : null };
+      }),
 
     openHandover: (token) =>
       guard(async (): Promise<HandoverView> => {

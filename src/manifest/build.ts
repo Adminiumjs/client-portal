@@ -47,6 +47,24 @@ export const STAFF_ROUTES = {
   settings: "/settings",
 };
 
+/**
+ * The desk's back-office screens, as the address bar will name them. Not in
+ * `frontends[].routes` yet: a route there is a row in Adminium's sidebar, and
+ * none shows before its screen is built. The screens move them into
+ * `STAFF_ROUTES` (and `surface-nav.ts`) as they ship.
+ */
+export const LATER_STAFF_ROUTES = {
+  time: "/time",
+  expenses: "/expenses",
+  suppliers: "/suppliers",
+  scoping: "/scoping",
+  schedule: "/schedule",
+  capacity: "/capacity",
+  money: "/money",
+  archive: "/archive",
+  emails: "/emails",
+};
+
 /** The clients' side. A sign-in link lands on `/c` and a shared handover on `/h`; their tokens ride the fragment. */
 export const CUSTOMER_ROUTES = {
   find: "/",
@@ -60,7 +78,8 @@ export const CUSTOMER_ROUTES = {
   handover: "/h",
 };
 
-export function buildManifest(): Record<string, unknown> {
+/** `laterPages`: also the pages declared for later — only the test that proves they install asks. */
+export function buildManifest(opts: { laterPages?: boolean } = {}): Record<string, unknown> {
   return {
     kind: "app",
     manifestVersion: 1,
@@ -92,7 +111,7 @@ export function buildManifest(): Record<string, unknown> {
     documents: DOCUMENTS,
     navGroups: NAV_GROUPS,
     requiredSchema: { prefixed: true, tables: TABLES },
-    pages: pages(),
+    pages: pages(opts.laterPages === true),
     roles: ROLES,
     publicKeys: PUBLIC_KEYS,
     publicAccess: PUBLIC_ACCESS,

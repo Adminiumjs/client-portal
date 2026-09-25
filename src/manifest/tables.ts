@@ -721,6 +721,91 @@ export const TABLES: Table[] = [
       clientKey,
     ],
   },
+
+  // ── the back office: who we buy from, what we bought, the hours we kept ──
+  {
+    ref: "suppliers",
+    label: l("Supplier"),
+    labelPlural: l("Suppliers"),
+    keyField: "name",
+    columns: [
+      id,
+      int("number_seq", "Number in the series", { ...opt, rules: { sequence: { gapless: true } } }),
+      text("number", 24, "Number", { ...opt, unique: true, rules: { format: { from: "number_seq", prefix: "SUP-", pad: 2 } } }),
+      text("name", 160, "Name", { semantic: "name" }),
+      choice(
+        "kind",
+        "What for",
+        {
+          print: "Print",
+          paper: "Paper",
+          signage: "Signage",
+          courier: "Courier",
+          fonts: "Fonts",
+          finishing: "Finishing",
+          photography: "Photography",
+          software: "Software",
+          other: "Other",
+        },
+        { default: "other" },
+      ),
+      text("contact", 120, "Ask for", opt),
+      text("email", 254, "Email", { ...opt, semantic: "email", rules: { normalize: "email", validation: { format: "email" } } }),
+      text("phone", 40, "Phone", opt),
+      text("address", 500, "Address", opt),
+      text("lead_time", 120, "Lead time", opt),
+      text("typical_cost", 160, "What it costs", opt),
+      text("note", 1000, "What to remember", opt),
+      bool("would_use_again", "Would use again", true),
+      clientKey,
+    ],
+  },
+  {
+    ref: "expenses",
+    label: l("Purchase"),
+    labelPlural: l("Expenses"),
+    keyField: "number",
+    columns: [
+      id,
+      int("number_seq", "Number in the series", { ...opt, rules: { sequence: { gapless: true } } }),
+      text("number", 24, "Number", { ...opt, unique: true, rules: { format: { from: "number_seq", prefix: "EX-", pad: 3 } } }),
+      // A purchase is dated the day it was made, never a day still to come.
+      date("date", "Bought on", { rules: { notAfter: "today" } }),
+      text("what", 300, "What it was"),
+      decimal("amount", "Cost", "currency", { semantic: "money", rules: { validation: { min: 0.01 } } }),
+      // The project's client whenever a project is named; a client of its own otherwise.
+      fk("client_id", "clients", "Client", true, { rules: { copy: { via: "project_id", from: "client_id", mode: "always" } } }),
+      fk("project_id", "projects", "Project", true),
+      fk("supplier_id", "suppliers", "Supplier", true),
+      // Passed on to the client at cost, never marked up; ours to carry when not.
+      bool("rebill", "Pass on at cost", false),
+      text("receipt", 255, "Purchase receipt", opt),
+      clientKey,
+    ],
+  },
+  {
+    ref: "time_entries",
+    label: l("Time entry"),
+    labelPlural: l("Time"),
+    keyField: "note",
+    columns: [
+      id,
+      fk("project_id", "projects", "Project"),
+      clientOf("project_id"),
+      fk("milestone_id", "milestones", "Milestone", true),
+      fk("person_id", "people", "Who"),
+      // Logged for a day that has happened, never one still to come.
+      date("date", "Day", { rules: { notAfter: "today" } }),
+      // Empty only while the clock runs; nobody works more than sixteen hours in a day.
+      decimal("hours", "Hours", 2, { ...opt, rules: { validation: { min: 0.01, max: 16 } } }),
+      text("note", 500, "What it went on", opt),
+      // Whose clock is running on this entry, emptied when it stops. Unique, so one person
+      // never has two clocks running, whichever computer started the second.
+      fk("running_for", "people", "Clock running for", true, { unique: true }),
+      at("started_at", "Clock started", { ...opt, rules: stamp("now", { column: "running_for", filled: true }) }),
+      clientKey,
+    ],
+  },
   {
     ref: "invoices",
     label: l("Invoice"),
@@ -759,7 +844,17 @@ export const TABLES: Table[] = [
     label: l("Invoice line"),
     labelPlural: l("Invoice lines"),
     ...builtOn("invoice@1", "lines"),
-    columns: [...withWords(partColumns("invoice@1", "lines", BUILT, LINE_WORDS), { discount_kind: DISCOUNT_KIND }), clientOf("document_id"), clientKey],
+    columns: [
+      ...withWords(partColumns("invoice@1", "lines", BUILT, LINE_WORDS), { discount_kind: DISCOUNT_KIND }),
+      clientOf("document_id"),
+      // The hours or the purchase a line puts on the invoice. The line is the one record of it: an
+      // entry is invoiced while a line points at it, and free again once a draft's line is removed.
+      // Unique, so the same hours or purchase is never on two lines, however often "Move onto an
+      // invoice" is pressed; and a row a line points at cannot be deleted from under it.
+      fk("time_entry_id", "time_entries", "Time it bills", true, { unique: true }),
+      fk("expense_id", "expenses", "Purchase it passes on", true, { unique: true }),
+      clientKey,
+    ],
   },
   {
     ref: "payments",
@@ -793,6 +888,7 @@ export const TABLES: Table[] = [
           "brief-sent": "Brief sent",
           "asked-for-a-new-price": "Asked for a new price",
           "new-note": "New note from a client",
+          "new-enquiry": "New enquiry",
           "invoice-sent": "Invoice sent",
           "invoice-rung-1": "First reminder",
           "invoice-rung-2": "Second reminder",
@@ -832,6 +928,36 @@ export const TABLES: Table[] = [
       text("error", null, "Why it was not sent", opt),
       at("effect_at", "Follow-up made", opt),
       text("effect_error", null, "Why the follow-up was refused", opt),
+      clientKey,
+    ],
+  },
+
+  // ── the back office: what it costs to open the door, the studio's dates ──
+  {
+    ref: "running_costs",
+    label: l("Running cost"),
+    labelPlural: l("Running costs"),
+    keyField: "label",
+    columns: [
+      id,
+      text("label", 160, "What it is"),
+      decimal("monthly_amount", "Every month", "currency", { semantic: "money", rules: { validation: { min: 0 } } }),
+      int("position", "Position", { default: 0 }),
+    ],
+  },
+  {
+    ref: "events",
+    label: l("Studio date"),
+    labelPlural: l("Studio dates"),
+    keyField: "title",
+    columns: [
+      id,
+      date("date", "Date"),
+      date("to_date", "Until", { ...opt, rules: { notBefore: { column: "date" } } }),
+      text("title", 200, "What it is"),
+      choice("kind", "Kind", { call: "A call", press: "A press check", away: "One of us away" }, { default: "call", tones: { call: "info", press: "accent", away: "warn" } }),
+      // Who is away: asked for on an away day only, by every door (the desk and the dashboard's form).
+      fk("person_id", "people", "Who is away", true, { rules: { requiredWhen: { column: "kind", in: ["away"] } } }),
       clientKey,
     ],
   },
