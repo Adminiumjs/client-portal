@@ -1,144 +1,147 @@
 /**
- * The app shell.
+ * The app: the clients' side or the studio's desk, the screen on show, and
+ * what can open over it (a sheet, the toasts).
  *
- * Routing is a plain state switch over `store.view`. Every member of the
- * `View` union is mapped below — the studio's seven views, the portal's four,
- * and the 404 — so no nav item or portal redirect can land nowhere.
+ * The two sides' screens are two separate records ON PURPOSE. `SURFACE_SIDE`
+ * folds to a literal at build time, so the clients' bundle — served to anyone
+ * on the internet — does not contain a single desk screen, and the desk's
+ * bundle no client page. One record filtered at runtime would be tidier and
+ * would ship the desk to every visitor (`testing/surfaceBuild.test.ts` checks
+ * it does not). `routes.ts` names every view and its file; `routes.test.ts`
+ * holds these records to it.
  */
+import { useEffect, type ComponentType } from "react";
 
-import { useEffect } from "react";
-import type { ComponentType } from "react";
-
-import DemoDock from "../components/DemoDock.tsx";
-import {
-  ChangesDialog,
-  DeclineDialog,
-  PaySheet,
-  RecordPayment,
-  ToastLayer,
-} from "../components/Overlays.tsx";
-import Shell from "../components/Shell.tsx";
-import type { View } from "../data/types.ts";
-import { DEMO, SURFACE_SIDE } from "../surface.ts";
-import type { CustomerView, StaffView } from "../surface-nav.ts";
 import { setAmbient } from "../i18n/ambient.ts";
 import { useI18n } from "../i18n/index.tsx";
-import { useStore } from "../state/store.ts";
+import { SURFACE_SIDE } from "../surface.ts";
+import type { CustomerView, StaffView } from "../surface-nav.ts";
+import { usePortal } from "../state/portal.ts";
+import { useUi } from "../state/ui.ts";
 
-import {
-  Home,
-  InvoicePage,
-  Invoices,
-  ProjectPage,
-  Projects,
-  ProposalPage,
-  Proposals,
-} from "../screens/Studio.tsx";
-import {
-  ClientInvoice,
-  Entry,
-  NotFound,
-  Progress,
-  Review,
-} from "../screens/Portal.tsx";
+import ClientFrame from "../components/ClientFrame.tsx";
+import ClientSheetHost from "../components/ClientSheetHost.tsx";
+import DeskFrame from "../components/DeskFrame.tsx";
+import SheetHost from "../components/SheetHost.tsx";
+import { Toasts } from "../components/Toasts.tsx";
 
-/*
- * TOTAL over the side's views, not partial — and `StaffView`/`CustomerView`
- * come from `surface-nav.ts`, which is also what the URL router and the emitted
- * `surface.json` read. A screen declared there with no component here, or a
- * component here for a screen not declared there, is a COMPILE error. That is
- * D7's drift rule, enforced by the type checker rather than by a test.
- *
- * `notfound` is in both: every build needs somewhere for an unknown view to go.
- */
-const STUDIO_SCREENS = {
+import Home from "../screens/Home.tsx";
+import Enquiries from "../screens/Enquiries.tsx";
+import Proposals from "../screens/Proposals.tsx";
+import Proposal from "../screens/Proposal.tsx";
+import Composer from "../screens/Composer.tsx";
+import Projects from "../screens/Projects.tsx";
+import Project from "../screens/Project.tsx";
+import Review from "../screens/Review.tsx";
+import Handover from "../screens/Handover.tsx";
+import Clients from "../screens/Clients.tsx";
+import Client from "../screens/Client.tsx";
+import Invoices from "../screens/Invoices.tsx";
+import Invoice from "../screens/Invoice.tsx";
+import Print from "../screens/Print.tsx";
+import Chasing from "../screens/Chasing.tsx";
+import Terms from "../screens/Terms.tsx";
+import Settings from "../screens/Settings.tsx";
+import NotFound from "../screens/NotFound.tsx";
+
+import ClientFind from "../screens/client/Find.tsx";
+import ClientLink from "../screens/client/Link.tsx";
+import ClientHome from "../screens/client/Home.tsx";
+import ClientProposal from "../screens/client/Proposal.tsx";
+import ClientProject from "../screens/client/Project.tsx";
+import ClientReview from "../screens/client/Review.tsx";
+import ClientInvoice from "../screens/client/Invoice.tsx";
+import ClientStatement from "../screens/client/Statement.tsx";
+import ClientBrief from "../screens/client/Brief.tsx";
+import ClientHandover from "../screens/client/Handover.tsx";
+import ClientExpired from "../screens/client/Expired.tsx";
+import ClientNotAvailable from "../screens/client/NotAvailable.tsx";
+import ClientNotFound from "../screens/client/NotFound.tsx";
+
+const DESK_SCREENS = {
   home: Home,
+  enquiries: Enquiries,
   proposals: Proposals,
-  proposal: ProposalPage,
+  proposal: Proposal,
+  composer: Composer,
   projects: Projects,
-  project: ProjectPage,
+  project: Project,
+  review: Review,
+  handover: Handover,
+  clients: Clients,
+  client: Client,
   invoices: Invoices,
-  invoice: InvoicePage,
+  invoice: Invoice,
+  print: Print,
+  chasing: Chasing,
+  terms: Terms,
+  settings: Settings,
   notfound: NotFound,
 } satisfies Record<StaffView, ComponentType>;
 
-const PORTAL_SCREENS = {
-  entry: Entry,
-  review: Review,
-  progress: Progress,
-  clientinvoice: ClientInvoice,
-  notfound: NotFound,
+const CLIENT_SCREENS = {
+  find: ClientFind,
+  link: ClientLink,
+  home: ClientHome,
+  proposal: ClientProposal,
+  project: ClientProject,
+  review: ClientReview,
+  invoice: ClientInvoice,
+  statement: ClientStatement,
+  brief: ClientBrief,
+  handover: ClientHandover,
+  expired: ClientExpired,
+  notavailable: ClientNotAvailable,
+  notfound: ClientNotFound,
 } satisfies Record<CustomerView, ComponentType>;
 
-/*
- * A surface build ships ONE persona's screens. `SURFACE_SIDE` folds to a
- * literal, so the branch not taken is eliminated and, with it, every screen
- * component only that branch referenced — which is what stops a PUBLIC customer
- * bundle from carrying the staff screens. The two records above stay separate
- * object LITERALS for exactly that reason; deriving one from an array at
- * runtime would read better and would ship the whole studio to every client.
- *
- * Not a clean cut, and the limit is worth naming: `Portal.tsx` imports `Ledger`,
- * `LineTable`, `ProjectBody` and `Ring` FROM `Studio.tsx`, so the customer build
- * keeps whatever of that file those four pull in.
- */
-const SCREENS: Partial<Record<View, ComponentType>> =
-  SURFACE_SIDE === "staff"
-    ? STUDIO_SCREENS
-    : SURFACE_SIDE === "customer"
-      ? PORTAL_SCREENS
-      : { ...STUDIO_SCREENS, ...PORTAL_SCREENS };
+/** The codes that mean the clients' side is switched off. */
+const SWITCHED_OFF = new Set(["PUBLIC_SWITCHED_OFF", "SURFACE_OFF", "APP_DISABLED", "PUBLIC_API_DISABLED", "PUBLIC_KEY_OFF"]);
 
-function CurrentScreen() {
-  const view = useStore((s) => s.view);
-  const Screen = SCREENS[view] ?? NotFound;
-  return <Screen />;
+function Desk() {
+  const view = useUi((s) => s.view);
+  const Screen = (DESK_SCREENS as Partial<Record<string, ComponentType>>)[view] ?? NotFound;
+  return (
+    <>
+      <DeskFrame>
+        <Screen />
+      </DeskFrame>
+      <SheetHost />
+      <Toasts />
+    </>
+  );
+}
+
+function ClientSide() {
+  const view = useUi((s) => s.view);
+  const off = usePortal((s) => s.loadError !== null && SWITCHED_OFF.has(s.loadError));
+  const Screen = off ? ClientNotAvailable : ((CLIENT_SCREENS as Partial<Record<string, ComponentType>>)[view] ?? ClientNotFound);
+  return (
+    <>
+      <ClientFrame>
+        <Screen />
+      </ClientFrame>
+      <ClientSheetHost />
+      <Toasts />
+    </>
+  );
 }
 
 export default function App() {
-  const initTheme = useStore((s) => s.initTheme);
-  const escape = useStore((s) => s.escape);
-
-  /*
-   * Publish the live locale to the module-level bridge before anything below
-   * renders, so `lib/format.ts` — which the store calls from outside React —
-   * formats in the locale the tree is about to paint.
-   */
   const { locale, t, money, number } = useI18n();
+  // Publish the live locale before anything renders, so the formatters called
+  // outside React are already in the new language on the first paint.
   setAmbient(locale, t, money, number);
+  const theme = useUi((s) => s.theme);
+  const persona = useUi((s) => s.persona);
+  const preview = useUi((s) => s.preview !== null);
 
   useEffect(() => {
-    initTheme();
-  }, [initTheme]);
+    document.documentElement.dataset["theme"] = theme;
+  }, [theme]);
 
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent): void => {
-      if (e.key === "Escape") escape();
-    };
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [escape]);
-
-  return (
-    <>
-      <a className="ol-sr-only" href="#main">
-        {t("chrome.skipToContent")}
-      </a>
-      <Shell>
-        <CurrentScreen />
-      </Shell>
-      {/*
-        Build-time, not runtime. `DEMO` folds to a literal, so a hosted or
-        connected build does not CONTAIN the dock — it is not merely hidden.
-        Rendering it unconditionally, as this line did, put the seeded fiction's
-        controls into every build that shipped.
-      */}
-      {DEMO && <DemoDock />}
-      <ToastLayer />
-      <PaySheet />
-      <RecordPayment />
-      <DeclineDialog />
-      <ChangesDialog />
-    </>
-  );
+  if (SURFACE_SIDE === "staff") return preview ? <ClientSide /> : <Desk />;
+  if (SURFACE_SIDE === "customer") return <ClientSide />;
+  // The demo: both sides, switched by the card's persona.
+  return persona === "client" || preview ? <ClientSide /> : <Desk />;
 }

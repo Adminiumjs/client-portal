@@ -1,30 +1,21 @@
 /*
- * Design tokens for adminium.dev — a faithful, hand-inlined mirror of
- * @adminium/tokens (packages/tokens/src/{tokens,accents}.css in the product
- * monorepo). Values are canonical; see 02-design-system.md §1.
+ * The design's tokens: colours (light and dark), type, radii, spacing and
+ * elevation — the values the Outline design computes, so every screen draws
+ * from one set.
  *
- * This file is copied rather than imported because the website is a separate
- * repo and @adminium/tokens is not yet on npm. When it is published, replace
- * this file with `import '@adminium/tokens'` so the marketing site and the
- * product can never drift. Until then: do NOT fork a hex here — if a value
- * changes in the product, change it here too.
- *
- * Only the default `indigo` accent is carried; the marketing site has no
- * accent switcher, so the [data-accent] palettes are omitted.
- *
- * Theme resolution: light by default, dark when the OS prefers dark, with an
- * explicit [data-theme] on <html> overriding the OS in either direction. The
- * dark block is duplicated across the two selectors on purpose — CSS has no
- * way to share a declaration set between a media query and an attribute
- * selector without a preprocessor.
+ * Theme: light by default, dark when the system prefers it, and an explicit
+ * [data-theme] on <html> (the app's own toggle, the host's, the demo card's)
+ * wins either way. The dark block is written twice on purpose: CSS cannot
+ * share a declaration set between a media query and an attribute selector.
  */
 
 :root {
   color-scheme: light;
 
-  /* Neutral surfaces + text (02-design-system.md §1.1) */
+  /* surfaces and text */
   --bg: #f6f6f8;
   --surface: #ffffff;
+  --surface-header: rgba(255, 255, 255, 0.84);
   --surface-2: #fafafa;
   --surface-3: #f1f1f4;
   --border: #ececef;
@@ -32,9 +23,8 @@
   --fg: #191920;
   --fg-muted: #4a4a54;
   --fg-subtle: #5a5a65;
-  --accent-fg: #ffffff;
 
-  /* Semantic tones */
+  /* tones */
   --pos: #0b7d59;
   --pos-soft: #e6f5ee;
   --warn: #a95800;
@@ -44,35 +34,62 @@
   --info: #1c59e0;
   --info-soft: #e7edfd;
 
-  /* Elevation */
-  --shadow: 0 1px 2px rgba(20, 20, 35, 0.04), 0 1px 3px rgba(20, 20, 35, 0.05);
-  --shadow-md: 0 4px 14px rgba(20, 20, 35, 0.09);
-  --shadow-lg: 0 12px 34px rgba(20, 20, 35, 0.13);
-  --scrim: rgba(10, 10, 15, 0.5);
+  /* the studio's accent (bronze) */
+  --accent: #b25e09;
+  --accent-fg: #ffffff;
+  --accent-soft: rgba(178, 94, 9, 0.1);
 
-  /* Accent — indigo, per-theme pair resolved into --accent (02 §1.2) */
-  --accent-light: #4f46e5;
-  --accent-dark: #99a5ff;
-  --accent: var(--accent-light);
-  --accent-soft: color-mix(in srgb, var(--accent) 10%, transparent);
-  --accent-hover: color-mix(in srgb, var(--accent) 82%, #000);
-  --accent-selection: color-mix(in srgb, var(--accent) 12%, transparent);
-  --accent-border: color-mix(in srgb, var(--accent) 12%, transparent);
-  --accent-glow: 0 2px 8px color-mix(in srgb, var(--accent) 36%, transparent);
+  /* elevation */
+  --shadow: 0 1px 2px rgba(20, 20, 35, 0.04), 0 8px 24px -14px rgba(20, 20, 35, 0.18);
+  --shadow-hover: 0 18px 36px -20px rgba(20, 20, 40, 0.32);
+  --shadow-pop: 0 24px 56px -26px rgba(10, 10, 25, 0.5);
+  --shadow-menu: 0 14px 34px rgba(20, 20, 35, 0.2);
+  --shadow-sheet: 0 40px 90px -30px rgba(10, 10, 25, 0.6);
+  --shadow-toast: 0 12px 34px rgba(10, 10, 20, 0.32);
+  --scrim: rgba(10, 10, 15, 0.55);
 
-  /* Type */
-  --font-sans: "Manrope", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
-    Roboto, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono",
-    Menlo, Consolas, monospace;
+  /* type */
+  --font-sans: "Manrope", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --text-kicker: 10.5px;
+  --text-xs: 11.5px;
+  --text-sm: 12.5px;
+  --text-md: 13.5px;
+  --text-body: 14.5px;
+  --text-title: clamp(21px, 2.6vw, 27px);
+  --text-hero: clamp(23px, 2.9vw, 30px);
+
+  /* radii */
+  --radius-chip: 9px;
+  --radius-btn: 11px;
+  --radius-field: 11px;
+  --radius-card: 15px;
+  --radius-panel: 19px;
+  --radius-sheet: 20px;
+  --radius-pill: 999px;
+
+  /* spacing and layout */
+  --gutter: clamp(14px, 2.4vw, 26px);
+  --page-top: clamp(18px, 2.6vw, 30px);
+  --sidebar-w: 240px;
+  --desk-max: 1180px;
+  --client-max: 760px;
+
+  /* layers: the header, a drop-down, the demo card, the menu, a sheet, the toast */
+  --z-header: 60;
+  --z-drop: 80;
+  --z-card: 400;
+  --z-menu: 460;
+  --z-sheet: 520;
+  --z-toast: 600;
 }
 
-/* Dark palette — shared by the OS preference and the explicit override. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
     --bg: #0a0a0d;
     --surface: #141419;
+    --surface-header: rgba(20, 20, 25, 0.82);
     --surface-2: #1a1a20;
     --surface-3: #24242c;
     --border: rgba(255, 255, 255, 0.07);
@@ -80,7 +97,6 @@
     --fg: #f4f4f6;
     --fg-muted: #b7b7c3;
     --fg-subtle: #a1a1ad;
-    --accent-fg: #0f0f14;
     --pos: #3ecf8e;
     --pos-soft: rgba(62, 207, 142, 0.14);
     --warn: #e0a458;
@@ -89,12 +105,10 @@
     --danger-soft: rgba(255, 107, 107, 0.14);
     --info: #6ea8ff;
     --info-soft: rgba(110, 168, 255, 0.14);
-    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
-    --shadow-md: 0 6px 20px rgba(0, 0, 0, 0.5);
-    --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.6);
-    --accent: var(--accent-dark);
-    --accent-soft: color-mix(in srgb, var(--accent) 12%, transparent);
-    --accent-hover: color-mix(in srgb, var(--accent) 88%, #fff);
+    --accent: #e6a24e;
+    --accent-fg: #0f0f14;
+    --accent-soft: rgba(178, 94, 9, 0.2);
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 32px -16px rgba(0, 0, 0, 0.7);
   }
 }
 
@@ -102,6 +116,7 @@
   color-scheme: dark;
   --bg: #0a0a0d;
   --surface: #141419;
+  --surface-header: rgba(20, 20, 25, 0.82);
   --surface-2: #1a1a20;
   --surface-3: #24242c;
   --border: rgba(255, 255, 255, 0.07);
@@ -109,7 +124,6 @@
   --fg: #f4f4f6;
   --fg-muted: #b7b7c3;
   --fg-subtle: #a1a1ad;
-  --accent-fg: #0f0f14;
   --pos: #3ecf8e;
   --pos-soft: rgba(62, 207, 142, 0.14);
   --warn: #e0a458;
@@ -118,38 +132,8 @@
   --danger-soft: rgba(255, 107, 107, 0.14);
   --info: #6ea8ff;
   --info-soft: rgba(110, 168, 255, 0.14);
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow-md: 0 6px 20px rgba(0, 0, 0, 0.5);
-  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.6);
-  --accent: var(--accent-dark);
-  --accent-soft: color-mix(in srgb, var(--accent) 12%, transparent);
-  --accent-hover: color-mix(in srgb, var(--accent) 88%, #fff);
-}
-
-
-/* ---------------------------------------------------------------------------
- * Accent override — Client Portal (bronze).
- *
- * Everything above is the canonical token set, copied verbatim; the only thing
- * this app changes is the accent pair. Layered here so a future
- * `import '@adminium/tokens'` drops in cleanly.
- * ------------------------------------------------------------------------- */
-
-:root {
-  --accent-light: #b25e09;
-  --accent-dark: #e6a24e;
-  --accent-fg: #ffffff;
-  --accent-soft: color-mix(in srgb, var(--accent) 10%, transparent);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --accent-fg: #0f0f14;
-    --accent-soft: color-mix(in srgb, var(--accent) 20%, transparent);
-  }
-}
-
-:root[data-theme="dark"] {
+  --accent: #e6a24e;
   --accent-fg: #0f0f14;
-  --accent-soft: color-mix(in srgb, var(--accent) 20%, transparent);
+  --accent-soft: rgba(178, 94, 9, 0.2);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 32px -16px rgba(0, 0, 0, 0.7);
 }

@@ -1,9 +1,8 @@
 /**
  * A module-level mirror of whatever locale the provider is currently rendering.
  *
- * `lib/format.ts` is a pure module: the zustand store, `data/demo.ts` and
- * `lib/pipeline.ts` all call its formatters from outside React, where no hook
- * can reach the provider. Rather than duplicate the runtime — a second lookup
+ * The stores and the actions run outside React, where no hook can reach the
+ * provider, and still need the page's words and formats (a toast, a refusal). Rather than duplicate the runtime — a second lookup
  * table and a second set of `Intl` rules — `<App>` pushes the provider's own
  * `locale` / `t` / `money` / `number` in here on every render, so those callers
  * forward to exactly the functions the tree is using.
@@ -15,8 +14,10 @@
 import { DEFAULT_LOCALE, type LocaleTag } from "./locales.ts";
 import { MESSAGES, type MessageKey } from "./messages/index.ts";
 import type { TFunction } from "./index.tsx";
+import { formatMoney } from "../lib/money.ts";
+import type { Decimal } from "../data/types.ts";
 
-type MoneyFn = (value: number, currency?: string) => string;
+type MoneyFn = (value: Decimal | number | null | undefined, currency?: string | null) => string;
 type NumberFn = (value: number, opts?: Intl.NumberFormatOptions) => string;
 
 /**
@@ -37,12 +38,7 @@ const fallbackT: TFunction = (key, params, count) => {
   );
 };
 
-const fallbackMoney: MoneyFn = (value, currency = activeCurrency) =>
-  new Intl.NumberFormat(DEFAULT_LOCALE, {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 0,
-  }).format(value);
+const fallbackMoney: MoneyFn = (value, currency) => formatMoney(value, currency ?? activeCurrency, DEFAULT_LOCALE);
 
 const fallbackNumber: NumberFn = (value, opts) =>
   new Intl.NumberFormat(DEFAULT_LOCALE, opts).format(value);
@@ -56,8 +52,8 @@ const fallbackNumber: NumberFn = (value, opts) =>
  * printed dollars — visible as `$6,338.40` above a `€1,200.00` on the same
  * page, against a database configured for EUR.
  *
- * Held here for the same reason the locale is: `lib/format.ts` is a pure module
- * called from the store and from `demo.ts`, where no hook can reach a provider.
+ * Held here for the same reason the locale is: the stores and actions format
+ * outside React, where no hook can reach a provider.
  *
  * `USD` remains the value before anything sets one — a demo build has no tenant.
  */
@@ -105,7 +101,7 @@ export function timezoneNotice(): { zone: string; source: 'host' | 'fallback' } 
 /**
  * The name the OPERATOR gave this app in Adminium, or null for "use ours".
  *
- * Every build bakes a name into its bundle — the one `chrome.brand` carries —
+ * Every build bakes a name into its bundle — the product's own —
  * and that name belongs to the sample this app shipped as, not to the business
  * running it. An operator can now set their own in Studio; it arrives on the
  * served `surface-config.json` at boot and lands here.
@@ -124,7 +120,7 @@ export function setAppName(name: string | null | undefined): void {
   activeAppName = typeof name === "string" && name.trim() !== "" ? name.trim() : null;
 }
 
-/** The operator's name for this app, or null to fall back to `chrome.brand`. */
+/** The operator's name for this app, or null to keep the product's own. */
 export const appName = (): string | null => activeAppName;
 
 let activeLocale: LocaleTag = DEFAULT_LOCALE;
@@ -145,7 +141,7 @@ export function setAmbient(
   activeNumber = number;
 }
 
-/** The tag every `Intl.*` instance in `lib/format.ts` is built against. */
+/** The tag every `Intl.*` formatter outside React is built against. */
 export const locale = (): LocaleTag => activeLocale;
 
 export const t: TFunction = (key, params, count) => activeT(key, params, count);

@@ -1,0 +1,11 @@
+/**
+ * A deliverable's review, the client's side — to be drawn.
+ *
+ * A placeholder: it names the page and nothing more. The clients' lane
+ * replaces this file whole (same name, a default export, no props).
+ */
+import { Placeholder } from "../../components/Placeholder.tsx";
+
+export default function Review() {
+  return <Placeholder titleKey="screen.clientReview" view="client-review" />;
+}

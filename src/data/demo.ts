@@ -1,242 +1,163 @@
 /**
- * Seeded demo data — Outline, a fictional two-person brand-design studio.
+ * The demo's sample studio — DEMO BUILD ONLY (`main.tsx` imports it behind
+ * `DEMO`, so no other build carries a byte of it).
  *
- * Six clients, three proposals, four projects, seven invoices. The invoices
- * are arranged so the aging strip has real shape on load: two overdue at
- * clearly different ages (about 12 days and about 47 days, which lands them in
- * two different buckets), one partially paid, one still a draft.
+ * A small studio in the tables' own shapes, on the demo's pinned day (Tuesday
+ * 28 July 2026): enough rows for every screen to draw something real. The
+ * figures a server decides — numbers, line amounts, totals, paid, balance —
+ * are left for the demo's stand-in world to settle when it loads
+ * (`demo/world.ts`), exactly as Adminium settles a sample bundle.
  *
- * Money is INTEGER CENTS. Dates are DAY SERIALS (whole days since the epoch,
- * UTC). Translatable prose is stored as an i18n KEY; brand names, contact
- * names, e-mail addresses and fictional filenames stay literal.
- *
- * No property, real-estate or lettings businesses appear here — that is a
- * standing constraint on this fiction, not an accident of the client list.
+ * Addresses are on reserved `.example` domains so nothing here can be mailed.
  */
+import type { TableRef, Tables } from "./types.ts";
 
-import type {
-  ActivityEntry,
-  Client,
-  Invoice,
-  Project,
-  Proposal,
-} from "./types.ts";
+type Seed = { [R in TableRef]?: Partial<Tables[R]>[] };
 
-export function ser(y: number, m: number, d: number): number {
-  return Math.round(Date.UTC(y, m - 1, d) / 86_400_000);
-}
+/** The person signed in to the demo's desk. */
+export const DEMO_STAFF = { name: "Nadia Cole", email: "nadia@outline.example", roleName: "Studio manager" };
 
-export function fromSer(s: number): { y: number; m: number; d: number; dow: number } {
-  const dt = new Date(s * 86_400_000);
-  return {
-    y: dt.getUTCFullYear(),
-    m: dt.getUTCMonth() + 1,
-    d: dt.getUTCDate(),
-    dow: dt.getUTCDay(),
-  };
-}
+/** The client the demo's clients' side is signed in as. */
+export const DEMO_CLIENT_ID = 1;
 
-export function serDate(s: number): Date {
-  return new Date(s * 86_400_000);
-}
-
-/** The pinned clock: Tuesday, 28 July 2026. Nothing reads `Date.now()`. */
-export const TODAY = ser(2026, 7, 28);
-
-/** The studio's standing tax rate, as a whole percentage. */
-export const TAX_RATE = 8;
-
-export const CLIENTS: Client[] = [
-  { id: "driftfern", company: "Drift & Fern", kind: "data.kind.florist", contact: "Amara Osei", email: "amara@driftandfern.example", tint: "#4e8a5f", icon: "flower-2", since: ser(2024, 3, 12) },
-  { id: "cindersage", company: "Cinder & Sage", kind: "data.kind.cafe", contact: "Jonah Marsh", email: "jonah@cinderandsage.example", tint: "#a3583a", icon: "coffee", since: ser(2024, 11, 2) },
-  { id: "loworbit", company: "Low Orbit", kind: "data.kind.podcast", contact: "Tessa Nakamura", email: "tessa@loworbit.example", tint: "#6d5fc4", icon: "mic", since: ser(2025, 2, 18) },
-  { id: "ovenbird", company: "Ovenbird Bakehouse", kind: "data.kind.bakery", contact: "Elio Ferrante", email: "elio@ovenbird.example", tint: "#b0813f", icon: "croissant", since: ser(2025, 9, 29) },
-  { id: "paperlantern", company: "Paper Lantern", kind: "data.kind.stationery", contact: "Mei Tan", email: "mei@paperlantern.example", tint: "#4a7ab5", icon: "notebook-pen", since: ser(2026, 1, 8) },
-  { id: "nightshift", company: "Night Shift Records", kind: "data.kind.label", contact: "Rowan Petit", email: "rowan@nightshiftrecords.example", tint: "#7d7f9c", icon: "disc-3", since: ser(2026, 4, 21) },
-];
-
-/** Proposal numbers run PRO-114x; seeds end at PRO-1146, so the next is PRO-1147. */
-export const SEED_PROPOSALS: Proposal[] = [
-  {
-    num: "PRO-1142", client: "driftfern", title: "data.doc.pro1142", status: "accepted",
-    validUntil: ser(2026, 6, 26), taxRate: TAX_RATE, createdAt: ser(2026, 5, 28),
-    sentAt: ser(2026, 5, 29), decidedAt: ser(2026, 6, 12), project: "pj-drift", declineNote: "",
-    scope: ["data.scope.pro1142a", "data.scope.pro1142b"],
-    items: [
-      { desc: "data.item.research", qty: 1, rate: 180_000, disc: 0 },
-      { desc: "data.item.guidelines", qty: 1, rate: 96_000, disc: 0 },
-      { desc: "data.item.stationery", qty: 1, rate: 34_000, disc: 10 },
-    ],
-  },
-  {
-    num: "PRO-1145", client: "ovenbird", title: "data.doc.pro1145", status: "sent",
-    validUntil: ser(2026, 8, 15), taxRate: TAX_RATE, createdAt: ser(2026, 7, 16),
-    sentAt: ser(2026, 7, 18), decidedAt: null, project: null, declineNote: "",
-    scope: ["data.scope.pro1145a", "data.scope.pro1145b", "data.scope.pro1145c"],
-    items: [
-      { desc: "data.item.packConcepts", qty: 1, rate: 220_000, disc: 0 },
-      { desc: "data.item.labels", qty: 1, rate: 130_000, disc: 0 },
-      { desc: "data.item.pressCheck", qty: 1, rate: 45_000, disc: 0 },
-    ],
-  },
-  {
-    num: "PRO-1146", client: "nightshift", title: "data.doc.pro1146", status: "draft",
-    validUntil: ser(2026, 9, 4), taxRate: TAX_RATE, createdAt: ser(2026, 7, 24),
-    sentAt: null, decidedAt: null, project: null, declineNote: "",
-    scope: ["data.scope.pro1146a"],
-    items: [
-      { desc: "data.item.sleeves", qty: 3, rate: 52_000, disc: 0 },
-      { desc: "data.item.loops", qty: 3, rate: 18_000, disc: 0 },
-    ],
-  },
-];
-
-export const SEED_PROJECTS: Project[] = [
-  {
-    id: "pj-drift", client: "driftfern", proposal: "PRO-1142",
-    name: "data.doc.pro1142", status: "active", due: ser(2026, 8, 21),
-    milestones: [
-      { title: "data.ms.kickoffResearch", due: ser(2026, 6, 18), done: true },
-      { title: "data.ms.moodboards", due: ser(2026, 6, 26), done: true },
-      { title: "data.ms.logoConcepts", due: ser(2026, 7, 10), done: true },
-      { title: "data.ms.guidelines", due: ser(2026, 8, 7), done: false },
-      { title: "data.ms.launchKit", due: ser(2026, 8, 21), done: false },
-    ],
-    deliverables: [
-      { id: "d-logo3", file: "logo_v3.pdf", title: "data.del.logo3", ms: 2, icon: "pen-tool", status: "pending", note: "" },
-      { id: "d-mood", file: "moodboard_a.pdf", title: "data.del.moodA", ms: 1, icon: "images", status: "approved", note: "" },
-      { id: "d-word", file: "wordmark_dark.svg", title: "data.del.wordmark", ms: 2, icon: "type", status: "changes", note: "data.note.wordmark" },
-    ],
-  },
-  {
-    id: "pj-cinder", client: "cindersage", proposal: null,
-    name: "data.doc.cinder", status: "active", due: ser(2026, 8, 12),
-    milestones: [
-      { title: "data.ms.kickoff", due: ser(2026, 7, 2), done: true },
-      { title: "data.ms.menuSystem", due: ser(2026, 7, 22), done: true },
-      { title: "data.ms.signage", due: ser(2026, 8, 5), done: false },
-      { title: "data.ms.printHandoff", due: ser(2026, 8, 12), done: false },
-    ],
-    deliverables: [
-      { id: "d-menu2", file: "menu_draft2.pdf", title: "data.del.menu2", ms: 1, icon: "book-open", status: "pending", note: "" },
-      { id: "d-sign", file: "window_sign.pdf", title: "data.del.windowSign", ms: 2, icon: "store", status: "approved", note: "" },
-    ],
-  },
-  {
-    id: "pj-lantern", client: "paperlantern", proposal: null,
-    name: "data.doc.lantern", status: "paused", due: ser(2026, 9, 18),
-    milestones: [
-      { title: "data.ms.kickoff", due: ser(2026, 6, 30), done: true },
-      { title: "data.ms.shopArt", due: ser(2026, 8, 28), done: false },
-      { title: "data.ms.rollout", due: ser(2026, 9, 18), done: false },
-    ],
-    deliverables: [
-      { id: "d-shelf", file: "shelf_story.pdf", title: "data.del.shelf", ms: 0, icon: "layout-grid", status: "approved", note: "" },
-    ],
-  },
-  {
-    id: "pj-orbit", client: "loworbit", proposal: null,
-    name: "data.doc.orbit", status: "done", due: ser(2026, 7, 10),
-    milestones: [
-      { title: "data.ms.kickoff", due: ser(2026, 5, 22), done: true },
-      { title: "data.ms.coverConcepts", due: ser(2026, 6, 12), done: true },
-      { title: "data.ms.episodeTemplates", due: ser(2026, 7, 3), done: true },
-      { title: "data.ms.finalHandoff", due: ser(2026, 7, 10), done: true },
-    ],
-    deliverables: [
-      { id: "d-cover4", file: "cover_s4.png", title: "data.del.cover4", ms: 1, icon: "disc-3", status: "approved", note: "" },
-      { id: "d-tmpl", file: "episode_templates.pdf", title: "data.del.templates", ms: 2, icon: "layout-template", status: "approved", note: "" },
-    ],
-  },
-];
-
-/**
- * Invoice numbers run INV-20xx; seeds end at INV-2041, so the next is INV-2042.
- *
- * Stored status is only draft|sent|paid — overdue is DERIVED. Against the
- * pinned 28 July: INV-2038 is 12 days late (bucket 1–30) and INV-2037 is 47
- * days late (bucket 31–60), so two aging buckets are populated on load.
- * INV-2039 is partially paid.
- */
-export const SEED_INVOICES: Invoice[] = [
-  {
-    num: "INV-2035", client: "driftfern", project: "pj-drift",
-    title: "data.doc.inv2035", status: "paid",
-    issued: ser(2026, 6, 16), due: ser(2026, 6, 30), taxRate: TAX_RATE,
-    items: [{ desc: "data.item.deposit50", qty: 1, rate: 153_300, disc: 0 }],
-    payments: [{ amt: 165_564, method: "card", at: ser(2026, 6, 24) }],
-  },
-  {
-    num: "INV-2036", client: "cindersage", project: "pj-cinder",
-    title: "data.doc.inv2036", status: "paid",
-    issued: ser(2026, 6, 20), due: ser(2026, 7, 4), taxRate: TAX_RATE,
-    items: [{ desc: "data.item.depositMenu", qty: 1, rate: 90_750, disc: 0 }],
-    payments: [{ amt: 98_010, method: "transfer", at: ser(2026, 7, 2) }],
-  },
-  {
-    num: "INV-2037", client: "nightshift", project: null,
-    title: "data.doc.inv2037", status: "sent",
-    issued: ser(2026, 5, 29), due: ser(2026, 6, 11), taxRate: TAX_RATE,
-    items: [
-      { desc: "data.item.sleeveRush", qty: 1, rate: 68_000, disc: 0 },
-      { desc: "data.item.printFiles", qty: 1, rate: 22_000, disc: 0 },
-    ],
-    payments: [],
-  },
-  {
-    num: "INV-2038", client: "paperlantern", project: "pj-lantern",
-    title: "data.doc.inv2038", status: "sent",
-    issued: ser(2026, 7, 1), due: ser(2026, 7, 16), taxRate: TAX_RATE,
-    items: [
-      { desc: "data.item.artDirectionHours", qty: 18, rate: 9_500, disc: 0 },
-      { desc: "data.item.referenceBoards", qty: 1, rate: 24_000, disc: 0 },
-    ],
-    payments: [],
-  },
-  {
-    num: "INV-2039", client: "loworbit", project: "pj-orbit",
-    title: "data.doc.inv2039", status: "sent",
-    issued: ser(2026, 7, 20), due: ser(2026, 8, 3), taxRate: TAX_RATE,
-    items: [
-      { desc: "data.item.coverSystem", qty: 1, rate: 210_000, disc: 0 },
-      { desc: "data.item.templatePack", qty: 1, rate: 80_000, disc: 0 },
-    ],
-    payments: [{ amt: 120_000, method: "transfer", at: ser(2026, 7, 24) }],
-  },
-  {
-    num: "INV-2040", client: "cindersage", project: "pj-cinder",
-    title: "data.doc.inv2040", status: "sent",
-    issued: ser(2026, 7, 24), due: ser(2026, 8, 7), taxRate: TAX_RATE,
-    items: [
-      { desc: "data.item.menuMilestone", qty: 1, rate: 84_000, disc: 0 },
-      { desc: "data.item.windowArtwork", qty: 2, rate: 19_500, disc: 0 },
-    ],
-    payments: [],
-  },
-  {
-    num: "INV-2041", client: "driftfern", project: "pj-drift",
-    title: "data.doc.inv2041", status: "draft",
-    issued: ser(2026, 7, 27), due: ser(2026, 8, 10), taxRate: TAX_RATE,
-    items: [
-      { desc: "data.item.guidelinesMilestone", qty: 1, rate: 96_000, disc: 0 },
-      { desc: "data.item.stationery", qty: 1, rate: 34_000, disc: 10 },
-    ],
-    payments: [],
-  },
-];
-
-export const SEED_ACTIVITY: ActivityEntry[] = [
-  { id: "ac1", icon: "banknote", tone: "pos", text: "data.act.payment", params: { amount: "$1,200.00", doc: "INV-2039" }, at: ser(2026, 7, 24) },
-  { id: "ac2", icon: "send", tone: "info", text: "data.act.invoiceSent", params: { doc: "INV-2040", who: "Cinder & Sage" }, at: ser(2026, 7, 24) },
-  { id: "ac3", icon: "circle-check-big", tone: "pos", text: "data.act.approved", params: { doc: "moodboard_a.pdf", who: "Drift & Fern" }, at: ser(2026, 7, 22) },
-  { id: "ac4", icon: "message-square", tone: "warn", text: "data.act.changes", params: { doc: "wordmark_dark.svg" }, at: ser(2026, 7, 21) },
-  { id: "ac5", icon: "send", tone: "info", text: "data.act.proposalSent", params: { doc: "PRO-1145", who: "Ovenbird Bakehouse" }, at: ser(2026, 7, 18) },
-  { id: "ac6", icon: "sparkles", tone: "accent", text: "data.act.accepted", params: { doc: "PRO-1142" }, at: ser(2026, 6, 12) },
-];
-
-/** Demo hint chips on the portal entry screen — real credentials for the demo. */
-export const PORTAL_HINTS = [
-  { email: "amara@driftandfern.example", num: "PRO-1142" },
-  { email: "tessa@loworbit.example", num: "INV-2039" },
-  { email: "elio@ovenbird.example", num: "PRO-1145" },
-] as const;
+export const DEMO_ROWS: Seed = {
+  settings: [
+    {
+      id: 1,
+      singleton: "studio",
+      name: "Outline",
+      mark: null,
+      reply_to: "hello@outline.example",
+      phone: "+1 555 0142",
+      website: "https://outline.example",
+      sign_off: "Nadia and Tomas",
+      hours_per_day: 6,
+      days_per_week: 4,
+    },
+  ],
+  people: [
+    { id: 1, name: "Nadia Cole", role_label: "Partner · type & identity", initials: "NC", email: "nadia@outline.example", shown_to_clients: true, position: 0 },
+    { id: 2, name: "Tomas Reyes", role_label: "Partner · packaging & print", initials: "TR", email: "tomas@outline.example", shown_to_clients: true, position: 1 },
+  ],
+  rates: [
+    { id: 1, label: "Design day", amount: "780.00", hours_per_unit: "6", position: 0, active: true },
+    { id: 2, label: "Print check", amount: "240.00", hours_per_unit: "2", position: 1, active: true },
+    { id: 3, label: "Type licence handling", amount: "90.00", hours_per_unit: null, position: 2, active: true },
+  ],
+  terms_versions: [
+    { id: 1, version: 1, status: "retired", in_force_from: "2025-02-01", note: "First written terms" },
+    { id: 2, version: 2, status: "retired", in_force_from: "2025-09-01", note: "Kill fee made clearer" },
+    { id: 3, version: 3, status: "in_force", in_force_from: "2026-03-01", note: "Pause after 45 days unpaid" },
+  ],
+  terms_clauses: [
+    { id: 1, version_id: 3, position: 0, title: "What we make", body: "The work in the proposal, in the rounds it names.", change: "same" },
+    { id: 2, version_id: 3, position: 1, title: "Paying in stages", body: "Each stage is invoiced when it starts; invoices are due in fourteen days.", change: "same" },
+    { id: 3, version_id: 3, position: 2, title: "Your files", body: "Final files are yours once the last invoice is paid.", change: "same" },
+    { id: 4, version_id: 3, position: 3, title: "When payment is late", body: "After 45 days unpaid, work pauses until the balance is settled.", change: "changed", change_note: "Pause after 45 days, not 60" },
+  ],
+  brief_questions: [
+    { id: 1, key: "audience", question: "Who is this for?", hint: "The people you most want to reach.", kind: "area", position: 0, active: true },
+    { id: 2, key: "feel", question: "How should it feel?", hint: "Three words is plenty.", kind: "text", position: 1, active: true },
+    { id: 3, key: "avoid", question: "Anything to avoid?", hint: null, kind: "area", position: 2, active: true },
+    { id: 4, key: "admire", question: "Work you admire", hint: "Links are fine.", kind: "area", position: 3, active: true },
+    { id: 5, key: "deadline", question: "Any fixed dates?", hint: "Launches, print runs, openings.", kind: "text", position: 4, active: true },
+    { id: 6, key: "decide", question: "Who signs things off?", hint: null, kind: "text", position: 5, active: true },
+  ],
+  clients: [
+    { id: 1, company: "Hearth & Co Bakery", trade: "Bakery", contact_name: "Amara Osei", email: "amara@hearth.example", phone: "+1 555 0181", address: "14 Mill Lane", terms: "net14", tax_rate: null, language: "en-US", tint: "#b25e09", created_at: "2026-02-03T15:00:00.000Z" },
+    { id: 2, company: "Fold & Rule Stationers", trade: "Stationery", contact_name: "Cleo Marchetti", email: "cleo@foldandrule.example", phone: null, address: null, terms: "net30", tax_rate: null, language: "en-US", tint: "#4f46e5", created_at: "2026-01-12T15:00:00.000Z" },
+    { id: 3, company: "Marigold Tea Rooms", trade: "Tea room", contact_name: "Priya Nair", email: "priya@marigold.example", phone: "+1 555 0107", address: null, terms: null, tax_rate: null, language: "en-US", tint: "#0d9488", created_at: "2025-11-20T15:00:00.000Z" },
+    { id: 4, company: "Kiln Street Ceramics", trade: "Ceramics", contact_name: "Jonas Berg", email: "jonas@kilnstreet.example", phone: null, address: null, terms: "net14", tax_rate: null, language: "en-US", tint: "#7c3aed", created_at: "2025-09-08T15:00:00.000Z" },
+  ],
+  client_notes: [{ id: 1, client_id: 1, body: "Prefers a call before anything big is sent.", by: "Nadia Cole", at: "2026-06-30T14:00:00.000Z" }],
+  enquiries: [
+    { id: 1, number: "ENQ-001", business: "Northwind Cycles", name: "Sam Hale", email: "sam@northwind.example", trade: "Bike shop", budget: "5–8k", start_when: "September", source: "Website", fit: "good", body: "A new mark and shop signage before the autumn season.", status: "new", received_at: "2026-07-27T13:10:00.000Z" },
+    { id: 2, number: "ENQ-002", business: "Lantern Books", name: "Ines Duarte", email: "ines@lantern.example", trade: "Bookshop", budget: "3k", start_when: "Soon", source: "Referral", fit: "maybe", body: "Shelf talkers and a tote bag for the anniversary.", status: "new", received_at: "2026-07-26T09:40:00.000Z" },
+    { id: 3, number: "ENQ-003", business: null, name: "Ray Moss", email: "ray@mosspress.example", trade: null, budget: null, start_when: null, source: "Call", fit: null, body: "Rang about a wine label; call back after the harvest.", status: "parked", parked_until: "2026-08-20", received_at: "2026-07-21T16:00:00.000Z" },
+    { id: 4, number: "ENQ-004", business: "Bright Offers Ltd", name: "Promo Team", email: "team@brightoffers.example", trade: null, budget: null, start_when: null, source: "Website", fit: "no", body: "We can get your site to the top of every search.", status: "new", received_at: "2026-07-28T07:00:00.000Z" },
+  ],
+  proposals: [
+    { id: 1, number: "PRO-1140", status: "declined", client_id: 3, title: "Menu and window lettering", scope: "A new menu system and window lettering.", split: "5050", valid_until: "2026-06-20", terms_version_id: 3, currency: "USD", tax_name: "Tax", tax_rate: "8.5", sent_at: "2026-06-01T14:00:00.000Z", decided_at: "2026-06-12T10:00:00.000Z", decline_note: "We're holding off until spring." },
+    { id: 2, number: "PRO-1141", status: "accepted", client_id: 2, title: "Packaging system", scope: "A packaging system for the notebook range: three sizes, one family.", split: "403030", valid_until: "2026-06-30", terms_version_id: 3, currency: "USD", tax_name: "Tax", tax_rate: "8.5", sent_at: "2026-06-02T14:00:00.000Z", decided_at: "2026-06-09T16:00:00.000Z", signed_name: "Cleo Marchetti", signed_email: "cleo@foldandrule.example", signed_at: "2026-06-09T16:00:00.000Z", accepted_how: "portal" },
+    { id: 3, number: "PRO-1142", status: "sent", client_id: 1, title: "Shopfront identity", scope: "A mark, a shopfront sign and the first run of bags and boxes.", split: "5050", valid_until: "2026-08-12", terms_version_id: 3, currency: "USD", tax_name: "Tax", tax_rate: "8.5", sent_at: "2026-07-22T14:00:00.000Z" },
+    { id: 4, number: null, status: "draft", client_id: 4, title: "Studio sale poster", scope: null, split: "end", valid_until: "2026-08-18", terms_version_id: 3, currency: "USD", tax_name: "Tax", tax_rate: "8.5" },
+  ],
+  proposal_lines: [
+    { id: 1, document_id: 1, position: 0, description: "Menu system", qty: "1", rate: "2200.00", discount_kind: "amount", discount: null },
+    { id: 2, document_id: 2, position: 0, description: "Packaging family, three sizes", qty: "1", rate: "5400.00", discount_kind: "amount", discount: null },
+    { id: 3, document_id: 2, position: 1, description: "Print checks", qty: "3", rate: "240.00", discount_kind: "amount", discount: null },
+    { id: 4, document_id: 3, position: 0, description: "Mark and wordmark", qty: "1", rate: "2600.00", discount_kind: "amount", discount: null },
+    { id: 5, document_id: 3, position: 1, description: "Shopfront sign artwork", qty: "1", rate: "900.00", discount_kind: "amount", discount: "100.00" },
+    { id: 6, document_id: 3, position: 2, description: "Bags and boxes, first run", qty: "2", rate: "250.00", discount_kind: "amount", discount: null },
+    { id: 7, document_id: 4, position: 0, description: "Poster design", qty: "1", rate: "650.00", discount_kind: "amount", discount: null },
+  ],
+  projects: [
+    { id: 1, number: "PRJ-01", client_id: 2, proposal_id: 2, name: "Packaging system", status: "active", started_on: "2026-06-10", share_token: "FOLDRULE2026ABCD", share_stopped: false, handover_sent: false },
+    { id: 2, number: "PRJ-02", client_id: 1, proposal_id: null, name: "Seasonal window", status: "active", started_on: "2026-07-01", share_token: "HEARTHWINDOW2026", share_stopped: false, handover_sent: false },
+    { id: 3, number: "PRJ-03", client_id: 3, proposal_id: null, name: "Loyalty cards", status: "paused", pause_note: "Paused under clause 4 — INV-2039 is 47 days unpaid.", started_on: "2026-04-14", share_token: "MARIGOLDCARDS26X", share_stopped: false, handover_sent: false },
+    { id: 4, number: "PRJ-04", client_id: 4, proposal_id: null, name: "Studio identity", status: "done", started_on: "2026-01-05", done_on: "2026-05-29", share_token: "KILNSTREETDONE26", share_expires_on: null, share_stopped: false, handover_notes: "Print the mark at 20 mm or larger.", handover_sent: true, handover_sent_at: "2026-05-29T15:00:00.000Z" },
+  ],
+  milestones: [
+    { id: 1, project_id: 1, title: "Structure and dielines", due_on: "2026-06-26", state: "done", done_at: "2026-06-25T15:00:00.000Z", position: 0 },
+    { id: 2, project_id: 1, title: "Artwork", due_on: "2026-07-31", state: "now", position: 1 },
+    { id: 3, project_id: 1, title: "Print and hand over", due_on: "2026-08-21", state: "next", position: 2 },
+    { id: 4, project_id: 2, title: "Window sketches", due_on: "2026-07-30", state: "now", position: 0 },
+    { id: 5, project_id: 2, title: "Install", due_on: "2026-08-07", state: "next", position: 1 },
+    { id: 6, project_id: 3, title: "Card design", due_on: "2026-06-10", state: "done", done_at: "2026-06-09T12:00:00.000Z", position: 0 },
+    { id: 7, project_id: 4, title: "Mark", due_on: "2026-03-01", state: "done", done_at: "2026-02-27T12:00:00.000Z", position: 0 },
+  ],
+  deliverables: [
+    { id: 1, project_id: 1, milestone_id: 2, title: "Notebook box, large", icon: "package", status: "pending", shared_at: "2026-07-24T13:00:00.000Z", position: 0 },
+    { id: 2, project_id: 1, milestone_id: 1, title: "Dielines", icon: "ruler", status: "approved", shared_at: "2026-06-22T13:00:00.000Z", reviewed_at: "2026-06-24T09:00:00.000Z", approved_how: "portal", approved_on: "2026-06-24", approved_by: "Cleo Marchetti", position: 1 },
+    { id: 3, project_id: 2, milestone_id: 4, title: "Window sketch A", icon: "pen-tool", status: "changes", shared_at: "2026-07-20T13:00:00.000Z", reviewed_at: "2026-07-23T11:00:00.000Z", review_note: "Could the loaf be bigger?", position: 0 },
+    { id: 4, project_id: 2, milestone_id: 4, title: "Window sketch B", icon: "pen-tool", status: "unshared", position: 1 },
+    { id: 5, project_id: 4, milestone_id: 7, title: "Final mark files", icon: "shapes", status: "approved", shared_at: "2026-02-25T13:00:00.000Z", reviewed_at: "2026-02-27T09:00:00.000Z", approved_how: "email", approved_on: "2026-02-27", approved_by: "Nadia Cole", position: 0 },
+  ],
+  deliverable_versions: [
+    { id: 1, deliverable_id: 1, v: 1, file: null, link: "https://files.outline.example/box-large-v1.pdf", note: "First pass on the large box.", posted_by: "Tomas Reyes", posted_at: "2026-07-24T13:00:00.000Z" },
+    { id: 2, deliverable_id: 2, v: 1, file: null, link: "https://files.outline.example/dielines-v1.pdf", note: null, posted_by: "Tomas Reyes", posted_at: "2026-06-22T13:00:00.000Z" },
+    { id: 3, deliverable_id: 3, v: 1, file: null, link: "https://files.outline.example/window-a-v1.pdf", note: "Autumn palette.", posted_by: "Nadia Cole", posted_at: "2026-07-20T13:00:00.000Z" },
+    { id: 4, deliverable_id: 5, v: 1, file: null, link: "https://files.outline.example/kiln-mark.zip", note: null, posted_by: "Nadia Cole", posted_at: "2026-02-25T13:00:00.000Z" },
+  ],
+  deliverable_notes: [
+    { id: 1, deliverable_id: 3, version_id: 3, side: "client", author: "Amara Osei", body: "Could the loaf be bigger?", pin_x: "0.42", pin_y: "0.58", at: "2026-07-23T11:00:00.000Z" },
+    { id: 2, deliverable_id: 3, version_id: 3, side: "studio", author: "Nadia Cole", body: "Yes — new version by Thursday.", pin_x: null, pin_y: null, at: "2026-07-23T15:30:00.000Z" },
+  ],
+  briefs: [
+    { id: 1, project_id: 1, status: "sent", sent_at: "2026-06-12T10:00:00.000Z" },
+    { id: 2, project_id: 2, status: "open" },
+  ],
+  brief_answers: [
+    { id: 1, brief_id: 1, question_key: "audience", answer: "People who still write by hand.", first_answer: "People who still write by hand." },
+    { id: 2, brief_id: 1, question_key: "feel", answer: "Quiet, precise, warm.", first_answer: "Quiet, precise, warm." },
+    { id: 3, brief_id: 2, question_key: "audience", answer: "Neighbours on their way to work.", first_answer: "Neighbours on their way to work." },
+  ],
+  invoices: [
+    { id: 1, number: "INV-2035", status: "void", client_id: 3, title: "Menu deposit", issued_on: "2026-05-02", due_on: "2026-05-16", terms: "net14", currency: "USD", tax_name: "Tax", tax_rate: "8.5", void_reason: "Raised in error", voided_at: "2026-05-03T10:00:00.000Z", sent_at: "2026-05-02T10:00:00.000Z" },
+    { id: 2, number: "INV-2036", status: "sent", client_id: 2, project_id: 1, proposal_id: 2, from_quote_id: 2, share_pct: "40", stage: "Deposit", title: "Packaging system — deposit", issued_on: "2026-06-10", due_on: "2026-07-10", terms: "net30", currency: "USD", tax_name: "Tax", tax_rate: "8.5", sent_at: "2026-06-10T10:00:00.000Z" },
+    { id: 3, number: "INV-2037", status: "sent", client_id: 2, project_id: 1, proposal_id: 2, from_quote_id: 2, share_pct: "30", stage: "Artwork", title: "Packaging system — artwork", issued_on: "2026-07-14", due_on: "2026-08-13", terms: "net30", currency: "USD", tax_name: "Tax", tax_rate: "8.5", sent_at: "2026-07-14T10:00:00.000Z", client_paid: true, client_paid_on: "2026-07-27", client_paid_amount: "500.00", client_paid_note: "Sent half by bank transfer.", client_paid_at: "2026-07-27T18:00:00.000Z" },
+    { id: 4, number: "INV-2038", status: "sent", client_id: 1, project_id: 2, title: "Seasonal window", issued_on: "2026-07-02", due_on: "2026-07-16", terms: "net14", currency: "USD", tax_name: "Tax", tax_rate: "8.5", sent_at: "2026-07-02T10:00:00.000Z" },
+    { id: 5, number: "INV-2039", status: "sent", client_id: 3, project_id: 3, title: "Loyalty cards", issued_on: "2026-05-28", due_on: "2026-06-11", terms: "net14", currency: "USD", tax_name: "Tax", tax_rate: "8.5", sent_at: "2026-05-28T10:00:00.000Z" },
+    { id: 6, number: "INV-2040", status: "sent", client_id: 1, title: "Shopfront survey & measure-up", issued_on: "2026-07-20", due_on: "2026-08-03", terms: "net14", currency: "USD", tax_name: "Tax", tax_rate: "8.5", sent_at: "2026-07-20T10:00:00.000Z" },
+    { id: 7, number: "INV-2041", status: "draft", client_id: 4, title: "Mark files, extra formats", terms: "net14", currency: "USD", tax_name: "Tax", tax_rate: "8.5" },
+  ],
+  invoice_lines: [
+    { id: 1, document_id: 1, position: 0, description: "Menu deposit", qty: "1", rate: "1100.00", discount_kind: "amount" },
+    { id: 2, document_id: 2, position: 0, description: "Deposit, 40 %", quote_id: 2, share_pct: "40", discount_kind: "amount" },
+    { id: 3, document_id: 3, position: 0, description: "Artwork stage, 30 %", quote_id: 2, share_pct: "30", discount_kind: "amount" },
+    { id: 4, document_id: 4, position: 0, description: "Window design and install", qty: "1", rate: "1400.00", discount_kind: "amount" },
+    { id: 5, document_id: 5, position: 0, description: "Loyalty card design", qty: "1", rate: "960.00", discount_kind: "amount" },
+    { id: 6, document_id: 6, position: 0, description: "Survey and measure-up", qty: "1", rate: "450.00", discount_kind: "amount" },
+    { id: 7, document_id: 7, position: 0, description: "Extra file formats", qty: "2", rate: "90.00", discount_kind: "amount" },
+  ],
+  payments: [
+    { id: 1, document_id: 2, number: "REC-0017", amount: "2881.85", method: "bank-transfer", paid_on: "2026-06-24", recorded_by: "Nadia Cole", recorded_at: "2026-06-24T10:00:00.000Z", voided: false },
+    { id: 2, document_id: 5, number: "REC-0016", amount: "300.00", method: "card", paid_on: "2026-06-20", recorded_by: "Tomas Reyes", recorded_at: "2026-06-20T10:00:00.000Z", voided: false },
+  ],
+  messages: [
+    { id: 1, kind: "invoice-rung-1", status: "sent", to: "amara@hearth.example", client_id: 1, invoice_id: 4, due: "2026-07-17T13:00:00.000Z", sent_at: "2026-07-17T13:00:00.000Z" },
+    { id: 2, kind: "invoice-rung-2", status: "held", to: "amara@hearth.example", client_id: 1, invoice_id: 4, due: "2026-07-27T13:00:00.000Z" },
+    { id: 3, kind: "invoice-rung-3", status: "held", to: "amara@hearth.example", client_id: 1, invoice_id: 4, due: "2026-08-10T13:00:00.000Z" },
+    { id: 4, kind: "invoice-rung-3", status: "held", to: "priya@marigold.example", client_id: 3, invoice_id: 5, due: "2026-07-26T13:00:00.000Z" },
+  ],
+};
