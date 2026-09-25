@@ -118,7 +118,7 @@ describe("the composer", () => {
     expect(sent.status).toBe("sent");
     expect(sent.sent_at).not.toBeNull();
     const empty = await act.sendProposal({ ...fromEnquiry(), enquiryId: null, client: { id: 1 }, lines: [] }, { replacedReason: "Replaced" });
-    expect(empty).toMatchObject({ ok: false, reason: "empty", code: "DOCUMENT_EMPTY" });
+    expect(empty).toMatchObject({ ok: false, reason: "empty", code: "STATE_MOVE_REFUSED", details: { requires: "proposal_lines" } });
   });
 
   it("makes a revision (the draft, then its copied lines); sending it withdraws the one it revises", async () => {
@@ -182,12 +182,15 @@ describe("starting the work", () => {
     const { project, invoice } = ok(await act.startProject(3, start));
     expect(trail()).toEqual(["insert projects", "insert milestones", "insert milestones", "insert invoices", "insert invoice_lines"]);
     expect(studio.writes[0]!.values).toMatchObject({ client_id: 1, proposal_id: 3, name: "Shopfront identity" });
-    expect(studio.writes[3]!.values).toMatchObject({ project_id: project.id, from_quote_id: 3, share_pct: "50", stage: "Deposit" });
-    // The line names the proposal; the rate and amount are the server's, from the proposal's stored total.
+    // The stage is taxed once, on the invoice, at the proposal's rate.
+    expect(studio.writes[3]!.values).toMatchObject({ project_id: project.id, from_quote_id: 3, share_pct: "50", stage: "Deposit", tax_rate: row("proposals", 3)["tax_rate"] });
+    // The line names the proposal; the rate and amount are the server's, from the proposal's stored subtotal (taxed once, on the invoice).
     expect(studio.writes[4]!.values).toMatchObject({ document_id: invoice.id, quote_id: 3 });
     expect(studio.writes[4]!.values).not.toHaveProperty("rate");
     expect(invoice.status).toBe("draft");
-    expect(Number(invoice.subtotal)).toBeCloseTo(Number(row("proposals", 3)["total"]) / 2, 2);
+    // A stage is invoiced before tax: half the proposal's SUBTOTAL, taxed once on the invoice.
+    expect(Number(invoice.subtotal)).toBeCloseTo(Number(row("proposals", 3)["subtotal"]) / 2, 2);
+    expect(invoice.tax_rate).toBe(row("proposals", 3)["tax_rate"]);
     expect(new Set(keys()).size).toBe(5);
   });
 
@@ -221,7 +224,7 @@ describe("starting the work", () => {
     ok(await act.moveProject(2, "resume"));
     ok(await act.moveProject(2, "done"));
     ok(await act.moveProject(2, "reopen"));
-    expect(studio.writes.map((w) => w.values)).toEqual([{ status: "paused", pause_note: "Waiting on photos" }, { status: "active", pause_note: null }, { status: "done" }, { status: "active" }]);
+    expect(studio.writes.map((w) => w.values)).toEqual([{ status: "paused", pause_note: "Waiting on photos" }, { status: "active", pause_note: null }, { status: "done" }, { status: "active", done_on: null }]);
     expect(row("projects", 2)["done_on"]).toBeNull();
   });
 
@@ -334,7 +337,7 @@ describe("chasing", () => {
       [3, { subject_override: "A reminder", body_override: "Could you look at INV-2038?" }],
       [2, { status: "queued", subject_override: null, body_override: "Thank you" }],
       [3, { status: "queued", due: expect.stringMatching(/^2026-07-28T14:00:00/) }],
-      [4, { status: "skipped", skip_reason: "by-hand" }],
+      [4, { status: "skipped" }],
     ]);
   });
 
@@ -345,6 +348,25 @@ describe("chasing", () => {
       [2, { status: "queued" }],
       [4, { status: "queued" }],
     ]);
+  });
+
+  it("when two rungs of one invoice are due, sends the later one — it overtakes the earlier", () => {
+    // 11 August: INV-2038's second (27 Jul) and third (10 Aug) rungs are both due.
+    const later = Date.parse("2026-08-11T15:00:00.000Z");
+    expect(act.readyRungs(later).find((m) => m.invoice_id === 4)?.id).toBe(3);
+  });
+});
+
+describe("marking a project done", () => {
+  it("closes the open milestones, then the project — and finishes from the step whose answer was lost", async () => {
+    studio.failWrite(2, "after");
+    const first = await act.markProjectDone(1);
+    if (first.ok || first.unfinished === null) throw new Error("expected an unfinished action");
+    expect(row("projects", 1)["status"]).toBe("active");
+    ok(await first.unfinished.resume());
+    // The first milestone is not sent again; the one whose answer was lost is (the same value), then the project.
+    expect(studio.writes.map((w) => `${w.op} ${w.table} ${String(w.id)}`)).toEqual(["update milestones 2", "update milestones 3", "update milestones 3", "update projects 1"]);
+    expect(row("projects", 1)).toMatchObject({ status: "done" });
   });
 });
 
@@ -405,6 +427,24 @@ describe("clients, terms and settings", () => {
     expect(trail()).toEqual(["insert terms_versions", "insert terms_clauses", "update terms_versions", "update terms_versions"]);
     expect(studio.writes[2]).toMatchObject({ id: 3, values: { status: "retired" } });
     expect(studio.writes[3]).toMatchObject({ id: v.id, values: { status: "in_force" } });
+  });
+
+  it("puts a version with no start day in force from today, and edits a version's note and day", async () => {
+    const v = ok(await act.newTermsVersion({ in_force_from: null, note: null, clauses: [] }));
+    ok(await act.editTermsVersion(v.id, { note: " Clearer kill fee ", in_force_from: null }));
+    ok(await act.putTermsInForce(v.id));
+    expect(studio.writes.slice(1).map((w) => [w.id, w.values])).toEqual([
+      [v.id, { note: "Clearer kill fee", in_force_from: null }],
+      [3, { status: "retired" }],
+      [v.id, { status: "in_force", in_force_from: "2026-07-28" }],
+    ]);
+  });
+
+  it("uploads the studio's mark, then points the settings at it — last", async () => {
+    const saved = ok(await act.saveStudioMark(new Blob(["png"], { type: "image/png" }), "mark.png"));
+    expect(trail()).toEqual(["upload settings", "update settings"]);
+    expect(studio.writes[0]!.values).toEqual({ column: "mark", filename: "mark.png" });
+    expect(saved.mark).toBe("demo-file:mark.png");
   });
 
   it("asks a client to sign, and saves the studio's settings and the add-on's", async () => {

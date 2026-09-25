@@ -252,7 +252,7 @@ describe("the statement, the brief and signing in", () => {
     expect(page).toContain("Everything");
     expect(page).toContain("Last 12 months");
     expect(page).toContain("What you have paid");
-    expect(page).toContain("$2,881.85 to date");
+    expect(page).toContain("$2,656.08 to date");
   });
 
   it("the brief asks the studio's questions with the answers saved so far", () => {
@@ -294,7 +294,7 @@ describe("the sheets", () => {
     const page = text(draw(<Receipt sheet={{ kind: "receipt", paymentId: 1 }} onClose={() => {}} />));
     expect(page).toContain("REC-0017");
     expect(page).toContain("Received with thanks");
-    expect(page).toContain("$2,881.85");
+    expect(page).toContain("$2,656.08");
     expect(page).toContain("from Fold & Rule Stationers, Cleo Marchetti");
     expect(page).toContain("INV-2036");
     expect(page).toContain("Bank transfer");
@@ -308,7 +308,7 @@ describe("the shared handover", () => {
         studio: null,
         project: { id: 4, number: "PRJ-04", name: "Studio identity", done_on: null, handover_notes: null, share_expires_on: null },
         fonts: [],
-        files: [{ id: 1, project_id: 4, client_id: null, file: "store:files/print-notes.pdf", note: "For the printer", position: 0, client_key: null }],
+        files: [{ id: 1, project_id: 4, client_id: null, file: "store:files/print-notes.pdf", link: null, note: "For the printer", position: 0, client_key: null }],
         deliverables: [{ id: 5, title: "Final mark files", position: 0 } as Tables["deliverables"]],
         versions: [{ id: 4, deliverable_id: 5, v: 1, file: null, link: "https://files.example/kiln-mark.zip", posted_at: "2026-02-25T13:00:00.000Z" } as Tables["deliverable_versions"]],
       },

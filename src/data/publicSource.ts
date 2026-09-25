@@ -17,16 +17,20 @@
  *
  * ── The client this sits on ─────────────────────────────────────────────────
  *
- * `PortalClient` is the public client's shape. The sign-in LINK calls
- * (`requestLink`, `peekLink`, `verifyLink`, `resendLink`) and the share-link
- * claim (`claimToken`) must share the client's session, so they are the
- * client's own methods, not a fetch beside it; a client without them answers
- * `PUBLIC_CLIENT_TOO_OLD` here rather than signing nobody in.
+ * `PortalClient` is the public client's shape (`@adminiumjs/public-client`
+ * as Adminium's main has it). The sign-in LINK calls (`requestLink`,
+ * `peekLink`, `openLink`, `verifyLinkCode`, `resendLink`), the share link
+ * (`openShared`), a private file (`file`) and the add-on's settings for a
+ * verified session (`addOnSettings`) must share the client's session, so they
+ * are the client's own methods, not a fetch beside it. A client without one
+ * (the 0.3.0 release on npm has none of them) answers `PUBLIC_CLIENT_TOO_OLD`
+ * here rather than signing nobody in — except the payment instructions, which
+ * simply read as "none" and the page says where else to find them.
  */
 import { normalise, normaliseAll } from "./rows.ts";
 import { realTables } from "./tableOfRef.ts";
 import type { ListCondition } from "./snapshotPort.ts";
-import { PortError, type ClientNote, type CodeResult, type DocumentKind, type HandoverView, type Me, type PortalPort, type PublicStudio, type SentPayment } from "./ports.ts";
+import { PortError, type ClientNote, type CodeResult, type DocumentKind, type HandoverView, type Me, type PortalPort, type PrivateFile, type PublicStudio, type SentPayment, type StatementPeriod } from "./ports.ts";
 import type { TableRef, Tables } from "./types.ts";
 
 export interface PublicRefLike {
@@ -50,16 +54,25 @@ export interface PortalClient {
   signOut(): Promise<void>;
   isClaimed(): boolean;
   documents?: {
-    render(input: { kind: string; ref: string; id: string | number; locale?: string }): Promise<{ id: string }>;
+    render(input: { kind: string; ref: string; id: string | number; locale?: string; period?: StatementPeriod }): Promise<{ id: string }>;
     contentUrl(id: string): string;
   };
-  /** The private file of a row's file column (a signed, short-lived link). */
-  fileUrl?(ref: string, id: string, column: string): string;
-  requestLink?(input: { email: string; lang: string }): Promise<void>;
-  peekLink?(input: { token: string }): Promise<{ firstName: string } | null>;
-  verifyLink?(input: { token: string } | { email: string; code: string }): Promise<{ ok: boolean; triesLeft?: number | null }>;
-  resendLink?(input: { token: string; lang: string }): Promise<void>;
-  claimToken?(input: { token: string }): Promise<void>;
+  /** A private file a row of this session names, fetched with the session. */
+  file?(ref: string, id: string | number, column: string): Promise<PrivateFile>;
+  /** Email a sign-in link (and a code); the same answer for every address. */
+  requestLink?(input: { email: string; lang?: string }): Promise<{ sentTo: string }>;
+  /** The first name a link greets; null for a used or expired link. Spends nothing. */
+  peekLink?(token: string): Promise<string | null>;
+  /** Use the link once: a verified session; false for a used or expired link. */
+  openLink?(token: string): Promise<boolean>;
+  /** The six-digit code from the same email, on another device. */
+  verifyLinkCode?(input: { email: string; code: string }): Promise<{ ok: true } | { ok: false; triesLeft: number }>;
+  /** "Email me a new link", to that link's own address. */
+  resendLink?(token: string): Promise<void>;
+  /** Open a row shared by link: a session on it, a code that opens nothing, or a stopped/expired link. */
+  openShared?(token: string): Promise<"opened" | "unknown" | "closed">;
+  /** An add-on's settings marked for a browser, for a VERIFIED session. */
+  addOnSettings?(key: string): Promise<Record<string, unknown>>;
 }
 
 /** A refusal in the page's terms: the server's code and what it named. */
@@ -189,6 +202,13 @@ export async function publicPortalPort(client: PortalClient, opts: PublicPortalO
   const tables = opts.tables ?? {};
   const refs = portalRefs(config, tables);
   const one = <R extends TableRef>(table: R, row: unknown): Tables[R] => normalise(table, (row ?? {}) as Record<string, unknown>);
+  /** The signed-in client's own row (the identity entry). */
+  const identity = async (): Promise<Record<string, unknown>> => {
+    const found = await client.list<Record<string, unknown>>(refs.identity, { limit: 1 });
+    const row = found.data[0];
+    if (row === undefined) throw new PortError("PUBLIC_CLAIM_LEVEL", "no client for this session", 401);
+    return row;
+  };
   const read = async <R extends TableRef>(table: R, ref: string, where?: ListCondition, order?: string, limit = 200): Promise<Tables[R][]> =>
     normaliseAll(table, (await client.list<Record<string, unknown>>(ref, { limit, ...(where === undefined ? {} : { where }), ...(order === undefined ? {} : { order }) })).data);
 
@@ -207,27 +227,27 @@ export async function publicPortalPort(client: PortalClient, opts: PublicPortalO
     peekLink: (token) =>
       guard(async () => {
         if (client.peekLink === undefined) throw TOO_OLD();
-        return client.peekLink({ token });
+        const firstName = await client.peekLink(token);
+        return firstName === null ? null : { firstName };
       }),
 
     verifyLink: (token) =>
       guard(async () => {
-        if (client.verifyLink === undefined) throw TOO_OLD();
-        const result = await client.verifyLink({ token });
-        if (!result.ok) throw new PortError("LINK_EXPIRED", "this link was used or has expired", 410);
+        if (client.openLink === undefined) throw TOO_OLD();
+        if (!(await client.openLink(token))) throw new PortError("LINK_EXPIRED", "this link was used or has expired", 410);
       }),
 
     verifyCode: (email, code) =>
       guard(async (): Promise<CodeResult> => {
-        if (client.verifyLink === undefined) throw TOO_OLD();
-        const result = await client.verifyLink({ email: email.trim(), code: code.trim() });
-        return result.ok ? { ok: true } : { ok: false, triesLeft: result.triesLeft ?? null };
+        if (client.verifyLinkCode === undefined) throw TOO_OLD();
+        const result = await client.verifyLinkCode({ email: email.trim(), code: code.trim() });
+        return result.ok ? { ok: true } : { ok: false, triesLeft: result.triesLeft };
       }),
 
-    resendFromLink: (token, language) =>
+    resendFromLink: (token) =>
       guard(async () => {
         if (client.resendLink === undefined) throw TOO_OLD();
-        await client.resendLink({ token, lang: language });
+        await client.resendLink(token);
       }),
 
     signOut: () => guard(() => client.signOut()),
@@ -244,25 +264,47 @@ export async function publicPortalPort(client: PortalClient, opts: PublicPortalO
 
     me: () =>
       guard(async (): Promise<Me> => {
-        const found = await client.list<Record<string, unknown>>(refs.identity, { limit: 1 });
-        const row = found.data[0];
-        if (row === undefined) throw new PortError("PUBLIC_CLAIM_LEVEL", "no client for this session", 401);
+        const row = await identity();
         return { company: String(row["company"] ?? ""), contact_name: String(row["contact_name"] ?? "") };
       }),
 
     list: (table, where, order, limit) => guard(() => read(table, readRefOf(refs, table), where, order, limit)),
 
-    documentUrl: (kind: DocumentKind, table, id, locale) =>
+    documentUrl: (kind: DocumentKind, table, id, locale, period) =>
       guard(async () => {
         if (client.documents === undefined) throw new PortError("PUBLIC_CLIENT_TOO_OLD", "this public client has no documents");
+        // A statement is over the client themselves (their own row, whatever id the page had to hand).
+        if (kind === "statement") {
+          const me = await identity();
+          const doc = await client.documents.render({ kind, ref: refs.identity, id: me["id"] as number, locale, period: period ?? "all" });
+          return client.documents.contentUrl(doc.id);
+        }
         const ref = table === "payments" ? refs.payments : table === "proposals" ? refs.proposals : refs.invoices;
         const doc = await client.documents.render({ kind, ref, id, locale });
         return client.documents.contentUrl(doc.id);
       }),
 
-    fileUrl: (table, id, column) => {
-      if (client.fileUrl === undefined) throw new PortError("PUBLIC_CLIENT_TOO_OLD", "this public client has no file links");
-      return client.fileUrl(readRefOf(refs, table), String(id), column);
+    fileUrl: () => {
+      // Files come with the session now (`file`), never as a bare link.
+      throw new PortError("PUBLIC_CLIENT_TOO_OLD", "files are fetched with the session");
+    },
+
+    file: (table, id, column) =>
+      guard(async () => {
+        if (client.file === undefined) throw TOO_OLD();
+        return client.file(readRefOf(refs, table), id, column);
+      }),
+
+    paymentInstructions: async () => {
+      // Built against the verified add-on settings read; a client without it (npm 0.3.0) or a
+      // refusal reads as "none", and the invoice page says where else the details are.
+      if (client.addOnSettings === undefined) return null;
+      try {
+        const value = (await client.addOnSettings("invoices"))["payment_instructions"];
+        return typeof value === "string" && value.trim() !== "" ? value : null;
+      } catch {
+        return null;
+      }
     },
 
     accept: (id, signedName) => guard(async () => one("proposals", await client.update(refs.accept, String(id), { status: "accepted", signed_name: signedName.trim() }))),
@@ -302,8 +344,10 @@ export async function publicPortalPort(client: PortalClient, opts: PublicPortalO
     openHandover: (token) =>
       guard(async (): Promise<HandoverView> => {
         const h = opts.handover;
-        if (h === null || h === undefined || h.claimToken === undefined) throw new PortError("PUBLIC_CLIENT_TOO_OLD", "this page has no handover key");
-        await h.claimToken({ token });
+        if (h === null || h === undefined || h.openShared === undefined) throw new PortError("PUBLIC_CLIENT_TOO_OLD", "this page has no handover key");
+        const opened = await h.openShared(token);
+        if (opened === "unknown") throw new PortError("LINK_UNKNOWN", "this link opens nothing", 404);
+        if (opened === "closed") throw new PortError("LINK_STOPPED", "this link has been stopped or has expired", 410);
         const hc = await h.config();
         const real = realTables(tables);
         const href = (table: TableRef) => Object.keys(hc.refs).find((ref) => ref === real[table] || ref.startsWith(`${real[table]}_`)) ?? real[table];

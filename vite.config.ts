@@ -1,7 +1,10 @@
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 
 import { surfaceJsonPlugin } from "./surface-emit.ts";
+import { demoJsonPlugin } from "./demo-emit.ts";
+import { DEMO_APP_KEY, DEMO_CLOCK, DEMO_DIR, DEMO_FRAMES, DEMO_PERSONAS, DEMO_SCREENS } from "./src/demo-card.ts";
+import { DEMO_MESSAGES } from "./src/demo/strings.ts";
 import { APP_KEY, APP_LABEL_KEY, SURFACE_NAV } from "./src/surface-nav.ts";
 import { MESSAGES } from "./src/i18n/messages/index.ts";
 
@@ -65,10 +68,34 @@ const server = {
   proxy: { "/api": { target: ADMINIUM_DEV_API, changeOrigin: false } },
 };
 
+/*
+ * THE CLIENTS' BUNDLE CARRIES NO PDF VIEWER.
+ *
+ * Only the studio's review draws a PDF (pdf.js, loaded when one is shown). The
+ * desk's screens are in the customer build's module graph until the side's
+ * literal folds them away, but Vite emits a `?url` asset the moment the module
+ * is loaded — so the customer build shipped pdf.js's 1.3 MB worker that nothing
+ * there ever asks for. For that build the worker's address is an empty string.
+ */
+const EMPTY_PDF_WORKER = "\0clients:no-pdf-worker";
+function noPdfWorkerForClients(side: string | undefined): Plugin {
+  return {
+    name: "clients:no-pdf-worker",
+    enforce: "pre",
+    resolveId(id) {
+      return side === "customer" && id.startsWith("pdfjs-dist/build/pdf.worker") ? EMPTY_PDF_WORKER : null;
+    },
+    load(id) {
+      return id === EMPTY_PDF_WORKER ? 'export default "";' : null;
+    },
+  };
+}
+
 export default defineConfig({
   define,
   server,
   plugins: [
+    noPdfWorkerForClients(process.env["VITE_ADMINIUM_SURFACE_SIDE"]),
     react(),
     /*
      * `surface.json` beside `index.html`, on surface builds only
@@ -86,6 +113,22 @@ export default defineConfig({
       appLabelKey: APP_LABEL_KEY,
       nav: SURFACE_NAV,
       messages: MESSAGES,
+    }),
+    /*
+     * `demo.json` beside `index.html`, on the demo build only (base
+     * `/demo/client-portal/app/`): the website's card reads it for this app's
+     * personas, screens, shortcuts and clock row. Its labels are the demo's
+     * own words (`src/demo/strings.ts`), in all eight languages; every other
+     * build writes nothing.
+     */
+    demoJsonPlugin({
+      appKey: DEMO_APP_KEY,
+      dir: DEMO_DIR,
+      frames: DEMO_FRAMES,
+      screens: DEMO_SCREENS,
+      personas: DEMO_PERSONAS,
+      clock: DEMO_CLOCK,
+      messages: DEMO_MESSAGES,
     }),
   ],
   build: {

@@ -44,9 +44,10 @@ describe("following the studio without a live channel", () => {
     const target = new EventTarget() as unknown as Window;
     const stop = attachPortalRefresh(target);
     lists = [];
-    await studio.world.writes.update("invoices", 6, { title: "Survey, measure-up and photos" });
+    // A sent invoice is locked but for a few columns: the studio moves its due day.
+    await studio.world.writes.update("invoices", 6, { due_on: "2026-08-10" });
     target.dispatchEvent(new Event("focus"));
-    await vi.waitFor(() => expect(usePortal.getState().rows.invoices[6]?.title).toBe("Survey, measure-up and photos"));
+    await vi.waitFor(() => expect(usePortal.getState().rows.invoices[6]?.due_on).toBe("2026-08-10"));
     lists = [];
     open("invoice", 6);
     await vi.waitFor(() => expect(lists).toContain("invoice_lines"));

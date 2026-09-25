@@ -35,3 +35,14 @@ export const firstName = (name: string): string => name.trim().split(/\s+/)[0] ?
 
 /** An enquiry's one-line summary: trade, budget, where it came from — whichever it has. */
 export const summary = (e: Enquiry): string => [e.trade, e.budget, e.source].filter((x): x is string => x !== null && x.trim() !== "").join(" · ");
+
+/**
+ * "Log a call", filled from outside the page (the website demo's "A call
+ * comes in"): the fields the call form has, as given; anything else (a phone
+ * number — an enquiry keeps none) is left out.
+ */
+export function callDraft(fill: Readonly<Record<string, string>>): Record<string, string> {
+  const draft: Record<string, string> = {};
+  for (const key of ["business", "name", "email", "body"] as const) if (fill[key] !== undefined) draft[key] = fill[key];
+  return draft;
+}

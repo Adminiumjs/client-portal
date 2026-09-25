@@ -14,17 +14,19 @@
  * server, and "Show more" reads the next.
  */
 import { useEffect, useMemo, useState } from "react";
-import { FilePlus, ReceiptText } from "lucide-react";
+import { FilePlus, ReceiptText, X } from "lucide-react";
 
 import { Button, DayText, DocList, DocRow, Empty, Filters, Money, Pill, ScreenHead, StatusPill } from "../components/ui.tsx";
 import type { Id } from "../data/types.ts";
-import { useI18n } from "../i18n/index.tsx";
+import { daysBetween } from "../data/venueTime.ts";
+import { useI18n, type MessageKey } from "../i18n/index.tsx";
 import { useDesk, loadPage, useRows } from "../state/desk.ts";
 import { openSheet } from "../state/sheets.ts";
-import { open } from "../state/ui.ts";
+import { open, useUi } from "../state/ui.ts";
 import { today } from "../lib/clock.ts";
 import { isPositive } from "../lib/money.ts";
 import { daysOverdue, filterCondition, INVOICE_FILTERS, invoiceWord, isOpen, matchesFilter, newestFirst, sumByCurrency, sumsLabel, type InvoiceFilter } from "./invoices/figures.ts";
+import { agingKeyOf } from "./home/model.ts";
 
 const PAGE = 50;
 
@@ -33,7 +35,16 @@ export default function Invoices() {
   const day = useDesk((s) => s.today) || today();
   const invoices = useRows("invoices");
   const clients = useDesk((s) => s.rows.clients);
-  const [filter, setFilter] = useState<InvoiceFilter>("all");
+  // Home's aging chips open the list on one bucket of the open invoices.
+  const bucket = useUi((s) => s.invoiceFilter?.bucket ?? null);
+  const [filter, setFilterState] = useState<InvoiceFilter>(bucket === null ? "all" : "open");
+  useEffect(() => {
+    if (bucket !== null) setFilterState("open");
+  }, [bucket]);
+  const setFilter = (next: InvoiceFilter) => {
+    setFilterState(next);
+    useUi.setState({ invoiceFilter: null });
+  };
   const [counts, setCounts] = useState<Partial<Record<InvoiceFilter, number>>>({});
   const [paged, setPaged] = useState<{ filter: InvoiceFilter; offset: number; total: number | null; busy: boolean }>({ filter: "all", offset: 0, total: null, busy: false });
 
@@ -75,11 +86,15 @@ export default function Invoices() {
       .catch(() => setPaged((p) => ({ ...p, busy: false })));
   };
 
-  const rows = useMemo(() => invoices.filter((i) => matchesFilter(filter, i, day)).sort(newestFirst), [invoices, filter, day]);
+  const rows = useMemo(
+    () => invoices.filter((i) => matchesFilter(filter, i, day) && (bucket === null || (isOpen(i) && agingKeyOf(i.due_on === null ? 0 : daysBetween(i.due_on, day)) === bucket))).sort(newestFirst),
+    [invoices, filter, day, bucket],
+  );
   const open_ = useMemo(() => invoices.filter(isOpen), [invoices]);
   const overdue = useMemo(() => invoices.filter((i) => invoiceWord(i, day) === "overdue"), [invoices, day]);
   const all = counts.all ?? invoices.length;
-  const shownTotal = paged.filter === filter ? paged.total : null;
+  // A bucket reads from the open invoices the desk holds (all of them): no more pages.
+  const shownTotal = paged.filter === filter && bucket === null ? paged.total : null;
 
   const label = (f: InvoiceFilter): string => t(`invoices.filter.${f}`);
   const company = (id: Id) => clients[id]?.company ?? "";
@@ -97,6 +112,14 @@ export default function Invoices() {
         }
       />
       <Filters label={t("invoices.filter.label")} value={filter} onChange={setFilter} items={INVOICE_FILTERS.map((f) => ({ id: f, label: label(f), ...(counts[f] === undefined ? {} : { count: counts[f] }) }))} />
+      {bucket !== null && (
+        <div className="filters">
+          <button type="button" className="filter ol-chip" aria-pressed="true" aria-label={`${t(`home.aging.${bucket}` as MessageKey)} — ${t("invoices.filter.bucketClear")}`} onClick={() => useUi.setState({ invoiceFilter: null })}>
+            {t(`home.aging.${bucket}` as MessageKey)}
+            <X size={13} aria-hidden="true" />
+          </button>
+        </div>
+      )}
       <div className="inv-list">
         {rows.length === 0 ? (
           <div className="card">

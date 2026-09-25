@@ -55,6 +55,34 @@ export interface ComposerForm {
 let lineNo = 0;
 export const blankLine = (): LineForm => ({ key: `new-${String(++lineNo)}`, description: "", qty: "1", rate: "", discount: "" });
 
+/**
+ * A proposal filled from outside the page (the website demo's "Fill a
+ * sample proposal"): the client, the title, the scope (paragraphs split by
+ * a blank line, as a proposal stores them) and the lines, each as typed. What the fill leaves out stays as it was; a
+ * line list that cannot be read keeps the lines already there.
+ */
+export function filledProposal(form: ComposerForm, fill: Readonly<Record<string, string>>): ComposerForm {
+  const client = Number(fill["client_id"] ?? "");
+  const next: ComposerForm = { ...form };
+  if (fill["client_id"] !== undefined && fill["client_id"] !== "" && Number.isInteger(client)) Object.assign(next, { clientId: client, newClient: null });
+  if (fill["title"] !== undefined) next.title = fill["title"];
+  if (fill["scope"] !== undefined) next.scope = scopeParagraphs(fill["scope"]);
+  if (fill["lines"] !== undefined) {
+    try {
+      const lines = JSON.parse(fill["lines"]) as unknown;
+      if (Array.isArray(lines))
+        next.lines = lines.map((raw) => {
+          const line = (raw ?? {}) as Record<string, unknown>;
+          const text = (key: string, or: string) => (typeof line[key] === "string" || typeof line[key] === "number" ? String(line[key]) : or);
+          return { ...blankLine(), description: text("description", ""), qty: text("qty", "1"), rate: text("rate", ""), discount: text("discount", "") };
+        });
+    } catch {
+      // Not a list: the lines stay as they are.
+    }
+  }
+  return next;
+}
+
 /** A stored decimal as a person would type it back ("1.00" → "1", "250.50" → "250.50"). */
 const typedBack = (value: string | null): string => (value === null ? "" : value.replace(/\.0+$/, ""));
 

@@ -89,6 +89,9 @@ const BY_CODE: Record<string, Refusal> = {
   PUBLIC_REF_NOT_FOUND: "gone",
 };
 
+/** A move's requirement that means "the document is empty": its lines, or a total above zero. */
+const isEmptyDocument = (requires: unknown): boolean => requires === "total" || requires === "proposal_lines" || requires === "invoice_lines";
+
 /** What a refused write means for the person on the page. */
 export function refusalOf<T = never>(error: unknown, unfinished: Unfinished<T> | null = null): Outcome<T> {
   if (error instanceof PortError) {
@@ -99,6 +102,8 @@ export function refusalOf<T = never>(error: unknown, unfinished: Unfinished<T> |
   const base = { ok: false as const, code: e.code, field: e.field, details: e.details, unfinished };
   if (e.kind === "signed-out") return { ...base, reason: "signed-out" };
   if (e.kind === "offline") return { ...base, reason: e.status === 429 || e.code === "NUMBER_BUSY" || e.code === "WRITE_CONFLICT" ? "busy" : "offline" };
+  // A document sent with no line, or no total: Adminium refuses the move and names what it requires.
+  if (e.code === "STATE_MOVE_REFUSED" && isEmptyDocument(e.details["requires"])) return { ...base, reason: "empty" };
   const byCode = BY_CODE[e.code] ?? BY_CODE[String(e.details["reason"] ?? "")];
   if (byCode !== undefined) return { ...base, reason: byCode };
   if (e.status === 403) return { ...base, reason: "not-allowed" };

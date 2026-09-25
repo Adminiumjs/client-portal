@@ -75,7 +75,7 @@ describe("the notices", () => {
   });
 
   it("saves the switches that moved, and none that were only flicked back", () => {
-    const row = { ...settingsRow(), notify_paid: true, notify_brief: false };
+    const row = { ...settingsRow(), notify_paid: true, notify_brief: false, notify_notes: false };
     expect(noticesPatch(row, { notify_paid: false, notify_brief: false, notify_notes: true })).toEqual({ notify_paid: false, notify_notes: true });
   });
 });

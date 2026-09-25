@@ -5,8 +5,9 @@
  * The document is the Invoices & Receipts add-on's own: Adminium draws it and
  * the page shows its print copy, with "Print or save as PDF" and — where the
  * add-on's PDF can draw the page's language — "Download PDF". Letter or A4
- * sets the sheet on screen. When Adminium's rendering cannot be asked for
- * here, the page draws the same document itself from the stored rows.
+ * sets the sheet on screen. The demo shows the copy the add-on drew at build
+ * time. When no copy can be asked for here, the page draws the same document
+ * itself from the stored rows.
  *
  * A draft has no printed copy (nothing has been issued); a void invoice has
  * one, marked void.
@@ -18,10 +19,10 @@ import { Alert, Button } from "../components/ui.tsx";
 import { useI18n } from "../i18n/index.tsx";
 import { today } from "../lib/clock.ts";
 import { ensureRows, loadClient, loadInvoice, loadProposal, useDesk, useSettings } from "../state/desk.ts";
-import { go, open } from "../state/ui.ts";
-import { documentPort, pdfDraws, requestFor, type DocumentLink } from "./print/document.ts";
+import { go, open, setPrintTarget, usePrintTarget, type PrintTarget } from "../state/ui.ts";
+import { documentPort, pdfDraws, type DocumentLink } from "./print/document.ts";
 import { PaperSheet, type Paper } from "./print/Paper.tsx";
-import { setPrintTarget, usePrintTarget, type PrintTarget, type StatementPeriod } from "./print/target.ts";
+import type { StatementPeriod } from "./print/target.ts";
 
 const PERIODS: readonly StatementPeriod[] = ["all", "year", "12m"];
 
@@ -59,7 +60,7 @@ export default function Print() {
     if (target === null || port === null) return;
     let live = true;
     setLink({ key, value: null, error: null });
-    port(requestFor(target, locale))
+    port(target, locale)
       .then((value) => live && setLink({ key, value, error: null }))
       .catch((error: unknown) => live && setLink({ key, value: null, error: error instanceof Error ? error.message : String(error) }));
     return () => {
@@ -111,13 +112,13 @@ export default function Print() {
             <Button kind="primary" icon={Printer} onClick={print}>
               {t("invoices.print.print")}
             </Button>
-            {server?.value != null && pdfDraws(locale) ? (
+            {server?.value != null && server.value.contentUrl !== null && pdfDraws(locale) ? (
               <a className="btn ol-gi" href={server.value.contentUrl} download>
                 <Download size={16} aria-hidden="true" />
                 {t("invoices.print.pdf")}
               </a>
             ) : (
-              <span className="pr-note">{server?.value != null ? t("invoices.print.noPdf") : t("invoices.print.drawnHere")}</span>
+              <span className="pr-note">{server?.value == null ? t("invoices.print.drawnHere") : server.value.contentUrl === null ? t("invoices.print.savePdf") : t("invoices.print.noPdf")}</span>
             )}
             <div className="pr-seg" role="group" aria-label={t("invoices.print.paperLabel")}>
               {(["letter", "a4"] as const).map((p) => (

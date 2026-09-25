@@ -395,7 +395,9 @@ export function createEngine(opts: EngineOptions): Engine {
     const spec = set as Record<string, unknown>;
     if ("byOrigin" in spec) {
       const by = spec["byOrigin"] as Record<string, unknown>;
-      return guest ? by["public"] : by["staff"];
+      const word = guest ? by["public"] : by["staff"];
+      // A time word means what it means on its own: "today" is the studio's day, never the text "today".
+      return word === "now" || word === "today" ? stampValue({ ...stamp, set: word }, writer, row) : word;
     }
     if ("copy" in spec) return row[String(spec["copy"])] ?? null;
     if ("claim" in spec) {

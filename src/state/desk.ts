@@ -16,7 +16,7 @@
  */
 import { create } from "zustand";
 
-import type { DeskReads, DeskSnapshot, DeskWrites, PageQuery } from "../data/ports.ts";
+import type { AddOnSettings, DeskReads, DeskSnapshot, DeskWrites, PageQuery } from "../data/ports.ts";
 import type { ListCondition } from "../data/snapshotPort.ts";
 import { TABLE_REFS, type Day, type Id, type TableRef, type Tables } from "../data/types.ts";
 import type { StaffAccess, TableAction } from "../staffConnection.ts";
@@ -49,12 +49,14 @@ export interface DeskState {
   today: Day;
   /** Every row the desk has read, by table and key. */
   rows: Held;
+  /** The add-ons' settings the desk has read (the invoices add-on's defaults, letterhead, instructions …). */
+  addOns: Record<string, AddOnSettings>;
 }
 
 const emptyHeld = (): Held => Object.fromEntries(TABLE_REFS.map((ref) => [ref, {}])) as Held;
 const EMPTY_ME: Me = { name: "", email: null, roleName: null, manager: false, access: null };
 
-export const useDesk = create<DeskState>(() => ({ load: "loading", loadError: null, me: EMPTY_ME, today: "", rows: emptyHeld() }));
+export const useDesk = create<DeskState>(() => ({ load: "loading", loadError: null, me: EMPTY_ME, today: "", rows: emptyHeld(), addOns: {} }));
 
 // ── the doors, set once at boot ─────────────────────────────────────────────
 
@@ -78,7 +80,7 @@ export function deskWrites(): DeskWrites {
 
 /** Forget everything (a test, the demo's reset). */
 export function resetDesk(): void {
-  useDesk.setState({ load: "loading", loadError: null, today: "", rows: emptyHeld() });
+  useDesk.setState({ load: "loading", loadError: null, today: "", rows: emptyHeld(), addOns: {} });
 }
 
 // ── folding rows in ─────────────────────────────────────────────────────────
@@ -286,6 +288,39 @@ export function useRow<R extends TableRef>(ref: R, id: Id | null | undefined): T
 /** The studio's settings row. */
 export function useSettings(): Tables["settings"] | null {
   return useDesk((s) => (Object.values(s.rows.settings)[0] as Tables["settings"] | undefined) ?? null);
+}
+
+// ── the add-ons' settings ───────────────────────────────────────────────────
+
+/**
+ * Read an add-on's settings once (boot), through the sink's `addOnSettings`;
+ * nothing is held when the door has no such read or the add-on is not there.
+ */
+export async function loadAddOnSettings(key: string): Promise<void> {
+  const read = writes?.addOnSettings;
+  if (typeof read !== "function") return;
+  try {
+    const settings = await read.call(writes, key);
+    if (settings !== null) useDesk.setState((s) => ({ addOns: { ...s.addOns, [key]: settings } }));
+  } catch (error) {
+    console.warn(`[clients] the ${key} add-on's settings could not be read:`, error);
+  }
+}
+
+/** An add-on's settings the desk holds (the invoices add-on's letterhead, tax name, terms, ladder …); null when not read. */
+export function addOnSettings(key: string, state: DeskState = useDesk.getState()): Record<string, unknown> | null {
+  return state.addOns[key]?.values ?? null;
+}
+
+/** `addOnSettings`, as a hook. */
+export function useAddOnSettings(key: string): Record<string, unknown> | null {
+  return useDesk((s) => s.addOns[key]?.values ?? null);
+}
+
+/** One text setting of an add-on, or null when unset or empty. */
+export function addOnText(settings: Record<string, unknown> | null, name: string): string | null {
+  const value = settings?.[name];
+  return typeof value === "string" && value.trim() !== "" ? value : null;
 }
 
 // ── who may do what ─────────────────────────────────────────────────────────

@@ -12,7 +12,7 @@
  * off; a draft keeps its lines as typed. A proposal started from an enquiry
  * makes its client, and moves the enquiry on, only when it is first saved.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, CircleAlert, Plus, Save, Send, Trash2 } from "lucide-react";
 
 import { Alert, Button, Empty, Money, StatusPill, UnfinishedLine } from "../components/ui.tsx";
@@ -24,7 +24,7 @@ import { minorUnits } from "../lib/money.ts";
 import { saveInvoice, saveProposal, sendInvoice, sendProposal, type Outcome } from "../state/actions.ts";
 import { ensureRows, loadInvoice, loadPage, loadProposal, loadWhere, useDesk, useRows } from "../state/desk.ts";
 import { refusalKey, type Unfinished } from "../state/outcome.ts";
-import { go, open, toast, useUi, type ComposerTarget } from "../state/ui.ts";
+import { go, open, openComposer, toast, useUi, type ComposerTarget } from "../state/ui.ts";
 import {
   blankLine,
   enquiryProposalForm,
@@ -42,7 +42,9 @@ import {
   VALID_DAYS,
   type ComposerForm,
   type LineForm,
+  filledProposal,
 } from "./composer/draft.ts";
+import { useDemoSignal } from "../state/demoSignal.ts";
 import { documentFigures, readAmount } from "./composer/figures.ts";
 import { inForce } from "./proposals/model.ts";
 
@@ -76,6 +78,8 @@ export default function Composer() {
   const [error, setError] = useState<string | null>(null);
   const [unfinished, setUnfinished] = useState<{ send: boolean; job: Unfinished<unknown> } | null>(null);
   const [missing, setMissing] = useState(false);
+  /** A fill that arrived before its proposal was open: laid over the form once it starts. */
+  const pendingFill = useRef<Record<string, string> | null>(null);
 
   // Read what the composer needs, then start the form from it (once per target).
   useEffect(() => {
@@ -120,7 +124,9 @@ export default function Composer() {
         next = newInvoiceForm({ clientId: target.clientId ?? null, projectId: target.projectId ?? null });
       }
       if (!live) return;
-      setForm(next);
+      const fill = pendingFill.current;
+      pendingFill.current = null;
+      setForm(next !== null && fill !== null && next.kind === "proposal" ? filledProposal(next, fill) : next);
       setFormFor(target);
       setMissing(next === null);
     };
@@ -148,6 +154,22 @@ export default function Composer() {
     () => documentFigures((form?.lines ?? []).map((l) => ({ qty: readAmount(l.qty), rate: readAmount(l.rate), discount: readAmount(l.discount) })), tax.rate, scale),
     [form?.lines, tax.rate, scale],
   );
+
+  /*
+   * The website demo's "Fill a sample proposal": a proposal being written
+   * takes the fill; anything else (nothing open, an invoice, a sent document)
+   * starts a new proposal for the client and fills it once it opens.
+   */
+  useDemoSignal("composer.fill", (fill) => {
+    const writing = form !== null && form.kind === "proposal" && sameTarget(target, formFor) && (doc === undefined || doc.status === "draft");
+    if (writing) {
+      setForm(filledProposal(form, fill));
+      return;
+    }
+    const client = Number(fill["client_id"] ?? "");
+    pendingFill.current = fill;
+    openComposer({ kind: "proposal", id: null, ...(Number.isInteger(client) && client > 0 ? { clientId: client } : {}) });
+  });
 
   if (target === null || missing) {
     return (

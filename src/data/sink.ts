@@ -145,16 +145,20 @@ export function sessionSink(transport: SessionTransport, tableOf: Readonly<Recor
       }
     }
   };
-  /** A write the transport cannot carry: a file's bytes, or a PUT. */
-  const raw = async <T>(url: string, method: "POST" | "PUT", body: BodyInit, contentType: string): Promise<T> => {
+  /** A call the transport cannot carry: a file's bytes, a PUT, or the add-ons' list. */
+  const raw = async <T>(url: string, method: "GET" | "POST" | "PUT", body?: BodyInit, contentType = "application/json"): Promise<T> => {
     let response: Response;
     try {
       const token = opts.csrfToken();
       response = await doFetch(url, {
         method,
         credentials: "same-origin",
-        headers: { accept: "application/json", "content-type": contentType, ...(token === null ? {} : { "x-adminium-csrf": token }) },
-        body,
+        headers: {
+          accept: "application/json",
+          ...(body === undefined ? {} : { "content-type": contentType }),
+          ...(token === null || method === "GET" ? {} : { "x-adminium-csrf": token }),
+        },
+        ...(body === undefined ? {} : { body }),
       });
     } catch (error) {
       throw asSinkError({ status: 0, code: "NETWORK", message: error instanceof Error ? error.message : String(error) });
@@ -208,6 +212,15 @@ export function sessionSink(transport: SessionTransport, tableOf: Readonly<Recor
     async regenerateCode<R extends TableRef>(ref: R, id: Id, column: string): Promise<Tables[R]> {
       const reply = await send<{ data?: Record<string, unknown> }>(`${await path(ref, id)}/regenerate-code`, "POST", { column });
       return normalise(ref, reply.data ?? {});
+    },
+    /*
+     * An add-on's stored settings and declared keys, from its entry in
+     * `GET /api/v1/add-ons` (any signed-in person; no secret is in it).
+     */
+    async addOnSettings(addOnKey) {
+      const reply = await raw<{ addOns?: { key: string; settings?: { key: string }[]; settingValues?: Record<string, unknown> }[] }>("/api/v1/add-ons", "GET");
+      const addOn = (reply.addOns ?? []).find((a) => a.key === addOnKey);
+      return addOn === undefined ? null : { values: addOn.settingValues ?? {}, declared: (addOn.settings ?? []).map((s) => s.key) };
     },
     async saveAddOnSettings(addOnKey, values) {
       const reply = await raw<{ values?: Record<string, unknown> }>(`/api/v1/add-ons/${encodeURIComponent(addOnKey)}/settings`, "PUT", JSON.stringify({ values }), "application/json");

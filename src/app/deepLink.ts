@@ -32,3 +32,12 @@ export function landingFromHash(hash: string): string | null {
   const to = new URLSearchParams(hash.replace(/^#[^&]*&?/, "")).get("to");
   return to !== null && /^[a-z]+(\/\d+)?$/.test(to) ? to : null;
 }
+
+/**
+ * Everything a link's fragment carries, read at once — the token AND where it
+ * lands — so the fragment can be taken out of the address straight after
+ * without losing where the link was for.
+ */
+export function linkFragment(hash: string): { token: string | null; landing: string | null } {
+  return { token: tokenFromHash(hash), landing: landingFromHash(hash) };
+}

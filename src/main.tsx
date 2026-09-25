@@ -129,7 +129,7 @@ async function bootClients(): Promise<void> {
     showStartupFailure({ key: "startup.noServer" }, "NO_BACKEND");
     return;
   }
-  const [{ publicPortalPort }, portal, { tokenFromHash }] = await Promise.all([import("./data/publicSource.ts"), import("./state/portal.ts"), import("./app/deepLink.ts")]);
+  const [{ publicPortalPort }, portal, { linkFragment }] = await Promise.all([import("./data/publicSource.ts"), import("./state/portal.ts"), import("./app/deepLink.ts")]);
   try {
     const port = await publicPortalPort(client as never, { tables: config.tables ?? {} });
     portal.setPortalPort(port);
@@ -141,10 +141,15 @@ async function bootClients(): Promise<void> {
     return;
   }
   setClockSource(() => Date.now());
-  // A sign-in or share link carries its token in the fragment: read it once, and take it out of the address.
-  const token = tokenFromHash(window.location.hash);
+  /*
+   * A sign-in or share link carries its token — and where a sign-in link
+   * should land (`&to=invoices/12`) — in the fragment: both are read once,
+   * BEFORE the fragment is taken out of the address, and kept for the page
+   * that uses them (`landing` is spent after sign-in).
+   */
+  const { token, landing } = linkFragment(window.location.hash);
   if (token !== null) history.replaceState(history.state, "", window.location.pathname + window.location.search);
-  useUi.setState({ persona: "client", view: "find", theme: systemTheme(), token });
+  useUi.setState({ persona: "client", view: "find", theme: systemTheme(), token, landing });
   await wireHost("customer");
   await portal.loadStudio();
   if (portal.portalPort().signedIn()) {
@@ -214,7 +219,7 @@ async function bootDesk(): Promise<void> {
   desk.setDeskWrites(sessionSink(transport, tables, { csrfToken: () => csrf }));
   onSignedOut(() => useUi.setState({ signedOut: true }));
   useUi.setState({ persona: "studio", view: "home", theme: systemTheme() });
-  await desk.loadDesk();
+  await Promise.all([desk.loadDesk(), desk.loadAddOnSettings("invoices")]);
   if (desk.useDesk.getState().load === "failed") {
     const loadError = desk.useDesk.getState().loadError;
     showStartupFailure(loadError === null ? { key: "startup.deskUnread" } : { text: loadError }, null);
@@ -237,13 +242,15 @@ async function bootDesk(): Promise<void> {
 }
 
 /**
- * THE DEMO — the website's card, with no server: the sample studio in
- * memory, on a pinned Tuesday, run by the same screens and the same actions.
+ * THE DEMO — the website's card, with no server: the app's own sample,
+ * added in memory at 10:00 on a pinned Tuesday, run by the same screens and
+ * the same actions, with Adminium's rules played by the demo's world.
  * `DEMO` folds to a literal, so no other build contains any of it.
  */
 async function bootDemo(): Promise<void> {
-  const [{ createWorld }, { DEMO_ROWS, DEMO_STAFF, DEMO_CLIENT_ID }, desk, portal, live] = await Promise.all([
+  const [{ createWorld }, { demoSample }, { DEMO_STAFF, DEMO_CLIENT_ID }, desk, portal, live] = await Promise.all([
     import("./demo/world.ts"),
+    import("./demo/sample.ts"),
     import("./data/demo.ts"),
     import("./state/desk.ts"),
     import("./state/portal.ts"),
@@ -251,11 +258,21 @@ async function bootDemo(): Promise<void> {
   ]);
   const clock = demoClock();
   setZone(DEMO_ZONE);
-  setClockSource(clock.now);
   setTimezoneClaim(DEMO_ZONE, "operator");
   setTenantCurrency("USD");
-  const world = createWorld(DEMO_ROWS, clock.now, DEMO_ZONE, { name: DEMO_STAFF.name });
-  desk.setDeskReads(world.reads);
+  // The sample is added in the language the page opens in; the card's language changes relabel it.
+  const opening = new URLSearchParams(window.location.search).get("lang") ?? "en-US";
+  const world = createWorld(demoSample(opening), clock.now, DEMO_ZONE, { name: DEMO_STAFF.name });
+  // The card moves the world's clock: every screen reads the time from it.
+  setClockSource(world.now);
+  // The printed copy opens the HTML the add-on drew at build time (no PDF: there is no server to draw one).
+  desk.setDeskReads({
+    ...world.reads,
+    documentUrl: async (kind, ref, id, locale) => {
+      const printUrl = await world.documentUrl(kind, ref, id, locale);
+      return printUrl === null ? null : { printUrl, contentUrl: null };
+    },
+  });
   desk.setDeskWrites(world.writes);
   portal.setPortalPort(world.portal(DEMO_CLIENT_ID));
   desk.useDesk.setState({ me: { name: DEMO_STAFF.name, email: DEMO_STAFF.email, roleName: DEMO_STAFF.roleName, manager: true, access: null } });
@@ -274,7 +291,7 @@ async function bootDemo(): Promise<void> {
   if (theme === "light" || theme === "dark") useUi.setState({ theme });
   const lang = asked.get("lang");
   if (lang !== null) setHostLocale(lang);
-  await Promise.all([desk.loadDesk(), portal.loadStudio(), portal.loadPortal()]);
+  await Promise.all([desk.loadDesk(), desk.loadAddOnSettings("invoices"), portal.loadStudio(), portal.loadPortal()]);
   // The world announces its changes as the live stream would: the desk follows the clients' side, and back.
   world.subscribe((frame) => {
     live.applyFrame(frame);

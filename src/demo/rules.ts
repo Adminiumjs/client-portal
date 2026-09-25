@@ -564,7 +564,11 @@ export const DEMO_RULES: DemoRules = {
       },
       {
         "column": "approved_on",
-        "set": "today",
+        "set": {
+          "byOrigin": {
+            "public": "today"
+          }
+        },
         "on": {
           "column": "status",
           "values": [
@@ -750,6 +754,11 @@ export const DEMO_RULES: DemoRules = {
       }
     ],
     "messages": [
+      {
+        "column": "created_at",
+        "set": "now",
+        "on": "create"
+      },
       {
         "column": "approved_by",
         "set": "user-name",
@@ -1339,7 +1348,8 @@ export const DEMO_RULES: DemoRules = {
       "client_id": "clients"
     },
     "enquiries": {
-      "client_id": "clients"
+      "client_id": "clients",
+      "proposal_id": "proposals"
     },
     "proposals": {
       "client_id": "clients",

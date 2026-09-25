@@ -278,6 +278,7 @@ export interface HandoverFile {
   project_id: Id;
   client_id: Id | null;
   file: string | null;
+  link: string | null;
   note: string | null;
   position: number;
   client_key: string | null;
@@ -552,7 +553,7 @@ export const NULLABLE: Readonly<Record<TableRef, readonly string[]>> = {
   proposal_lines: ["description", "rate", "discount", "currency", "amount", "client_id", "client_key"],
   projects: ["number_seq", "number", "proposal_id", "pause_note", "started_on", "done_on", "share_token", "share_expires_on", "share_stopped_at", "handover_notes", "handover_sent_at", "client_key"],
   project_fonts: ["client_id", "licence", "client_key"],
-  handover_files: ["client_id", "file", "note", "client_key"],
+  handover_files: ["client_id", "file", "link", "note", "client_key"],
   milestones: ["client_id", "due_on", "done_at", "estimated_days", "client_key"],
   deliverables: ["client_id", "milestone_id", "icon", "shared_at", "reviewed_at", "review_note", "approved_how", "approved_on", "approved_by", "client_key"],
   deliverable_versions: ["client_id", "v", "file", "link", "note", "posted_by", "posted_at", "client_key"],

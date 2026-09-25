@@ -128,9 +128,9 @@ export const EMAIL_EN: EmailWords = {
   },
   "invoice-rung-3": {
     name: "Third reminder",
-    subject: "Pausing {{project.name}} until {{invoice.number}} clears",
+    subject: "{{invoice.number}} is {{invoice.due_on.days_since}} days past due — our work pauses until it clears",
     paras: [
-      "{{invoice.number}} is {{invoice.due_on.days_since}} days past due, so I am pausing the work on {{project.name}} today rather than letting more of it run up against an unpaid invoice. Clause 6 of the terms you agreed covers this, and it is not personal.",
+      "{{invoice.number}} is {{invoice.due_on.days_since}} days past due — {{invoice.balance}} outstanding. Under clause 6 of the terms you agreed, any work we have under way for you pauses from today rather than running up against an unpaid invoice. It is not personal.",
       "Nothing is lost. The day it clears we pick up where we stopped.",
     ],
     button: "View {{invoice.number}}",

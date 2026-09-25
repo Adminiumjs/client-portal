@@ -22,9 +22,10 @@ import { now, studioZone } from "../lib/clock.ts";
 import { declineEnquiry, parkEnquiry, sendEnquiryReply } from "../state/actions.ts";
 import { loadPage, useDesk, useRows } from "../state/desk.ts";
 import { refusalKey } from "../state/outcome.ts";
+import { useDemoSignal } from "../state/demoSignal.ts";
 import { openSheet } from "../state/sheets.ts";
 import { open, openComposer, toast } from "../state/ui.ts";
-import { byReceived, ENQUIRY_FILTERS, ENQUIRY_WORD, firstName, inEnquiryFilter, nextUnanswered, replyFor, summary, type EnquiryFilter } from "./enquiries/model.ts";
+import { byReceived, callDraft, ENQUIRY_FILTERS, ENQUIRY_WORD, firstName, inEnquiryFilter, nextUnanswered, replyFor, summary, type EnquiryFilter } from "./enquiries/model.ts";
 
 /** How long ago something came in, in the page's language ("4 hours ago", "yesterday", "12 Jul"). */
 function ago(at: string | null, locale: string, zone: string): string {
@@ -56,6 +57,8 @@ export default function Enquiries() {
   /** Counts Adminium answered, when there are more enquiries than one page. */
   const [counts, setCounts] = useState<Partial<Record<EnquiryFilter | "month", number>> | null>(null);
   const [total, setTotal] = useState<number | null>(null);
+  // The website demo's "A call comes in": "Log a call", already filled in.
+  useDemoSignal("enquiries.call", (fill) => openSheet({ kind: "add", what: "enquiry" }, callDraft(fill)));
 
   useEffect(() => {
     let live = true;

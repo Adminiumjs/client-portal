@@ -92,9 +92,9 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
     },
     "invoice-rung-3": {
       name: "Dritte Erinnerung",
-      subject: "{{project.name}} pausiert, bis {{invoice.number}} beglichen ist",
+      subject: "{{invoice.number}} ist {{invoice.due_on.days_since}} Tage überfällig — unsere Arbeit pausiert bis zur Zahlung",
       paras: [
-        "{{invoice.number}} ist {{invoice.due_on.days_since}} Tage überfällig, deshalb pausiere ich die Arbeit an {{project.name}} ab heute, statt weitere Arbeit gegen eine unbezahlte Rechnung auflaufen zu lassen. Klausel 6 der vereinbarten Bedingungen regelt das, und es ist nichts Persönliches.",
+        "{{invoice.number}} ist {{invoice.due_on.days_since}} Tage überfällig — {{invoice.balance}} sind offen. Nach Klausel 6 der vereinbarten Bedingungen pausiert ab heute jede Arbeit, die wir für Sie laufen haben, statt weiter gegen eine unbezahlte Rechnung aufzulaufen. Das ist nichts Persönliches.",
         "Es geht nichts verloren. Sobald sie beglichen ist, machen wir dort weiter, wo wir aufgehört haben.",
       ],
       button: "{{invoice.number}} ansehen",
@@ -250,9 +250,9 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
     },
     "invoice-rung-3": {
       name: "Troisième rappel",
-      subject: "{{project.name}} en pause jusqu’au règlement de {{invoice.number}}",
+      subject: "{{invoice.number}} a {{invoice.due_on.days_since}} jours de retard — notre travail est en pause jusqu’au règlement",
       paras: [
-        "{{invoice.number}} est en retard de {{invoice.due_on.days_since}} jours : je mets donc le travail sur {{project.name}} en pause dès aujourd’hui, plutôt que d’en accumuler davantage face à une facture impayée. La clause 6 des conditions que vous avez acceptées le prévoit, et ce n’est rien de personnel.",
+        "{{invoice.number}} est en retard de {{invoice.due_on.days_since}} jours — {{invoice.balance}} restent dus. Selon la clause 6 des conditions que vous avez acceptées, tout travail en cours pour vous est mis en pause dès aujourd’hui plutôt que de s’accumuler face à une facture impayée. Ce n’est rien de personnel.",
         "Rien n’est perdu. Le jour où elle sera réglée, nous reprendrons là où nous nous sommes arrêtés.",
       ],
       button: "Voir {{invoice.number}}",
@@ -408,9 +408,9 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
     },
     "invoice-rung-3": {
       name: "Tredje påmindelse",
-      subject: "{{project.name}} sættes på pause, til {{invoice.number}} er betalt",
+      subject: "{{invoice.number}} er {{invoice.due_on.days_since}} dage over forfald — vores arbejde holder pause, til den er betalt",
       paras: [
-        "{{invoice.number}} er {{invoice.due_on.days_since}} dage over forfald, så jeg sætter arbejdet på {{project.name}} på pause fra i dag i stedet for at lade mere arbejde løbe op mod en ubetalt faktura. Punkt 6 i de vilkår, du accepterede, dækker dette, og det er ikke personligt.",
+        "{{invoice.number}} er {{invoice.due_on.days_since}} dage over forfald — {{invoice.balance}} udestår. Efter punkt 6 i de vilkår, du accepterede, sættes alt arbejde, vi har i gang for dig, på pause fra i dag i stedet for at løbe op mod en ubetalt faktura. Det er ikke personligt.",
         "Intet går tabt. Den dag den er betalt, fortsætter vi, hvor vi slap.",
       ],
       button: "Se {{invoice.number}}",
@@ -566,9 +566,9 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
     },
     "invoice-rung-3": {
       name: "Třetí připomínka",
-      subject: "Pozastavujeme {{project.name}} do úhrady {{invoice.number}}",
+      subject: "{{invoice.number}} je {{invoice.due_on.days_since}} dní po splatnosti — naše práce stojí do úhrady",
       paras: [
-        "{{invoice.number}} je {{invoice.due_on.days_since}} dní po splatnosti, proto od dnešního dne pozastavuji práci na {{project.name}}, místo abychom hromadili další práci proti nezaplacené faktuře. Pokrývá to bod 6 podmínek, které jste přijali, a není to nic osobního.",
+        "{{invoice.number}} je {{invoice.due_on.days_since}} dní po splatnosti — zbývá uhradit {{invoice.balance}}. Podle bodu 6 podmínek, které jste přijali, od dnešního dne pozastavujeme veškerou práci, kterou máme rozběhnutou, místo abychom ji hromadili proti nezaplacené faktuře. Není to nic osobního.",
         "Nic se neztratí. Jakmile bude uhrazena, navážeme tam, kde jsme skončili.",
       ],
       button: "Zobrazit {{invoice.number}}",
@@ -719,9 +719,9 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
     },
     "invoice-rung-3": {
       name: "التذكير الثالث",
-      subject: "إيقاف {{project.name}} مؤقتًا حتى تُسدَّد {{invoice.number}}",
+      subject: "{{invoice.number}} متأخرة {{invoice.due_on.days_since}} يومًا — يتوقف عملنا مؤقتًا حتى تُسدَّد",
       paras: [
-        "{{invoice.number}} متأخرة {{invoice.due_on.days_since}} يومًا، لذا أوقف العمل على {{project.name}} مؤقتًا من اليوم بدل أن يتراكم مزيد من العمل مقابل فاتورة غير مدفوعة. البند 6 من الشروط التي وافقتَ عليها يغطي ذلك، والأمر ليس شخصيًا.",
+        "{{invoice.number}} متأخرة {{invoice.due_on.days_since}} يومًا — والمستحق {{invoice.balance}}. وفق البند 6 من الشروط التي وافقتَ عليها، يتوقف مؤقتًا من اليوم أي عمل جارٍ لك بدل أن يتراكم مقابل فاتورة غير مدفوعة. والأمر ليس شخصيًا.",
         "لن يضيع شيء. في اليوم الذي تُسدَّد فيه نكمل من حيث توقّفنا.",
       ],
       button: "اعرض {{invoice.number}}",
@@ -860,9 +860,9 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
     },
     "invoice-rung-3": {
       name: "第三次提醒",
-      subject: "在 {{invoice.number}} 结清前暂停 {{project.name}}",
+      subject: "{{invoice.number}} 已逾期 {{invoice.due_on.days_since}} 天——结清前我们的工作暂停",
       paras: [
-        "{{invoice.number}} 已逾期 {{invoice.due_on.days_since}} 天，所以我从今天起暂停 {{project.name}} 的工作，而不是让更多工作积压在一张未付的发票上。您同意的条款第 6 条对此有规定，这并非针对个人。",
+        "{{invoice.number}} 已逾期 {{invoice.due_on.days_since}} 天，尚欠 {{invoice.balance}}。根据您同意的条款第 6 条，从今天起我们为您进行中的工作将暂停，而不是继续积压在一张未付的发票上。这并非针对个人。",
         "什么都不会丢失。款项结清的那天，我们就从停下的地方继续。",
       ],
       button: "查看 {{invoice.number}}",
@@ -998,9 +998,9 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
     },
     "invoice-rung-3": {
       name: "第三次提醒",
-      subject: "在 {{invoice.number}} 結清前暫停 {{project.name}}",
+      subject: "{{invoice.number}} 已逾期 {{invoice.due_on.days_since}} 天——結清前我們的工作暫停",
       paras: [
-        "{{invoice.number}} 已逾期 {{invoice.due_on.days_since}} 天，所以我從今天起暫停 {{project.name}} 的工作，而不是讓更多工作累積在一張未付的發票上。您同意的條款第 6 條對此有規定，這並非針對個人。",
+        "{{invoice.number}} 已逾期 {{invoice.due_on.days_since}} 天，尚欠 {{invoice.balance}}。根據您同意的條款第 6 條，從今天起我們為您進行中的工作將暫停，而不是繼續累積在一張未付的發票上。這並非針對個人。",
         "什麼都不會遺失。款項結清的那天，我們就從停下的地方繼續。",
       ],
       button: "查看 {{invoice.number}}",

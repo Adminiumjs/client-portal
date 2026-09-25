@@ -23,7 +23,7 @@ import { fakeStudio, type FakeStudio } from "../testing/fakeStudio.ts";
 import { loadClient, loadInvoice, loadPage, useDesk } from "../state/desk.ts";
 import { recordPayment, sendAllReady, voidPayment } from "../state/actions.ts";
 import { useSheets } from "../state/sheets.ts";
-import { useUi } from "../state/ui.ts";
+import { openPrint, useUi } from "../state/ui.ts";
 import { usePortal } from "../state/portal.ts";
 import { now } from "../lib/clock.ts";
 import Invoice from "./Invoice.tsx";
@@ -35,7 +35,6 @@ import Print from "./Print.tsx";
 import RecordPayment from "../sheets/RecordPayment.tsx";
 import VoidInvoice from "../sheets/VoidInvoice.tsx";
 import VoidPayment from "../sheets/VoidPayment.tsx";
-import { openPrint, printStore, resetPrintTarget } from "./print/target.ts";
 import { paymentRefusal } from "./invoices/amount.ts";
 
 /*
@@ -44,7 +43,7 @@ import { paymentRefusal } from "./invoices/amount.ts";
  * what the stores hold now (test-only).
  */
 function current(): void {
-  for (const store of [useDesk, usePortal, useUi, useSheets, printStore] as unknown as { getState: () => object; getInitialState: () => object }[]) {
+  for (const store of [useDesk, usePortal, useUi, useSheets] as unknown as { getState: () => object; getInitialState: () => object }[]) {
     Object.assign(store.getInitialState(), store.getState());
   }
 }
@@ -60,7 +59,7 @@ let studio: FakeStudio;
 
 beforeEach(async () => {
   studio = await fakeStudio();
-  resetPrintTarget();
+  useUi.setState({ print: null });
 });
 
 async function invoicePage(id: number): Promise<string> {

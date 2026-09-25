@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { detailFromPath, landingFromHash, tokenFromHash } from "./deepLink.ts";
+import { detailFromPath, landingFromHash, linkFragment, tokenFromHash } from "./deepLink.ts";
 
 describe("links into one document", () => {
   it("opens the document a section path names, on each side", () => {
@@ -18,5 +18,10 @@ describe("links into one document", () => {
     expect(landingFromHash("#abcDEF123&to=invoices/12")).toBe("invoices/12");
     expect(landingFromHash("#abcDEF123&to=//evil.example")).toBeNull();
     expect(landingFromHash("#abcDEF123&to=https://evil.example")).toBeNull();
+  });
+
+  it("reads the token and the landing together, before the fragment leaves the address", () => {
+    expect(linkFragment("#abcDEF123_-xyz&to=invoices/12")).toEqual({ token: "abcDEF123_-xyz", landing: "invoices/12" });
+    expect(linkFragment("")).toEqual({ token: null, landing: null });
   });
 });

@@ -8,6 +8,7 @@
 import { create } from "zustand";
 
 import type { Id } from "../data/types.ts";
+import type { StatementPeriod } from "../data/ports.ts";
 import type { ClientView, DeskView, Persona, View } from "../app/routes.ts";
 
 export type Theme = "light" | "dark";
@@ -32,6 +33,20 @@ export interface Selected {
   client: Id | null;
   deliverable: Id | null;
   payment: Id | null;
+}
+
+/** A printed copy: the add-on's document for one row (a statement over a client, for a period). */
+export type PrintTarget =
+  | { kind: "invoice"; id: Id }
+  | { kind: "quote"; id: Id }
+  | { kind: "receipt"; id: Id }
+  | { kind: "statement"; id: Id; period: StatementPeriod };
+
+/** How far past due an open invoice is: not yet, up to 30 days, 31–60, over 60. */
+export type AgingBucket = "current" | "d30" | "d60" | "d61";
+
+export interface InvoiceFilter {
+  bucket: AgingBucket;
 }
 
 /** What the composer is writing: a proposal or an invoice, new or a draft. */
@@ -68,6 +83,12 @@ export interface UiState {
   preview: Preview | null;
   /** The token a sign-in link or a share link carried (from the address's fragment). */
   token: string | null;
+  /** Where a sign-in link asked to land once signed in (`invoices/12`); spent after sign-in. */
+  landing: string | null;
+  /** The printed copy on show (a quote, an invoice, a receipt, a statement). */
+  print: PrintTarget | null;
+  /** The Invoices list's aging filter, when Home's aging chips opened it. */
+  invoiceFilter: InvoiceFilter | null;
 }
 
 const NOTHING: Selected = { proposal: null, invoice: null, project: null, client: null, deliverable: null, payment: null };
@@ -83,6 +104,9 @@ export const useUi = create<UiState>(() => ({
   signedOut: false,
   preview: null,
   token: null,
+  landing: null,
+  print: null,
+  invoiceFilter: null,
 }));
 
 function scrollTop(): void {
@@ -109,17 +133,58 @@ const DETAIL: Partial<Record<View, keyof Selected>> = {
 /** Open a detail screen on one row: `open("invoice", 12)`. */
 export function open(view: DeskView | ClientView, id: Id): void {
   const key = DETAIL[view];
-  useUi.setState((s) => ({ view, menu: false, selected: key === undefined ? s.selected : { ...s.selected, [key]: id } }));
+  useUi.setState((s) => ({
+    view,
+    menu: false,
+    selected: key === undefined ? s.selected : { ...s.selected, [key]: id },
+    // An invoice's printed copy opened the plain way is that invoice's.
+    ...(view === "print" ? { print: { kind: "invoice" as const, id } } : {}),
+  }));
   scrollTop();
 }
 
-/** Open the printed copy of a proposal or an invoice. */
-export function openPrint(table: "proposals" | "invoices", id: Id): void {
+/**
+ * Open the printed copy of one document: a proposal (`quote`), an invoice, a
+ * payment's receipt, or a client's statement over a period. The one way in —
+ * `open("print", invoiceId)` still reads as that invoice's copy.
+ */
+export function openPrint(target: PrintTarget): void {
   useUi.setState((s) => ({
     view: "print",
     menu: false,
-    selected: { ...s.selected, invoice: table === "invoices" ? id : null, proposal: table === "proposals" ? id : s.selected.proposal },
+    print: target,
+    selected: {
+      ...s.selected,
+      ...(target.kind === "invoice" ? { invoice: target.id } : {}),
+      ...(target.kind === "quote" ? { proposal: target.id } : {}),
+      ...(target.kind === "receipt" ? { payment: target.id } : {}),
+      ...(target.kind === "statement" ? { client: target.id } : {}),
+    },
   }));
+  scrollTop();
+}
+
+/** Change what the open printed copy shows (a statement's period). */
+export function setPrintTarget(target: PrintTarget): void {
+  useUi.setState({ print: target });
+}
+
+/** The printed copy on show: the one asked for, else the selected invoice's. */
+export function printTargetOf(s: Pick<UiState, "print" | "selected">): PrintTarget | null {
+  if (s.print !== null) return s.print;
+  return s.selected.invoice === null ? null : { kind: "invoice", id: s.selected.invoice };
+}
+
+/** `printTargetOf`, as a hook. */
+export function usePrintTarget(): PrintTarget | null {
+  const print = useUi((s) => s.print);
+  const invoice = useUi((s) => s.selected.invoice);
+  return printTargetOf({ print, selected: { ...NOTHING, invoice } });
+}
+
+/** Open the Invoices list on one aging bucket (Home's aging chips). */
+export function openInvoices(bucket: AgingBucket | null): void {
+  useUi.setState({ view: "invoices", invoiceFilter: bucket === null ? null : { bucket }, menu: false });
   scrollTop();
 }
 
