@@ -57,6 +57,8 @@ export default function Archive() {
   const years = useMemo(() => byYear(items, currency), [items, currency]);
   const thisYear = today === "" ? null : Number(today.slice(0, 4));
   const yearKey = (year: number | null) => (year === null ? "none" : String(year));
+  // A year in the page's digits, never grouped ("2026", not "2,026").
+  const yearText = (year: number) => number(year, { useGrouping: false });
   const selected = picked ?? (years.length === 0 ? "none" : yearKey(years[0]!.year));
   const group = years.find((g) => yearKey(g.year) === selected) ?? years[0];
   const searching = query.trim() !== "";
@@ -72,7 +74,7 @@ export default function Archive() {
           years: t("archive.years", { count: number(yearCount) }, yearCount),
           sum: money(worth(items, currency), currency),
         });
-  const head = searching ? t("archive.matching", { query: query.trim() }) : group === undefined ? t("archive.thisYear") : group.year === thisYear ? t("archive.thisYear") : group.year === null ? t("archive.noYear") : String(group.year);
+  const head = searching ? t("archive.matching", { query: query.trim() }) : group === undefined ? t("archive.thisYear") : group.year === thisYear ? t("archive.thisYear") : group.year === null ? t("archive.noYear") : yearText(group.year);
 
   return (
     <section className="screen ol-screen archive" data-screen="archive" aria-labelledby="archive-title">
@@ -87,7 +89,7 @@ export default function Archive() {
         {years.length > 0 && (
           <Filters
             label={t("archive.yearsLabel")}
-            items={years.map((g) => ({ id: yearKey(g.year), label: g.year === null ? t("archive.noYear") : String(g.year), count: g.items.length }))}
+            items={years.map((g) => ({ id: yearKey(g.year), label: g.year === null ? t("archive.noYear") : yearText(g.year), count: g.items.length }))}
             value={selected}
             onChange={(id) => {
               setPicked(id);

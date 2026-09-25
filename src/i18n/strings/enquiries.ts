@@ -111,7 +111,7 @@ export const enquiries: { "en-US": Messages } & Record<Exclude<LocaleTag, "en-US
     "enquiries.emptyBody": "Essayez un autre filtre — ou notez un appel.",
     "enquiries.none": "Rien n’est encore arrivé.",
     "enquiries.noneBody": "Quand quelqu’un appelle, notez l’appel ici.",
-    "enquiries.fit.good": "Bon profil",
+    "enquiries.fit.good": "Correspond bien",
     "enquiries.fit.maybe": "À discuter",
     "enquiries.fit.no": "Pas pour nous",
     "enquiries.budget": "Budget annoncé",

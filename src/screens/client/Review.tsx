@@ -72,7 +72,7 @@ export default function Review() {
       <Tile icon={d.icon} size={72} />
       {pins.map((pin) => (
         <span key={pin.id} className="cl-pin" aria-hidden="true" style={{ insetBlockStart: `${pin.y}%`, insetInlineStart: `${pin.x}%` }}>
-          {pin.n}
+          {number(pin.n)}
         </span>
       ))}
     </>
@@ -161,7 +161,7 @@ export default function Review() {
             {pins.map((pin) => (
               <li key={pin.id} className="cl-pin-row">
                 <span className="cl-pin cl-pin--static" aria-hidden="true">
-                  {pin.n}
+                  {number(pin.n)}
                 </span>
                 <span>{pin.body}</span>
               </li>

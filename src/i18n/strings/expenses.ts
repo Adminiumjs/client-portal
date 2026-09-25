@@ -541,7 +541,7 @@ export const expenses: { "en-US": Messages } & Record<Exclude<LocaleTag, "en-US"
     "expenses.form.needCost": "تكلفة أكبر من صفر، من فضلك.",
     "expenses.form.futureDate": "يُؤرَّخ المشترى باليوم الذي تم فيه، لا بيوم لم يأتِ بعد.",
     "expenses.form.needDate": "حدّد يوم الشراء.",
-    "expenses.form.tooBig": "حجم الملف أكبر من 100 ميجابايت. تكفي صورة أو ملف PDF للإيصال.",
+    "expenses.form.tooBig": "حجم الملف أكبر من ١٠٠ ميجابايت. تكفي صورة أو ملف PDF للإيصال.",
     "expenses.saved.client": "{amount} سيُضاف إلى فاتورة {company} التالية.",
     "expenses.saved.ours": "سُجّل {amount} على حسابنا.",
     "expenses.sheet.noReceipt": "لا يوجد بعد",

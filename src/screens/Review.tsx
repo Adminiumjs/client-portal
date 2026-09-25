@@ -75,7 +75,7 @@ export default function Review() {
   const at = current === undefined ? -1 : versions.indexOf(current);
   const previous = at > 0 ? versions[at - 1] : undefined;
   const comparing = compare && previous !== undefined;
-  const label = (v: DeliverableVersion) => `v${String(versionNumber(v, versions))}`;
+  const label = (v: DeliverableVersion) => t("common.versionTag", { n: versionNumber(v, versions) });
   const waiting = current === undefined ? [] : (unworded[current.id] ?? []);
   const pins = current === undefined ? [] : pinsOf(notes, current.id, waiting);
   const onDrawable = useCallback((yes: boolean) => setDrawn(yes), []);

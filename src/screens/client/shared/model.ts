@@ -11,6 +11,7 @@
 import type { Day, Decimal, Id, Instant, Tables } from "../../../data/types.ts";
 import { daysBetween, venueDay } from "../../../data/venueTime.ts";
 import { daysLate } from "../../../lib/dates.ts";
+import { t } from "../../../i18n/ambient.ts";
 import { isPositive, minorUnits, sumDecimals } from "../../../lib/money.ts";
 import type { StatusWord } from "../../../components/ui.tsx";
 
@@ -142,11 +143,10 @@ export function fileName(ref: string | null | undefined): string {
 /** The name a version's file goes by. */
 export const versionFile = (v: Version | undefined): string => (v === undefined ? "" : fileName(v.file) || fileName(v.link));
 
-/** A version's label: its number, else its place among the versions (a sample has none). */
+/** A version's label ("v2", in the page's language): its number, else its place among the versions (a sample has none). */
 export function versionLabel(v: Version, all: readonly Version[]): string {
-  if (v.v !== null) return `v${v.v}`;
-  const oldestFirst = [...all].reverse();
-  return `v${oldestFirst.indexOf(v) + 1}`;
+  const n = v.v ?? [...all].reverse().indexOf(v) + 1;
+  return t("common.versionTag", { n });
 }
 
 // ── time ────────────────────────────────────────────────────────────────────

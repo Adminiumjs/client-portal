@@ -125,7 +125,7 @@ function AgreementList({ list, selected, onSelect, total, signed, failed, onMore
       <div className="tm-card-head">
         <FileSignature size={15} aria-hidden="true" />
         <h2 id="tm-agreements">{t("terms.agreements")}</h2>
-        {total !== null && signed !== null && <span className="tm-count">{t("terms.signedCount", { signed: String(signed), total: String(total) })}</span>}
+        {total !== null && signed !== null && <span className="tm-count">{t("terms.signedCount", { signed, total })}</span>}
       </div>
       {failed && (
         <div className="tm-pad">
@@ -150,7 +150,7 @@ function AgreementList({ list, selected, onSelect, total, signed, failed, onMore
                     <span className="tm-agreement-client">{clients[p.client_id]?.company ?? ""}</span>
                     <span className="tm-agreement-sub">{p.status === "accepted" ? t("terms.acceptedOn", { date: dayLabel(p.decided_at === null ? null : venueDay(instant(p.decided_at), studioZone()), locale, "long") }) : t("terms.sentNoAnswer", { title: p.title })}</span>
                   </span>
-                  <span className="tm-mono tm-agreement-ver">{v === undefined ? t("terms.noVersion") : t("terms.versionTag", { n: String(versionNumber(v, versions)) })}</span>
+                  <span className="tm-mono tm-agreement-ver">{v === undefined ? t("terms.noVersion") : t("terms.versionTag", { n: versionNumber(v, versions) })}</span>
                 </button>
               </li>
             );
@@ -187,7 +187,7 @@ function NewVersionForm({ versions, onDone, onCancel }: { versions: readonly Ter
       return;
     }
     const v = out.value;
-    toast(source === null ? t("terms.new.startedEmpty", { n: String(v.version ?? "") }) : t("terms.new.started", { n: String(v.version ?? ""), from: String(versionNumber(source, versions)) }));
+    toast(source === null ? t("terms.new.startedEmpty", { n: v.version ?? "" }) : t("terms.new.started", { n: v.version ?? "", from: versionNumber(source, versions) }));
     onDone(v);
   };
   const onStart = async () => {
@@ -273,7 +273,7 @@ export function VersionList({ versions, counts, manager, openId, onOpen }: { ver
           return (
             <li key={v.id} className="tm-version" aria-current={v.id === openId ? "true" : undefined}>
               <span className="tm-version-top">
-                <span className="tm-mono tm-version-name">{t("terms.versionTag", { n: String(versionNumber(v, versions)) })}</span>
+                <span className="tm-mono tm-version-name">{t("terms.versionTag", { n: versionNumber(v, versions) })}</span>
                 <Pill tone={v.status === "in_force" ? "pos" : "neutral"}>{tag}</Pill>
                 {count !== undefined && count !== null && count > 0 && (
                   <span className="tm-version-used">
@@ -286,7 +286,7 @@ export function VersionList({ versions, counts, manager, openId, onOpen }: { ver
               <span className="tm-version-actions">
                 <button type="button" className="tm-link ol-gi" onClick={() => onOpen(v.id)}>
                   {canEdit ? <PenLine size={13} aria-hidden="true" /> : <ScrollText size={13} aria-hidden="true" />}
-                  {canEdit ? t("terms.editWording", { n: String(versionNumber(v, versions)) }) : t("terms.readVersion", { n: String(versionNumber(v, versions)) })}
+                  {canEdit ? t("terms.editWording", { n: versionNumber(v, versions) }) : t("terms.readVersion", { n: versionNumber(v, versions) })}
                 </button>
               </span>
             </li>
@@ -308,7 +308,7 @@ function TrailCard({ proposal, versions, rows, signedState }: { proposal: Propos
   const project = projects.find((p) => p.proposal_id === proposal.id) ?? null;
   const client = clients[proposal.client_id];
   const version = versions.find((v) => v.id === proposal.terms_version_id);
-  const n = version === undefined ? null : String(versionNumber(version, versions));
+  const n = version === undefined ? null : versionNumber(version, versions);
   const time = (at: string | null) => (at === null ? "" : instantLabel(at, studioZone(), locale, { hour: "numeric", minute: "2-digit" }));
   const sentTo = sentMessage(messages, proposal.id)?.to ?? null;
   const how = proposal.accepted_how === "email" || proposal.accepted_how === "call" || proposal.accepted_how === "meeting" ? proposal.accepted_how : "other";
@@ -363,13 +363,13 @@ function TrailCard({ proposal, versions, rows, signedState }: { proposal: Propos
 function DiffCard({ version, versions, clauses, held }: { version: TermsVersion; versions: readonly TermsVersion[]; clauses: readonly TermsClause[]; held: boolean }) {
   const { t } = useI18n();
   const prev = previousVersion(version, versions);
-  const n = String(versionNumber(version, versions));
+  const n = versionNumber(version, versions);
   const rows = diffRows(version, clauses, versions);
   return (
     <section className="tm-card" aria-labelledby="tm-diff">
       <div className="tm-card-head">
         <GitCompare size={15} aria-hidden="true" />
-        <h2 id="tm-diff">{prev === null ? t("terms.diff.first", { n }) : t("terms.diff.title", { n, prev: String(versionNumber(prev, versions)) })}</h2>
+        <h2 id="tm-diff">{prev === null ? t("terms.diff.first", { n }) : t("terms.diff.title", { n, prev: versionNumber(prev, versions) })}</h2>
       </div>
       {rows.length === 0 && <p className="tm-empty">{t("terms.diff.none")}</p>}
       <ul className="tm-list" role="list">
@@ -396,9 +396,9 @@ function DiffCard({ version, versions, clauses, held }: { version: TermsVersion;
 }
 
 function ClausesCard({ version, versions, clauses, title }: { version: TermsVersion; versions: readonly TermsVersion[]; clauses: readonly TermsClause[]; title: string }) {
-  const { t } = useI18n();
+  const { t, number } = useI18n();
   const list = clausesOf(clauses, version.id);
-  const n = String(versionNumber(version, versions));
+  const n = versionNumber(version, versions);
   const isFirst = previousVersion(version, versions) === null;
   return (
     <section className="tm-card tm-print" aria-labelledby="tm-clauses">
@@ -413,7 +413,7 @@ function ClausesCard({ version, versions, clauses, title }: { version: TermsVers
       <ol className="tm-list" role="list">
         {list.map((c, i) => (
           <li key={c.id} className="tm-clause">
-            <span className="tm-mono tm-clause-n">{i + 1}</span>
+            <span className="tm-mono tm-clause-n">{number(i + 1)}</span>
             <span className="tm-clause-text">
               <span className="tm-clause-top">
                 <span className="tm-clause-title">{c.title}</span>
@@ -456,7 +456,7 @@ export function AgreementPanel({ proposal, versions }: { proposal: Proposal; ver
   const rows = trailOf(proposal, { messages, project, zone: studioZone() });
   const asked = askedState(messages, proposal.id, today(), studioZone());
   const fp = shortFingerprint(proposal.fingerprint);
-  const n = version === null ? null : String(versionNumber(version, versions));
+  const n = version === null ? null : versionNumber(version, versions);
   const how = proposal.accepted_how === "email" || proposal.accepted_how === "call" || proposal.accepted_how === "meeting" ? proposal.accepted_how : "other";
   const decided = proposal.decided_at === null ? "" : dayLabel(venueDay(instant(proposal.decided_at), studioZone()), locale, "long");
 
@@ -606,7 +606,7 @@ function ClauseForm({ initial, onSave, onCancel, busy, error, saveLabel }: { ini
 }
 
 export function VersionPanel({ version, versions, count, manager, onBack }: { version: TermsVersion; versions: readonly TermsVersion[]; count: number | null | undefined; manager: boolean; onBack: () => void }) {
-  const { t } = useI18n();
+  const { t, number } = useI18n();
   const refusal = useRefusalText();
   const clauses = useRows("terms_clauses");
   const [editing, setEditing] = useState<Id | "new" | null>(null);
@@ -619,7 +619,7 @@ export function VersionPanel({ version, versions, count, manager, onBack }: { ve
   }, [version.id]);
 
   const list = clausesOf(clauses, version.id);
-  const n = String(versionNumber(version, versions));
+  const n = versionNumber(version, versions);
   const canEdit = manager && editable(version, count ?? null);
   const locked = count !== undefined && count !== null && count > 0;
   const current = inForce(versions);
@@ -692,7 +692,7 @@ export function VersionPanel({ version, versions, count, manager, onBack }: { ve
       <ol className="tm-list" role="list">
         {list.map((c, i) => (
           <li key={c.id} className="tm-clause">
-            <span className="tm-mono tm-clause-n">{i + 1}</span>
+            <span className="tm-mono tm-clause-n">{number(i + 1)}</span>
             {editing === c.id ? (
               <ClauseForm initial={{ title: c.title, body: c.body ?? "", note: c.change_note ?? "" }} busy={busy} error={null} saveLabel={t("terms.clause.save")} onCancel={() => setEditing(null)} onSave={(v) => void onEditSave(c, v)} />
             ) : (
@@ -702,8 +702,8 @@ export function VersionPanel({ version, versions, count, manager, onBack }: { ve
                   <Pill tone={CHANGE_TONE[c.change]}>{t(`terms.change.${c.change}` as MessageKey)}</Pill>
                   {canEdit && (
                     <span className="tm-clause-tools">
-                      <IconButton icon={PenLine} label={t("terms.clause.editLabel", { n: String(i + 1) })} onClick={() => setEditing(c.id)} />
-                      <IconButton icon={Trash2} label={t("terms.clause.removeLabel", { n: String(i + 1) })} onClick={() => setRemoving(c.id)} />
+                      <IconButton icon={PenLine} label={t("terms.clause.editLabel", { n: i + 1 })} onClick={() => setEditing(c.id)} />
+                      <IconButton icon={Trash2} label={t("terms.clause.removeLabel", { n: i + 1 })} onClick={() => setRemoving(c.id)} />
                     </span>
                   )}
                 </span>
@@ -740,7 +740,7 @@ export function VersionPanel({ version, versions, count, manager, onBack }: { ve
           {version.status === "draft" &&
             (confirmPut ? (
               <span className="tm-confirm">
-                <span className="tm-confirm-text tm-confirm-text--plain">{current === null ? t("terms.put.askFirst") : t("terms.put.ask", { current: String(versionNumber(current, versions)) })}</span>
+                <span className="tm-confirm-text tm-confirm-text--plain">{current === null ? t("terms.put.askFirst") : t("terms.put.ask", { current: versionNumber(current, versions) })}</span>
                 <Button size="small" onClick={() => setConfirmPut(false)}>
                   {t("common.cancel")}
                 </Button>

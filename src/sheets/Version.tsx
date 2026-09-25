@@ -28,7 +28,7 @@ type Problem = null | "file" | "link" | "tooBig" | { refused: string };
 type Posted = Outcome<{ version: DeliverableVersion; deliverable: Deliverable }>;
 
 export default function Version({ sheet, onClose }: { sheet: Extract<DeskSheet, { kind: "version" }>; onClose: () => void }) {
-  const { t, number: num } = useI18n();
+  const { t } = useI18n();
   const deliverable = useRow("deliverables", sheet.deliverableId);
   const project = useRow("projects", deliverable?.project_id);
   const client = useRow("clients", project?.client_id);
@@ -45,7 +45,7 @@ export default function Version({ sheet, onClose }: { sheet: Extract<DeskSheet, 
   const note = typeof draft["note"] === "string" ? draft["note"] : "";
   const problem = (draft["problem"] ?? null) as Problem;
   const first = firstName(client?.contact_name);
-  const next = `v${num(nextVersionNumber(versions))}`;
+  const next = t("common.versionTag", { n: nextVersionNumber(versions) });
   const shared = deliverable !== undefined && deliverable.status !== "unshared";
   const fileName = newestInfo?.name ?? deliverable?.title ?? "";
 
@@ -55,7 +55,7 @@ export default function Version({ sheet, onClose }: { sheet: Extract<DeskSheet, 
       return;
     }
     if (file !== null && out.value.version.file !== null) rememberUpload(out.value.version.file, file, file.name);
-    const saved = `v${num(versionNumber(out.value.version, versionsOf(all.concat(out.value.version), sheet.deliverableId)))}`;
+    const saved = t("common.versionTag", { n: versionNumber(out.value.version, versionsOf(all.concat(out.value.version), sheet.deliverableId)) });
     toast(shared ? t("review.sheet.version.shared", { v: saved, first }) : t("review.sheet.version.saved", { v: saved }), { icon: "upload" });
   };
 

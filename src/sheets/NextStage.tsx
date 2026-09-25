@@ -26,7 +26,7 @@ import { open, toast } from "../state/ui.ts";
 
 /** The stage block both sheets draw: the agreed split, when it was agreed, the stage's share before tax. */
 export function StagePlan({ proposal, stage }: { proposal: Proposal; stage: Stage }) {
-  const { t, locale, money } = useI18n();
+  const { t, locale, money, number } = useI18n();
   const agreedAt = proposal.signed_at ?? proposal.decided_at ?? proposal.sent_at;
   const amount = shareOf(proposal.subtotal, stage.share, minorUnits(proposal.currency ?? undefined));
   return (
@@ -39,7 +39,7 @@ export function StagePlan({ proposal, stage }: { proposal: Proposal; stage: Stag
         {agreedAt !== null && <span className="prop-stage-agreed">{t("proposals.sheet.agreed", { date: instantLabel(agreedAt, studioZone(), locale, { day: "numeric", month: "short" }) })}</span>}
       </div>
       <span className="prop-stage-line">
-        {t("proposals.sheet.stageLine", { pct: stage.share, stage: t(`proposals.stage.${stage.name}` as MessageKey), amount: money(amount, proposal.currency) })}
+        {t("proposals.sheet.stageLine", { pct: number(Number(stage.share), { maximumFractionDigits: 2 }), stage: t(`proposals.stage.${stage.name}` as MessageKey), amount: money(amount, proposal.currency) })}
       </span>
       <span className="prop-stage-note">{t("proposals.sheet.draftNote")}</span>
     </div>

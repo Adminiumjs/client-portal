@@ -25,7 +25,7 @@ import { ArrowLeft, ArrowRight, ArrowUpRight, BellRing, Check, Circle, CircleDot
 import { Alert, Button, Pill, UnfinishedLine, type PillTone } from "../components/ui.tsx";
 import type { Id, Invoice, InvoiceLadder, Message } from "../data/types.ts";
 import { daysBetween } from "../data/venueTime.ts";
-import { useI18n, type LocaleTag } from "../i18n/index.tsx";
+import { paramFormatter, useI18n, type LocaleTag } from "../i18n/index.tsx";
 import { dirFor, LOCALE_TAGS } from "../i18n/locales.ts";
 import { now, studioZone, today } from "../lib/clock.ts";
 import { dayLabel } from "../lib/dates.ts";
@@ -263,7 +263,7 @@ function InvoiceLadderPanel({ inv, manager, messages, at, zone, day, clients, pr
     "invoice.balance": money(inv.balance, inv.currency),
     "invoice.total": money(inv.total, inv.currency),
     "invoice.due_on.date": dayLabel(inv.due_on, tag, "long"),
-    "invoice.due_on.days_since": String(Math.max(0, late)),
+    "invoice.due_on.days_since": paramFormatter(tag)(Math.max(0, late)),
     "project.name": project?.name ?? t("chasing.theWork"),
     "project.number": project?.number ?? "",
     "recipient.first_name": first,
@@ -434,7 +434,7 @@ function RungRow({ rung, last, inv, words, emailTag, values, first, project, loc
 
   const metas: string[] = [];
   if (rung.state === "sent" && m !== null) metas.push(t("chasing.meta.sent", { day: m.sent_at == null ? "" : dayLabel(dayOf(m.sent_at, studioZone()), locale, "long"), to: m.to ?? "" }));
-  if (rung.state === "skipped" && m !== null) metas.push(t(`chasing.meta.skipped.${m.skip_reason ?? "by-hand"}`, { n: String(rung.no + 1) }));
+  if (rung.state === "skipped" && m !== null) metas.push(t(`chasing.meta.skipped.${m.skip_reason ?? "by-hand"}`, { n: rung.no + 1 }));
   if (rung.state === "waiting") metas.push(t("chasing.meta.waiting", { day: dayLabel(rung.dueDay, locale), n: number(rung.day ?? 0) }));
   if (rung.state === "queued") metas.push(t("chasing.meta.queued"));
   if (rung.state === "failed") metas.push(t("chasing.meta.failed", { error: m?.error ?? "" }));
@@ -567,7 +567,7 @@ function Tried({ inv, messages, at, zone, day }: { inv: Invoice; messages: reado
                 <span className="ch-tried-main">
                   <span className="ch-tried-what">{r.state === "skipped" ? t("chasing.tried.skipped", { rung: t(`chasing.rung.${r.no}`) }) : t(`chasing.rung.${r.no}`)}</span>
                   <span className="ch-tried-result">
-                    {r.state === "skipped" ? t(`chasing.meta.skipped.${r.message?.skip_reason ?? "by-hand"}`, { n: String(r.no + 1) }) : ago === 0 ? t("chasing.tried.today") : t("chasing.tried.ago", { n: number(ago) }, ago)}
+                    {r.state === "skipped" ? t(`chasing.meta.skipped.${r.message?.skip_reason ?? "by-hand"}`, { n: r.no + 1 }) : ago === 0 ? t("chasing.tried.today") : t("chasing.tried.ago", { n: number(ago) }, ago)}
                   </span>
                 </span>
               </li>

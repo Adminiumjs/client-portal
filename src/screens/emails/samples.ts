@@ -15,6 +15,7 @@ import { ensureRows, isInDate, isOverdue, loadWhere, useDesk } from "../../state
 import type { Client, Day, Deliverable, Enquiry, Invoice, Payment, Project, Proposal, Settings } from "../../data/types.ts";
 import type { LocaleTag } from "../../i18n/locales.ts";
 import { dirFor } from "../../i18n/locales.ts";
+import { paramFormatter } from "../../i18n/numbers.ts";
 import { dayLabel, daysLate } from "../../lib/dates.ts";
 import { formatMoney, isolateMoney } from "../../lib/money.ts";
 import type { EmailKind } from "./model.ts";
@@ -156,6 +157,8 @@ export function valuesFor(picked: Picked, ctx: SampleContext): Record<string, st
   const dir = dirFor(tag);
   const money = (value: string | null | undefined, currency: string | null | undefined) => (value === null || value === undefined ? "" : isolateMoney(formatMoney(value, currency ?? "USD", tag), dir));
   const day = (d: Day | null | undefined) => (d === null || d === undefined ? "" : dayLabel(d, tag, "long"));
+  // A count in the email's own digits, as its amounts and dates are.
+  const said = paramFormatter(tag);
   const v: Record<string, string> = {
     "practice.name": settings?.name ?? "",
     "practice.reply_to": settings?.reply_to ?? "",
@@ -166,7 +169,7 @@ export function valuesFor(picked: Picked, ctx: SampleContext): Record<string, st
     manage_url: `${ctx.places.portal}h`,
     staff_url: ctx.places.staff,
     appName: settings?.name ?? "",
-    minutes: "20",
+    minutes: said(20),
     link: `${ctx.places.portal}c#${HIDDEN_TOKEN}`,
     code: ctx.code,
   };
@@ -191,7 +194,7 @@ export function valuesFor(picked: Picked, ctx: SampleContext): Record<string, st
     v["invoice.total"] = money(invoice.total, invoice.currency);
     v["invoice.balance"] = money(invoice.balance, invoice.currency);
     v["invoice.due_on.date"] = day(invoice.due_on);
-    v["invoice.due_on.days_since"] = String(Math.max(0, invoice.due_on === null ? 0 : daysLate(invoice.due_on, ctx.today)));
+    v["invoice.due_on.days_since"] = said(Math.max(0, invoice.due_on === null ? 0 : daysLate(invoice.due_on, ctx.today)));
     v["invoice.client_paid_amount"] = money(invoice.client_paid_amount ?? invoice.balance, invoice.currency);
     v["invoice.client_paid_on.date"] = day(invoice.client_paid_on ?? ctx.today);
     v["invoice.client_paid_note"] = invoice.client_paid_note ?? "";

@@ -384,7 +384,7 @@ const AR: Words = {
   "demo.do.partPayment": "دفعة جزئية",
   "demo.do.saysPaid": "العميل يقول إنه دفع",
   "demo.clock.week": "+أسبوع",
-  "demo.clock.reset": "العودة إلى 28 يوليو",
+  "demo.clock.reset": "العودة إلى ٢٨ يوليو",
   "demo.toast.now": "اليوم هو {day}.",
   "demo.toast.reset": "عدنا إلى {day}، والبيانات النموذجية كما كانت.",
   "demo.toast.accepted": "قبل {client} العرض {number} ووقّعه في البوابة.",

@@ -5,7 +5,9 @@
  * clone and read, so a ~120-line context beats a 40 KB dependency. It covers
  * exactly what the app needs — message lookup with `{placeholder}`
  * substitution, a persisted locale, `lang`/`dir` stamping on <html>, and
- * memoized `Intl` formatters for money, numbers and dates.
+ * memoized `Intl` formatters for money, numbers and dates. A number passed as
+ * a placeholder is said in the page's own digits (`numbers.ts`), so a count in
+ * an Arabic sentence reads "٤٧" beside the "٦٬٩٣٧٫٥٠" of its amounts.
  *
  * Plurals: `t()` takes an optional `count`, and a message may carry
  * `|`-separated variants selected through `Intl.PluralRules`, e.g.
@@ -38,6 +40,9 @@ import {
 } from "./locales.ts";
 import type { MessageKey } from "./messages/index.ts";
 import { RUNTIME_MESSAGES } from "./messages/runtime.ts";
+import { paramFormatter } from "./numbers.ts";
+
+export { paramFormatter } from "./numbers.ts";
 
 const STORAGE_KEY = "client-portal-locale";
 
@@ -108,6 +113,34 @@ export function initialLocale(): LocaleTag {
   return resolveLocale(navigator.languages ?? [navigator.language]);
 }
 
+/** The page's `t` for one language: lookup, plural choice, placeholders filled. */
+export function createT(locale: LocaleTag, messages: Record<LocaleTag, Record<string, string>> = RUNTIME_MESSAGES): TFunction {
+  const bundle = messages[locale];
+  const fallback = messages[DEFAULT_LOCALE];
+  const pr = new Intl.PluralRules(locale);
+  const show = paramFormatter(locale);
+
+  return (key, params, count) => {
+    let raw = bundle[key] ?? fallback[key] ?? key;
+
+    if (count !== undefined && raw.includes("|")) {
+      const variants = raw.split("|");
+      const order = PLURAL_ORDER[locale];
+      const idx = order.indexOf(pr.select(count));
+      raw =
+        variants[
+          idx === -1 ? variants.length - 1 : Math.min(idx, variants.length - 1)
+        ];
+    }
+
+    const all = count === undefined ? params : { count, ...params };
+    if (!all) return raw;
+    return raw.replace(/\{(\w+)\}/g, (m: string, name: string) =>
+      name in all ? show(all[name as keyof typeof all]) : m,
+    );
+  };
+}
+
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<LocaleTag>(initialLocale);
   const dir = dirFor(locale);
@@ -139,36 +172,8 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo<I18nValue>(() => {
-    const bundle = RUNTIME_MESSAGES[locale];
-    const fallback = RUNTIME_MESSAGES[DEFAULT_LOCALE];
-    const pr = new Intl.PluralRules(locale);
     const nf = new Intl.NumberFormat(locale);
-
-    const lookup = (
-      key: string,
-      params?: Record<string, string | number>,
-      count?: number,
-    ): string => {
-      let raw = bundle[key] ?? fallback[key] ?? key;
-
-      if (count !== undefined && raw.includes("|")) {
-        const variants = raw.split("|");
-        const order = PLURAL_ORDER[locale];
-        const idx = order.indexOf(pr.select(count));
-        raw =
-          variants[
-            idx === -1 ? variants.length - 1 : Math.min(idx, variants.length - 1)
-          ];
-      }
-
-      const all = count === undefined ? params : { count, ...params };
-      if (!all) return raw;
-      return raw.replace(/\{(\w+)\}/g, (m: string, name: string) =>
-        name in all ? String(all[name as keyof typeof all]) : m,
-      );
-    };
-
-    const t: TFunction = (key, params, count) => lookup(key, params, count);
+    const t = createT(locale);
 
     return {
       locale,

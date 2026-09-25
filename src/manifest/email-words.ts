@@ -509,7 +509,7 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
     studioFoot: "Odesláno ze studia {{practice.name}} na {{practice.reply_to}}. Co vám hlásíme, změníte v Nastavení.",
     "proposal-sent": {
       name: "Nabídka odeslána",
-      subject: "Nabídka pro {{client.company}} — {{proposal.number}}",
+      subject: "{{client.company}}: nabídka {{proposal.number}}",
       preheader: "{{proposal.title}} · {{proposal.total}}",
       paras: [
         "Posíláme naši nabídku na {{proposal.title}}: co zahrnuje, kolik stojí a jak se platí.",
@@ -521,8 +521,8 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
       name: "Připomínka nabídky",
       subject: "{{proposal.number}} platí do {{proposal.valid_until.date}}",
       paras: [
-        "Krátká zpráva pro případ, že vám naše nabídka na {{proposal.title}} zapadla. Platí do {{proposal.valid_until.date}}.",
-        "Přijměte ji a podepište v portálu, nebo nám napište, co by ji pro vás udělalo vhodnou.",
+        "Jen krátce připomínáme, kdyby vám naše nabídka na {{proposal.title}} zapadla. Platí do {{proposal.valid_until.date}}.",
+        "Přijměte ji a podepište v portálu, nebo nám napište, co byste na ní potřebovali změnit.",
       ],
       button: "Přečíst {{proposal.number}}",
     },
@@ -543,7 +543,7 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
     },
     "enquiry-reply": {
       name: "Odpověď na poptávku",
-      subject: "Re: vaše zpráva pro {{practice.name}}",
+      subject: "Re: vaše zpráva studiu {{practice.name}}",
       paras: [
         "Děkujeme, že jste se ozvali.",
         "Mohli bychom si příští týden na půl hodiny zavolat? Potom vám pošleme krátkou nabídku, obvykle během pár dní.",
@@ -551,7 +551,7 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
     },
     "ask-to-sign": {
       name: "Žádost o podpis",
-      subject: "Jedna věc k podpisu pro {{proposal.number}}",
+      subject: "K nabídce {{proposal.number}} chybí už jen váš podpis",
       paras: [
         "Nabídku {{proposal.title}} jste přijali dřív, než jsme začali používat portál. Mohli byste ji tam podepsat? Zabere to minutu — přečtete si podmínky a napíšete své jméno.",
       ],
@@ -749,7 +749,7 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
       name: "التذكير الثالث",
       subject: "{{invoice.number}} متأخرة {{invoice.due_on.days_since}} يومًا — يتوقف عملنا مؤقتًا حتى تُسدَّد",
       paras: [
-        "{{invoice.number}} متأخرة {{invoice.due_on.days_since}} يومًا — والمستحق {{invoice.balance}}. وفق البند 6 من الشروط التي وافقتَ عليها، يتوقف مؤقتًا من اليوم أي عمل جارٍ لك بدل أن يتراكم مقابل فاتورة غير مدفوعة. والأمر ليس شخصيًا.",
+        "{{invoice.number}} متأخرة {{invoice.due_on.days_since}} يومًا — والمستحق {{invoice.balance}}. وفق البند ٦ من الشروط التي وافقتَ عليها، يتوقف مؤقتًا من اليوم أي عمل جارٍ لك بدل أن يتراكم مقابل فاتورة غير مدفوعة. والأمر ليس شخصيًا.",
         "لن يضيع شيء. في اليوم الذي تُسدَّد فيه نكمل من حيث توقّفنا.",
       ],
       button: "اعرض {{invoice.number}}",

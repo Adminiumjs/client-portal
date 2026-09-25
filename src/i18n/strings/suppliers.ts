@@ -485,7 +485,7 @@ export const suppliers: { "en-US": Messages } & Record<Exclude<LocaleTag, "en-US
     "suppliers.form.lead_time": "مدة التسليم",
     "suppliers.form.lead_timePh": "عشرة أيام عمل",
     "suppliers.form.typical_cost": "كم يكلّف",
-    "suppliers.form.typical_costPh": "من 200 $ للمهمة",
+    "suppliers.form.typical_costPh": "من ٢٠٠ $ للمهمة",
     "suppliers.form.address": "العنوان",
     "suppliers.form.addressPh": "الشارع، المدينة، الرمز البريدي",
     "suppliers.form.needName": "اسمًا على الأقل. كلمة «المطبعة» هي كيف ينتهي بك الأمر بالاتصال بالمطبعة الخطأ.",

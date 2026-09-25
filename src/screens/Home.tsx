@@ -72,7 +72,7 @@ function todayLong(day: string, locale: string): string {
 }
 
 export default function Home() {
-  const { t, locale, money } = useI18n();
+  const { t, locale, money, number } = useI18n();
   const rows = useDesk((s) => s.rows);
   const today = useDesk((s) => s.today);
   const zone = studioZone();
@@ -139,12 +139,12 @@ export default function Home() {
         </div>
         <div className="card card--pad ol-card">
           <Kicker icon={ClockAlert}>{t("home.overdue")}</Kicker>
-          <div className="stat-value home-danger">{figures.overdueCount}</div>
+          <div className="stat-value home-danger">{number(figures.overdueCount)}</div>
           <div className="stat-sub">{figures.overdueCount === 0 ? t("home.overdueNone") : t("home.overdueSub", {}, figures.oldestDays)}</div>
         </div>
         <div className="card card--pad ol-card">
           <Kicker icon={FolderKanban}>{t("home.active")}</Kicker>
-          <div className="stat-value">{figures.active}</div>
+          <div className="stat-value">{number(figures.active)}</div>
           <div className="stat-sub">{figures.done === null ? t("home.activeSubNoDone", { paused: figures.paused }) : t("home.activeSub", { paused: figures.paused, done: figures.done })}</div>
         </div>
       </div>

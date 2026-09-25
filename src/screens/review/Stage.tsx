@@ -124,18 +124,18 @@ function Drawing({ info, kind, pins, onDrop, onTakeBack, label, onFail }: { info
  * in a right-to-left page), so the same point shows in every language.
  */
 function PinMark({ pin, onTakeBack }: { pin: Pin; onTakeBack?: (p: Pin) => void }) {
-  const { t } = useI18n();
+  const { t, number } = useI18n();
   const style = { left: `${String(pin.x)}%`, top: `${String(pin.y)}%` };
   if (pin.noteId === null) {
     return (
       <button type="button" className="rv-pin rv-pin--new" style={style} onClick={() => onTakeBack?.(pin)} aria-label={t("review.pin.takeBack", { n: pin.n })} title={t("review.pin.takeBack", { n: pin.n })}>
-        {pin.n}
+        {number(pin.n)}
       </button>
     );
   }
   return (
     <span className="rv-pin" style={style} title={pin.body ?? ""} aria-label={t("review.pin.said", { n: pin.n, body: pin.body ?? "" })} role="img">
-      {pin.n}
+      {number(pin.n)}
     </span>
   );
 }

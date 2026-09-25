@@ -466,7 +466,7 @@ function StartPopover({ series, next, prefix, onClose, onSaved }: { series: Seri
         </span>
       </div>
       <p className="set-pop-sub">{t("settings.inv.startSub", { number: formatNumber(prefix, next, series.fallback) })}</p>
-      <Field label={t("settings.inv.startField")} error={error ? t("settings.inv.startError", { n: String(next) }) : undefined}>
+      <Field label={t("settings.inv.startField")} error={error ? t("settings.inv.startError", { n: next }) : undefined}>
         {({ id, describedBy, invalid }) => (
           <input
             ref={input}
@@ -686,7 +686,7 @@ function InvoiceCard() {
                       dir="ltr"
                       inputMode="numeric"
                       value={d}
-                      aria-label={t("settings.inv.rungAria", { ladder: t(`settings.inv.ladder.${l}` as MessageKey), n: String(i + 1) })}
+                      aria-label={t("settings.inv.rungAria", { ladder: t(`settings.inv.ladder.${l}` as MessageKey), n: i + 1 })}
                       aria-invalid={errors[l] !== undefined}
                       aria-describedby={errors[l] === undefined ? undefined : `${base}-${l}-err`}
                       onChange={(e) => {

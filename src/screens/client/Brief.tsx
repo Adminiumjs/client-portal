@@ -182,7 +182,7 @@ export default function Brief() {
         return (
           <section key={q.key} className="cl-card cl-pad cl-question">
             <span className="cl-question-head">
-              <span className="cl-mono-small">{String(i + 1).padStart(2, "0")}</span>
+              <span className="cl-mono-small">{number(i + 1, { minimumIntegerDigits: 2 })}</span>
               <span className="cl-question-text">
                 <label className="cl-question-title" htmlFor={fieldId}>
                   {q.question}

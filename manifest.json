@@ -448,7 +448,7 @@
               "de-DE": "Antwortadresse",
               "fr-FR": "Adresse de réponse",
               "da-DK": "Svaradresse",
-              "cs-CZ": "Adresa pro odpovědi",
+              "cs-CZ": "Adresa k odpovědím",
               "ar-EG": "عنوان الرد",
               "zh-CN": "回复地址",
               "zh-TW": "回覆地址"
@@ -522,7 +522,7 @@
             "type": "int",
             "label": {
               "en-US": "Hours in a working day",
-              "de-DE": "Stunden pro Arbeitstag",
+              "de-DE": "Stunden je Arbeitstag",
               "fr-FR": "Heures dans une journée de travail",
               "da-DK": "Timer i en arbejdsdag",
               "cs-CZ": "Hodin v pracovním dni",
@@ -537,7 +537,7 @@
             "type": "int",
             "label": {
               "en-US": "Days in a working week",
-              "de-DE": "Arbeitstage pro Woche",
+              "de-DE": "Arbeitstage je Woche",
               "fr-FR": "Jours dans une semaine de travail",
               "da-DK": "Dage i en arbejdsuge",
               "cs-CZ": "Dnů v pracovním týdnu",
@@ -820,7 +820,7 @@
             "type": "int",
             "label": {
               "en-US": "Days a week",
-              "de-DE": "Tage pro Woche",
+              "de-DE": "Tage je Woche",
               "fr-FR": "Jours par semaine",
               "da-DK": "Dage om ugen",
               "cs-CZ": "Dnů v týdnu",
@@ -837,7 +837,7 @@
         "label": {
           "en-US": "Rate",
           "de-DE": "Satz",
-          "fr-FR": "Tarif",
+          "fr-FR": "Prix unitaire",
           "da-DK": "Sats",
           "cs-CZ": "Sazba",
           "ar-EG": "السعر",
@@ -2111,7 +2111,7 @@
                     "de-DE": "Nichts für uns",
                     "fr-FR": "Pas pour nous",
                     "da-DK": "Ikke noget for os",
-                    "cs-CZ": "Není pro nás",
+                    "cs-CZ": "Nehodí se nám",
                     "ar-EG": "ليس لنا",
                     "zh-CN": "不适合我们",
                     "zh-TW": "不適合我們"
@@ -3326,7 +3326,7 @@
             "label": {
               "en-US": "Rate",
               "de-DE": "Satz",
-              "fr-FR": "Tarif",
+              "fr-FR": "Prix unitaire",
               "da-DK": "Sats",
               "cs-CZ": "Sazba",
               "ar-EG": "السعر",
@@ -6479,7 +6479,7 @@
               "de-DE": "Uhr läuft für",
               "fr-FR": "Chrono lancé pour",
               "da-DK": "Uret kører for",
-              "cs-CZ": "Stopky běží pro",
+              "cs-CZ": "Čí stopky běží",
               "ar-EG": "المؤقت يعمل لـ",
               "zh-CN": "正在计时的人",
               "zh-TW": "正在計時的人"
@@ -7615,7 +7615,7 @@
             "label": {
               "en-US": "Rate",
               "de-DE": "Satz",
-              "fr-FR": "Tarif",
+              "fr-FR": "Prix unitaire",
               "da-DK": "Sats",
               "cs-CZ": "Sazba",
               "ar-EG": "السعر",
@@ -14174,7 +14174,7 @@
           "footer": "{{practice.name}} · {{practice.reply_to}} · {{practice.phone}}. Svar på denne e-mail, så læser en af os den."
         },
         "cs-CZ": {
-          "subject": "Nabídka pro {{client.company}} — {{proposal.number}}",
+          "subject": "{{client.company}}: nabídka {{proposal.number}}",
           "preheader": "{{proposal.title}} · {{proposal.total}}",
           "blocks": [
             {
@@ -14553,8 +14553,8 @@
               "id": "body",
               "data": {
                 "paras": [
-                  "Krátká zpráva pro případ, že vám naše nabídka na {{proposal.title}} zapadla. Platí do {{proposal.valid_until.date}}.",
-                  "Přijměte ji a podepište v portálu, nebo nám napište, co by ji pro vás udělalo vhodnou."
+                  "Jen krátce připomínáme, kdyby vám naše nabídka na {{proposal.title}} zapadla. Platí do {{proposal.valid_until.date}}.",
+                  "Přijměte ji a podepište v portálu, nebo nám napište, co byste na ní potřebovali změnit."
                 ]
               }
             },
@@ -15576,7 +15576,7 @@
           "footer": "{{practice.name}} · {{practice.reply_to}} · {{practice.phone}}. Svar på denne e-mail, så læser en af os den."
         },
         "cs-CZ": {
-          "subject": "Re: vaše zpráva pro {{practice.name}}",
+          "subject": "Re: vaše zpráva studiu {{practice.name}}",
           "blocks": [
             {
               "block": "email.text",
@@ -15898,7 +15898,7 @@
           "footer": "{{practice.name}} · {{practice.reply_to}} · {{practice.phone}}. Svar på denne e-mail, så læser en af os den."
         },
         "cs-CZ": {
-          "subject": "Jedna věc k podpisu pro {{proposal.number}}",
+          "subject": "K nabídce {{proposal.number}} chybí už jen váš podpis",
           "blocks": [
             {
               "block": "email.text",
@@ -20204,7 +20204,7 @@
               "id": "body",
               "data": {
                 "paras": [
-                  "{{invoice.number}} متأخرة {{invoice.due_on.days_since}} يومًا — والمستحق {{invoice.balance}}. وفق البند 6 من الشروط التي وافقتَ عليها، يتوقف مؤقتًا من اليوم أي عمل جارٍ لك بدل أن يتراكم مقابل فاتورة غير مدفوعة. والأمر ليس شخصيًا.",
+                  "{{invoice.number}} متأخرة {{invoice.due_on.days_since}} يومًا — والمستحق {{invoice.balance}}. وفق البند ٦ من الشروط التي وافقتَ عليها، يتوقف مؤقتًا من اليوم أي عمل جارٍ لك بدل أن يتراكم مقابل فاتورة غير مدفوعة. والأمر ليس شخصيًا.",
                   "لن يضيع شيء. في اليوم الذي تُسدَّد فيه نكمل من حيث توقّفنا."
                 ]
               }
