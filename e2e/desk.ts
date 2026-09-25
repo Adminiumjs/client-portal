@@ -38,15 +38,15 @@ export class Desk {
 
   /** A sidebar item: on a phone, through the menu. */
   async nav(view: NavView): Promise<void> {
-    const index = NAV.indexOf(view);
     const rail = this.page.locator(".desk-rail .desk-nav-item");
     const menu = this.page.locator(".desk-header button[aria-haspopup='dialog']");
     // The desk has drawn its frame: the sidebar, or at phone width the menu button.
     await expect(rail.first().or(menu)).toBeVisible({ timeout: 30_000 });
-    if (await rail.first().isVisible()) await rail.nth(index).click();
+    // Items by the screen they open, not their place: the sidebar's order is the design's to change.
+    if (await rail.first().isVisible()) await this.page.locator(`.desk-rail [data-nav="${view}"]`).click();
     else {
       await menu.click();
-      await this.page.locator(".menu-panel .desk-nav-item").nth(index).click();
+      await this.page.locator(`.menu-panel [data-nav="${view}"]`).click();
     }
     await this.shows(view);
   }
@@ -94,7 +94,7 @@ export function deskStops(checks: { home?(d: Desk): Promise<void>; chasing?(d: D
     {
       name: "enquiries",
       go: async (d) => {
-        if (await d.page.locator(".menu-panel").isVisible()) await d.page.locator(".menu-panel .desk-nav-item").nth(1).click();
+        if (await d.page.locator(".menu-panel").isVisible()) await d.page.locator('.menu-panel [data-nav="enquiries"]').click();
         else await d.nav("enquiries");
         await d.shows("enquiries");
       },

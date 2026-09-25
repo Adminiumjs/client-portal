@@ -246,7 +246,11 @@ test("every email we send — light, dark, Arabic, phone — and a test that onl
   const clientEmails = (await stack.rows("clients")).map((c) => String(c["email"]));
 
   for (const variant of VARIANTS) {
-    const page = await deskAt(browser, variant, "emails", "emails");
+    // Every email is reached from Settings, as a studio manager would find it.
+    const page = await deskAt(browser, variant, "settings", "settings");
+    await page.locator("main button.set-email-link").click();
+    await expect(screenOf(page, "emails")).toBeVisible({ timeout: 30_000 });
+    await settle(page);
     const main = page.locator("[data-screen=emails]");
     const tabs = main.locator(".em-tab");
     await expect(tabs).toHaveCount(21);
