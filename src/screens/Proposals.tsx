@@ -8,7 +8,7 @@
  * only the recent ones); a draft opens straight in the composer.
  */
 import { useEffect, useMemo, useState } from "react";
-import { SquarePen } from "lucide-react";
+import { Calculator, SquarePen } from "lucide-react";
 
 import { Button, DocList, DocRow, Empty, Filters, Money, StatusPill, type FilterItem } from "../components/ui.tsx";
 import type { Proposal } from "../data/types.ts";
@@ -16,7 +16,7 @@ import type { ListCondition } from "../data/snapshotPort.ts";
 import { useI18n, type MessageKey } from "../i18n/index.tsx";
 import { sumDecimals } from "../lib/money.ts";
 import { loadPage, useDesk, useRows } from "../state/desk.ts";
-import { open, openComposer } from "../state/ui.ts";
+import { go, open, openComposer } from "../state/ui.ts";
 import { dayWithYear } from "./proposals/format.ts";
 import { inFilter, isOutOfDate, PROPOSAL_FILTERS, proposalWord, type ProposalFilter } from "./proposals/model.ts";
 
@@ -79,6 +79,9 @@ export default function Proposals() {
           </p>
         </div>
         <span className="screen-actions">
+          <Button icon={Calculator} onClick={() => go("scoping")}>
+            {t("scoping.fromProposals")}
+          </Button>
           <Button kind="primary" icon={SquarePen} onClick={() => openComposer({ kind: "proposal", id: null })}>
             {t("proposals.new")}
           </Button>

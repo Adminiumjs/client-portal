@@ -44,7 +44,8 @@ describe("Settings, for a studio manager", () => {
     expect(html).toContain(">Settings</h1>");
     expect(html).toContain("The handful of things that are true for every document we send.");
     expect(html).toContain("Terms &amp; signature");
-    expect(html).not.toMatch(/Suppliers|worksheet|Year-end/);
+    expect(html).not.toMatch(/Suppliers|Year-end/);
+    expect(html).toContain("Use it on a worksheet");
   });
 
   it("fills the studio card from the settings row", () => {

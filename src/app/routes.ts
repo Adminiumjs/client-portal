@@ -146,7 +146,7 @@ export interface SidebarItem {
 export const SIDEBAR: readonly SidebarItem[] = [
   { view: "home", labelKey: "nav.home", icon: "house", children: [] },
   { view: "enquiries", labelKey: "nav.enquiries", icon: "inbox", children: [], badge: "enquiries" },
-  { view: "proposals", labelKey: "nav.proposals", icon: "file-text", children: ["proposal", "composer"], badge: "proposals" },
+  { view: "proposals", labelKey: "nav.proposals", icon: "file-text", children: ["proposal", "composer", "scoping"], badge: "proposals" },
   { view: "projects", labelKey: "nav.projects", icon: "folder-kanban", children: ["project", "review", "handover"] },
   { view: "clients", labelKey: "nav.clients", icon: "users-round", children: ["client"] },
   { view: "invoices", labelKey: "nav.invoices", icon: "receipt-text", children: ["invoice", "print"], badge: "invoices" },

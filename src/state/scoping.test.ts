@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import type { Rate } from "../data/types.ts";
 import { fakeStudio, tableOf, type FakeStudio } from "../testing/fakeStudio.ts";
 import type { Outcome } from "./outcome.ts";
-import { pastStages, turnIntoProposal, workSheet, type Worksheet, type WorksheetInputs } from "./scoping.ts";
+import { pastStages, reserveQty, turnIntoProposal, workSheet, type Worksheet, type WorksheetInputs } from "./scoping.ts";
 
 const rate = (id: number, label: string, amount: string, hours: string | null): Rate => ({ id, label, amount, hours_per_unit: hours, position: id, active: true });
 
@@ -73,6 +73,8 @@ describe("the worksheet's figures", () => {
     const f = workSheet({ ...sheet, contingency: true }, inputs);
     // Stages ran 12.5 % over on average; the reserve is that share of the fees.
     expect([f.drift, f.contingency, f.price]).toEqual([0.13, 777.4, 7177.4]);
+    // The reserve is held per row, in thousandths of the rate: what the lines will carry.
+    expect([reserveQty("6", 0.13), reserveQty("1", 0.13), reserveQty("12", 0.13), reserveQty("0.5", 0.13), reserveQty("1.25", 0.13), reserveQty("3", 0)]).toEqual(["0.78", "0.13", "1.56", "0.065", "0.163", "0"]);
     expect(workSheet({ ...sheet, contingency: true }, { ...inputs, milestones: [] }).contingency).toBe(0);
   });
 
@@ -91,27 +93,31 @@ describe("turning it into a proposal", () => {
     return outcome.value;
   };
 
-  it("saves one draft for the client with a line per rate, the reserve and the purchases at cost — and nothing before", async () => {
+  it("saves one draft for the client with a line per rate and a reserve line per rate — and nothing before", async () => {
     workSheet({ ...sheet, contingency: true }, inputs);
     expect(studio.writes).toEqual([]);
-    const proposal = ok(await turnIntoProposal({ ...sheet, contingency: true }, inputs, { contingencyWords: "Time held in reserve for this stage" }));
-    expect(studio.writes.map((w) => `${w.op} ${w.table}`)).toEqual(["insert proposals", ...Array(5).fill("insert proposal_lines")]);
+    const proposal = ok(await turnIntoProposal({ ...sheet, contingency: true }, inputs, { contingencyWords: (label) => `Time held in reserve — ${label}` }));
+    expect(studio.writes.map((w) => `${w.op} ${w.table}`)).toEqual(["insert proposals", ...Array(6).fill("insert proposal_lines")]);
     expect(studio.writes[0]!.values).toMatchObject({ client_id: 4, title: "Podcast identity — mark & wordmark", split: "5050", valid_until: "2026-08-18", terms_version_id: 3 });
+    // Every rate is the card's and every reserve a quantity of it: no amount the browser worked out is sent.
     expect(studio.writes.slice(1).map((w) => [w.values!["description"], w.values!["qty"], w.values!["rate"]])).toEqual([
       ["Day rate, design", "6", "750.00"],
       ["Half day", "1", "400.00"],
       ["Template, each", "12", "90.00"],
-      ["Time held in reserve for this stage", "1", "777.40"],
-      ["Type licence — two weights", "1", "420"],
+      ["Time held in reserve — Day rate, design", "0.78", "750.00"],
+      ["Time held in reserve — Half day", "0.13", "400.00"],
+      ["Time held in reserve — Template, each", "1.56", "90.00"],
     ]);
-    // The totals are Adminium's: 5980 + 777.40 + 420.
-    expect(proposal).toMatchObject({ status: "draft", subtotal: "7177.40" });
+    // The expenses stay on the worksheet: they reach the invoice with their receipts.
+    expect(studio.writes.some((w) => w.values?.["description"] === "Type licence — two weights")).toBe(false);
+    // The totals are Adminium's: 5980 + 585 + 52 + 140.40.
+    expect(proposal).toMatchObject({ status: "draft", subtotal: "6757.40" });
     expect(tableOf(studio, "proposals").filter((p) => p["status"] === "draft")).toHaveLength(2);
   });
 
   it("asks for a client and a stage name before saving anything", async () => {
-    const noClient = await turnIntoProposal({ ...sheet, clientId: null }, inputs, { contingencyWords: "x" });
-    const noStage = await turnIntoProposal({ ...sheet, stage: " " }, inputs, { contingencyWords: "x" });
+    const noClient = await turnIntoProposal({ ...sheet, clientId: null }, inputs, { contingencyWords: () => "x" });
+    const noStage = await turnIntoProposal({ ...sheet, stage: " " }, inputs, { contingencyWords: () => "x" });
     expect([!noClient.ok && noClient.code, !noStage.ok && noStage.code]).toEqual(["CLIENT_REQUIRED", "TITLE_REQUIRED"]);
     expect(studio.writes).toEqual([]);
   });

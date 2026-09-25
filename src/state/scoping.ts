@@ -107,6 +107,19 @@ const num = (text: string | null | undefined): number => {
 };
 const cents = (n: number): number => Math.round(n * 100) / 100;
 
+/**
+ * How many of a rate the reserve holds back for one row: its quantity times
+ * how far past stages ran over, to the thousandth a line's quantity keeps
+ * (worked in whole thousandths and hundredths, so no float rounding moves
+ * it). The reserve is a QUANTITY of the rate card's own rate: the line's
+ * amount is Adminium's, never a sum the browser worked out.
+ */
+export function reserveQty(qty: string | number, drift: number): string {
+  const thousandths = Math.round((typeof qty === "number" ? qty : num(qty)) * 1000);
+  const held = Math.round((thousandths * Math.round(drift * 100)) / 100);
+  return (held / 1000).toFixed(3).replace(/\.?0+$/, "");
+}
+
 /** The history card: each finished milestone with an estimate, against the hours logged on it. */
 export function pastStages(inputs: Pick<WorksheetInputs, "milestones" | "time" | "settings">): PastStage[] {
   const hoursPerDay = inputs.settings?.hours_per_day ?? 6;
@@ -136,7 +149,14 @@ export function workSheet(sheet: Worksheet, inputs: WorksheetInputs): WorksheetF
   const expensesCarried = cents(sheet.expenses.filter((e) => !e.passOn).reduce((sum, e) => sum + num(e.amount), 0));
   const past = pastStages(inputs);
   const drift = past.length === 0 ? null : Math.round((past.reduce((sum, p) => sum + p.actualDays / p.quotedDays, 0) / past.length - 1) * 100) / 100;
-  const contingency = sheet.contingency && drift !== null && drift > 0 ? cents(fees * drift) : 0;
+  // The reserve, as the proposal will carry it: per row, its held quantity at the row's rate.
+  const contingency =
+    sheet.contingency && drift !== null && drift > 0
+      ? cents(sheet.rows.reduce((sum, row) => {
+          const rate = inputs.rates.find((r) => r.id === row.rateId);
+          return rate === undefined ? sum : sum + cents(num(reserveQty(row.qty, drift)) * num(rate.amount));
+        }, 0))
+      : 0;
   const price = cents(fees + contingency + expensesAtCost);
   const tax = cents((price * num(inputs.taxRate)) / 100);
   const priceWithTax = cents(price + tax);
@@ -171,8 +191,8 @@ export function termsInForce(versions: readonly TermsVersion[]): TermsVersion | 
 }
 
 export interface TurnInput {
-  /** The line that holds the contingency, in the studio's words ("Time held in reserve for this stage"). */
-  contingencyWords: string;
+  /** A reserve line's words, for the rate it holds back ("Time held in reserve — Day rate, design"). */
+  contingencyWords: (rateLabel: string) => string;
   /** How long the proposal holds: three weeks from today unless said. */
   validUntil?: Day;
 }
@@ -180,8 +200,11 @@ export interface TurnInput {
 /**
  * Turn this into a proposal: ONE proposal draft for the client, titled with
  * the stage, with a line per rate row (the rate's words, how many, its
- * amount), the contingency as a line of its own, and the expenses passed on
- * at cost — never marked up. It names the terms in force, holds three weeks,
+ * amount) and, with the contingency on, a reserve line per row (the same
+ * rate, the held quantity) — every amount Adminium's, from a stored rate and
+ * a quantity. The expenses stay on the worksheet: they reach the client's
+ * invoice with their receipts (Expenses' "Pass on"), never the proposal, so
+ * nothing is charged twice. It names the terms in force, holds three weeks,
  * and is paid in the sheet's split. Before this, nothing was stored.
  */
 export function turnIntoProposal(sheet: Worksheet, inputs: WorksheetInputs, words: TurnInput): Promise<Outcome<Proposal>> {
@@ -189,16 +212,17 @@ export function turnIntoProposal(sheet: Worksheet, inputs: WorksheetInputs, word
   if (sheet.stage.trim() === "") return Promise.resolve(invalid("TITLE_REQUIRED", "stage"));
   const figures = workSheet(sheet, inputs);
   const lines: LineInput[] = [];
+  const reserve: LineInput[] = [];
   for (const row of sheet.rows) {
     const rate = inputs.rates.find((r) => r.id === row.rateId);
     if (rate === undefined || num(row.qty) <= 0) continue;
     lines.push({ description: rate.label, qty: row.qty.trim(), rate: rate.amount });
+    if (figures.contingency > 0 && figures.drift !== null) {
+      const held = reserveQty(row.qty, figures.drift);
+      if (num(held) > 0) reserve.push({ description: words.contingencyWords(rate.label), qty: held, rate: rate.amount });
+    }
   }
-  if (figures.contingency > 0) lines.push({ description: words.contingencyWords, qty: "1", rate: figures.contingency.toFixed(2) });
-  for (const expense of sheet.expenses) {
-    if (!expense.passOn || num(expense.amount) <= 0 || expense.what.trim() === "") continue;
-    lines.push({ description: expense.what.trim(), qty: "1", rate: expense.amount.trim() });
-  }
+  lines.push(...reserve);
   if (lines.length === 0) return Promise.resolve(invalid("NOTHING_TO_PRICE", "rows"));
   const draft: ProposalDraft = {
     id: null,

@@ -20,7 +20,7 @@
  */
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
-import { ArrowUpRight, Bell, Check, FileSignature, Mail, PenTool, Plus, ReceiptText, Ruler, Trash2, UsersRound } from "lucide-react";
+import { ArrowUpRight, Bell, Calculator, Check, FileSignature, Mail, PenTool, Plus, ReceiptText, Ruler, Trash2, UsersRound } from "lucide-react";
 
 import { Alert, Button, Field, IconButton, ScreenHead } from "../components/ui.tsx";
 import type { Id, Person, Rate, Settings as SettingsRow } from "../data/types.ts";
@@ -788,6 +788,9 @@ function RateCard({ rates, settings, manager }: { rates: Rate[]; settings: Setti
       title={t("settings.rates.title")}
       action={
         <>
+          <Button size="small" icon={Calculator} className="set-head-btn" onClick={() => go("scoping")}>
+            {t("scoping.fromRateCard")}
+          </Button>
           {manager && (
             <Button size="small" icon={Plus} className="set-head-btn" onClick={() => openSheet({ kind: "add", what: "rate" })}>
               {t("settings.rates.add")}
