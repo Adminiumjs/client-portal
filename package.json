@@ -16,6 +16,7 @@
     "test": "vitest run",
     "dev:hosted": "VITE_ADMINIUM_SURFACE_SIDE=staff vite",
     "manifest": "vite-node scripts/write-manifest.ts",
+    "sample": "vite-node scripts/write-sample-columns.ts",
     "lexicon": "node scripts/sync-lexicon.mjs",
     "lexicon:check": "node scripts/sync-lexicon.mjs --check"
   },

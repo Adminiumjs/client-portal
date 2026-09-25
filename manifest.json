@@ -2968,6 +2968,7 @@
             ],
             "except": [
               "valid_until",
+              "decided_at",
               "withdraw_reason",
               "signed_name",
               "signed_email",
@@ -3146,7 +3147,7 @@
           {
             "ref": "discount",
             "type": "decimal",
-            "scale": "currency",
+            "scale": 3,
             "nullable": true,
             "label": {
               "en-US": "Discount",
@@ -6428,7 +6429,7 @@
             "rules": {
               "copy": {
                 "via": "quote_id",
-                "from": "total",
+                "from": "subtotal",
                 "mode": "always"
               }
             },
@@ -6491,7 +6492,7 @@
           {
             "ref": "discount",
             "type": "decimal",
-            "scale": "currency",
+            "scale": 3,
             "nullable": true,
             "label": {
               "en-US": "Discount",
@@ -16955,5 +16956,8 @@
         }
       }
     }
-  ]
+  ],
+  "sampleData": {
+    "file": "seeds/clients.sample.json"
+  }
 }

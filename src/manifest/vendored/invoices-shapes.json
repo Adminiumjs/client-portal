@@ -1,6 +1,6 @@
 {
   "addOn": "invoices",
-  "version": "draft",
+  "version": "1.0.2",
   "shapes": [
     {
       "name": "invoice",
@@ -432,7 +432,7 @@
               "rules": {
                 "copy": {
                   "via": "quote_id",
-                  "from": "total",
+                  "from": "subtotal",
                   "mode": "always"
                 }
               }
@@ -449,7 +449,7 @@
             {
               "ref": "discount",
               "type": "decimal",
-              "scale": "currency",
+              "scale": 3,
               "nullable": true
             },
             {
@@ -730,22 +730,32 @@
           "kind": "invoice",
           "part": "document",
           "name": {
-            "en-US": "Invoice"
+            "en-US": "Invoice",
+            "de-DE": "Rechnung",
+            "fr-FR": "Facture",
+            "cs-CZ": "Faktura",
+            "da-DK": "Faktura",
+            "zh-CN": "发票",
+            "zh-TW": "發票",
+            "ar-EG": "فاتورة"
           },
           "mapping": {
             "number": {
               "column": "number"
             },
-            "issuedOn": {
+            "issuedAt": {
               "column": "issued_on"
             },
-            "dueOn": {
+            "dueAt": {
               "column": "due_on"
+            },
+            "terms": {
+              "column": "terms"
             },
             "currency": {
               "column": "currency"
             },
-            "taxLabel": {
+            "taxName": {
               "column": "tax_name"
             },
             "taxRate": {
@@ -763,26 +773,28 @@
             "paid": {
               "column": "paid"
             },
-            "amountDue": {
+            "balance": {
               "column": "balance"
             },
             "status": {
               "column": "status"
             },
-            "voidedAt": {
+            "voidedOn": {
               "column": "voided_at"
             },
-            "lines": {
+            "items": {
               "collection": {
                 "table": "lines",
                 "via": "document_id",
                 "orderBy": "position",
                 "columns": {
-                  "description": "description",
+                  "desc": "description",
                   "qty": "qty",
-                  "unitPrice": "rate",
+                  "rate": "rate",
                   "discount": "discount",
-                  "amount": "amount"
+                  "discountKind": "discount_kind",
+                  "amount": "amount",
+                  "share": "share_pct"
                 }
               }
             },
@@ -794,8 +806,8 @@
                 "columns": {
                   "number": "number",
                   "paidOn": "paid_on",
-                  "amount": "amount",
                   "method": "method",
+                  "amount": "amount",
                   "voided": "voided"
                 }
               }
@@ -806,31 +818,48 @@
           "kind": "receipt",
           "part": "payments",
           "name": {
-            "en-US": "Receipt"
+            "en-US": "Receipt",
+            "de-DE": "Quittung",
+            "fr-FR": "Reçu",
+            "cs-CZ": "Stvrzenka",
+            "da-DK": "Kvittering",
+            "zh-CN": "收据",
+            "zh-TW": "收據",
+            "ar-EG": "إيصال"
           },
           "mapping": {
             "number": {
               "column": "number"
             },
-            "paidOn": {
+            "issuedAt": {
               "column": "paid_on"
-            },
-            "amount": {
-              "column": "amount"
             },
             "currency": {
               "column": "currency"
             },
-            "method": {
+            "amount": {
+              "column": "amount"
+            },
+            "paidWith": {
               "column": "method"
             },
             "invoiceNumber": {
               "via": "document_id",
               "column": "number"
             },
+            "invoiceTotal": {
+              "via": "document_id",
+              "column": "total"
+            },
             "balanceAfter": {
               "via": "document_id",
               "column": "balance"
+            },
+            "voided": {
+              "column": "voided"
+            },
+            "voidedOn": {
+              "column": "voided_at"
             }
           }
         }
@@ -956,6 +985,1343 @@
             "link": "payment_id",
             "onCreate": {
               "table": "payments"
+            }
+          }
+        ],
+        "templates": [
+          {
+            "kind": "invoice-sent",
+            "name": {
+              "en-US": "Invoice sent",
+              "de-DE": "Rechnung versendet",
+              "fr-FR": "Facture envoyée",
+              "cs-CZ": "Faktura odeslána",
+              "da-DK": "Faktura sendt",
+              "zh-CN": "发票已发送",
+              "zh-TW": "發票已發送",
+              "ar-EG": "تم إرسال الفاتورة"
+            },
+            "attach": {
+              "kind": "invoice",
+              "link": "invoice"
+            },
+            "vars": [
+              "number",
+              "total",
+              "due_on",
+              "contact_first_name",
+              "letterhead_name"
+            ],
+            "locales": {
+              "en-US": {
+                "subject": "{{number}} from {{letterhead_name}} — {{total}}",
+                "preheader": "{{number}} · due {{due_on}} · {{total}}",
+                "blocks": [
+                  {
+                    "block": "email.text",
+                    "id": "greeting",
+                    "data": {
+                      "paras": [
+                        "Hello {{contact_first_name}},",
+                        "Here is {{number}}, for {{total}}. It is due on {{due_on}}. The invoice is attached, with how to pay."
+                      ]
+                    }
+                  },
+                  {
+                    "block": "email.box",
+                    "id": "summary",
+                    "data": {
+                      "label": "{{number}} · due {{due_on}}",
+                      "value": "{{total}}"
+                    }
+                  },
+                  {
+                    "block": "email.button",
+                    "id": "action",
+                    "data": {
+                      "label": "View {{number}}",
+                      "url": "{{signInLink}}"
+                    }
+                  }
+                ],
+                "footer": "{{letterhead_name}}"
+              },
+              "de-DE": {
+                "subject": "{{number}} von {{letterhead_name}} — {{total}}",
+                "preheader": "{{number}} · fällig am {{due_on}} · {{total}}",
+                "blocks": [
+                  {
+                    "block": "email.text",
+                    "id": "greeting",
+                    "data": {
+                      "paras": [
+                        "Hallo {{contact_first_name}},",
+                        "hier ist {{number}} über {{total}}. Sie ist am {{due_on}} fällig. Die Rechnung liegt bei, mit dem Zahlungsweg."
+                      ]
+                    }
+                  },
+                  {
+                    "block": "email.box",
+                    "id": "summary",
+                    "data": {
+                      "label": "{{number}} · fällig am {{due_on}}",
+                      "value": "{{total}}"
+                    }
+                  },
+                  {
+                    "block": "email.button",
+                    "id": "action",
+                    "data": {
+                      "label": "{{number}} ansehen",
+                      "url": "{{signInLink}}"
+                    }
+                  }
+                ],
+                "footer": "{{letterhead_name}}"
+              },
+              "fr-FR": {
+                "subject": "{{number}} de {{letterhead_name}} — {{total}}",
+                "preheader": "{{number}} · échéance le {{due_on}} · {{total}}",
+                "blocks": [
+                  {
+                    "block": "email.text",
+                    "id": "greeting",
+                    "data": {
+                      "paras": [
+                        "Bonjour {{contact_first_name}},",
+                        "Voici {{number}}, d’un montant de {{total}}, à régler avant le {{due_on}}. La facture est jointe, avec la façon de régler."
+                      ]
+                    }
+                  },
+                  {
+                    "block": "email.box",
+                    "id": "summary",
+                    "data": {
+                      "label": "{{number}} · échéance le {{due_on}}",
+                      "value": "{{total}}"
+                    }
+                  },
+                  {
+                    "block": "email.button",
+                    "id": "action",
+                    "data": {
+                      "label": "Voir {{number}}",
+                      "url": "{{signInLink}}"
+                    }
+                  }
+                ],
+                "footer": "{{letterhead_name}}"
+              },
+              "cs-CZ": {
+                "subject": "{{number}} od {{letterhead_name}} — {{total}}",
+                "preheader": "{{number}} · splatnost {{due_on}} · {{total}}",
+                "blocks": [
+                  {
+                    "block": "email.text",
+                    "id": "greeting",
+                    "data": {
+                      "paras": [
+                        "Dobrý den, {{contact_first_name}},",
+                        "posíláme {{number}} na {{total}} se splatností {{due_on}}. Faktura je v příloze i s pokyny k platbě."
+                      ]
+                    }
+                  },
+                  {
+                    "block": "email.box",
+                    "id": "summary",
+                    "data": {
+                      "label": "{{number}} · splatnost {{due_on}}",
+                      "value": "{{total}}"
+                    }
+                  },
+                  {
+                    "block": "email.button",
+                    "id": "action",
+                    "data": {
+                      "label": "Zobrazit {{number}}",
+                      "url": "{{signInLink}}"
+                    }
+                  }
+                ],
+                "footer": "{{letterhead_name}}"
+              },
+              "da-DK": {
+                "subject": "{{number}} fra {{letterhead_name}} — {{total}}",
+                "preheader": "{{number}} · forfalder {{due_on}} · {{total}}",
+                "blocks": [
+                  {
+                    "block": "email.text",
+                    "id": "greeting",
+                    "data": {
+                      "paras": [
+                        "Hej {{contact_first_name}},",
+                        "Her er {{number}} på {{total}}. Den forfalder {{due_on}}. Fakturaen er vedhæftet, med oplysninger om betaling."
+                      ]
+                    }
+                  },
+                  {
+                    "block": "email.box",
+                    "id": "summary",
+                    "data": {
+                      "label": "{{number}} · forfalder {{due_on}}",
+                      "value": "{{total}}"
+                    }
+                  },
+                  {
+                    "block": "email.button",
+                    "id": "action",
+                    "data": {
+                      "label": "Se {{number}}",
+                      "url": "{{signInLink}}"
+                    }
+                  }
+                ],
+                "footer": "{{letterhead_name}}"
+              },
+              "zh-CN": {
+                "subject": "{{letterhead_name}} 的 {{number}} — {{total}}",
+                "preheader": "{{number}} · {{due_on}} 到期 · {{total}}",
+                "blocks": [
+                  {
+                    "block": "email.text",
+                    "id": "greeting",
+                    "data": {
+                      "paras": [
+                        "{{contact_first_name}}，您好：",
+                        "这是 {{number}}，金额 {{total}}，{{due_on}} 到期。发票及付款方法见附件。"
+                      ]
+                    }
+                  },
+                  {
+                    "block": "email.box",
+                    "id": "summary",
+                    "data": {
+                      "label": "{{number}} · {{due_on}} 到期",
+                      "value": "{{total}}"
+                    }
+                  },
+                  {
+                    "block": "email.button",
+                    "id": "action",
+                    "data": {
+                      "label": "查看 {{number}}",
+                      "url": "{{signInLink}}"
+                    }
+                  }
+                ],
+                "footer": "{{letterhead_name}}"
+              },
+              "zh-TW": {
+                "subject": "{{letterhead_name}} 的 {{number}} — {{total}}",
+                "preheader": "{{number}} · {{due_on}} 到期 · {{total}}",
+                "blocks": [
+                  {
+                    "block": "email.text",
+                    "id": "greeting",
+                    "data": {
+                      "paras": [
+                        "{{contact_first_name}}，您好：",
+                        "這是 {{number}}，金額 {{total}}，{{due_on}} 到期。發票及付款方法見附件。"
+                      ]
+                    }
+                  },
+                  {
+                    "block": "email.box",
+                    "id": "summary",
+                    "data": {
+                      "label": "{{number}} · {{due_on}} 到期",
+                      "value": "{{total}}"
+                    }
+                  },
+                  {
+                    "block": "email.button",
+                    "id": "action",
+                    "data": {
+                      "label": "查看 {{number}}",
+                      "url": "{{signInLink}}"
+                    }
+                  }
+                ],
+                "footer": "{{letterhead_name}}"
+              },
+              "ar-EG": {
+                "subject": "{{number}} من {{letterhead_name}} — {{total}}",
+                "preheader": "{{number}} · تستحق في {{due_on}} · {{total}}",
+                "blocks": [
+                  {
+                    "block": "email.text",
+                    "id": "greeting",
+                    "data": {
+                      "paras": [
+                        "مرحباً {{contact_first_name}}،",
+                        "هذه {{number}} بمبلغ {{total}}، وتستحق في {{due_on}}. الفاتورة مرفقة مع طريقة الدفع."
+                      ]
+                    }
+                  },
+                  {
+                    "block": "email.box",
+                    "id": "summary",
+                    "data": {
+                      "label": "{{number}} · تستحق في {{due_on}}",
+                      "value": "{{total}}"
+                    }
+                  },
+                  {
+                    "block": "email.button",
+                    "id": "action",
+                    "data": {
+                      "label": "عرض {{number}}",
+                      "url": "{{signInLink}}"
+                    }
+                  }
+                ],
+                "footer": "{{letterhead_name}}"
+              }
+            }
+          },
+          {
+            "kind": "invoice-rung-1",
+            "name": {
+              "en-US": "Reminder 1 — a gentle nudge",
+              "de-DE": "Erinnerung 1 — ein sanfter Hinweis",
+              "fr-FR": "Relance 1 — un petit rappel",
+              "cs-CZ": "Upomínka 1 — jemné připomenutí",
+              "da-DK": "Rykker 1 — en venlig påmindelse",
+              "zh-CN": "提醒 1——温和提示",
+              "zh-TW": "提醒 1——溫和提示",
+              "ar-EG": "تذكير ١ — تنبيه لطيف"
+            },
+            "vars": [
+              "number",
+              "balance",
+              "due_on",
+              "contact_first_name",
+              "letterhead_name"
+            ],
+            "locales": {
+              "en-US": {
+                "subject": "{{number}} — in case it slipped",
+                "preheader": "{{balance}} is still open on {{number}}",
+                "blocks": [
+                  {
+                    "block": "email.text",
+                    "id": "body",
+                    "data": {
+                      "paras": [
+                        "Hello {{contact_first_name}},",
+                        "No alarm at all — {{number}} came due on {{due_on}} and I do not think it has landed yet. If it is already in your payment run, ignore me entirely.",
+                        "{{balance}} is still open on it."
+                      ]
+                    }
+                  },
+                  {
+                    "block": "email.button",
+                    "id": "action",
+                    "data": {
+                      "label": "View {{number}}",
+                      "url": "{{signInLink}}"
+                    }
+                  }
+                ],
+                "footer": "{{letterhead_name}}"
+              },
+              "de-DE": {
+                "subject": "{{number}} — falls es untergegangen ist",
+                "preheader": "Auf {{number}} sind noch {{balance}} offen",
+                "blocks": [
+                  {
+                    "block": "email.text",
+                    "id": "body",
+                    "data": {
+                      "paras": [
+                        "Hallo {{contact_first_name}},",
+                        "kein Grund zur Sorge — {{number}} war am {{due_on}} fällig, und ich glaube, die Zahlung ist noch nicht angekommen. Wenn sie schon unterwegs ist, vergessen Sie diese Nachricht einfach.",
+                        "Offen sind noch {{balance}}."
+                      ]
+                    }
+                  },
+                  {
+                    "block": "email.button",
+                    "id": "action",
+                    "data": {
+                      "label": "{{number}} ansehen",
+                      "url": "{{signInLink}}"
+                    }
+                  }
+                ],
+                "footer": "{{letterhead_name}}"
+              },
+              "fr-FR": {
+                "subject": "{{number}} — au cas où elle vous aurait échappé",
+                "preheader": "Il reste {{balance}} à régler sur {{number}}",
+                "blocks": [
+                  {
+                    "block": "email.text",
+                    "id": "body",
+                    "data": {
+                      "paras": [
+                        "Bonjour {{contact_first_name}},",
+                        "Rien d’alarmant — {{number}} arrivait à échéance le {{due_on}} et je crois que le règlement n’est pas encore arrivé. S’il est déjà en route, ne tenez pas compte de ce message.",
+                        "Il reste {{balance}} à régler."
+                      ]
+                    }
+                  },
+                  {
+                    "block": "email.button",
+                    "id": "action",
+                    "data": {
+                      "label": "Voir {{number}}",
+                      "url": "{{signInLink}}"
+                    }
+                  }
+                ],
+                "footer": "{{letterhead_name}}"
+              },
+              "cs-CZ": {
+                "subject": "{{number}} — kdyby vám to uniklo",
+                "preheader": "Na {{number}} zbývá uhradit {{balance}}",
+                "blocks": [
+                  {
+                    "block": "email.text",
+                    "id": "body",
+                    "data": {
+                      "paras": [
+                        "Dobrý den, {{contact_first_name}},",
+                        "nic vážného — {{number}} byla splatná {{due_on}} a myslím, že platba zatím nedorazila. Pokud už je na cestě, tuto zprávu klidně přejděte.",
+                        "Zbývá uhradit {{balance}}."
+                      ]
+                    }
+                  },
+                  {
+                    "block": "email.button",
+                    "id": "action",
+                    "data": {
+                      "label": "Zobrazit {{number}}",
+                      "url": "{{signInLink}}"
+                    }
+                  }
+                ],
+                "footer": "{{letterhead_name}}"
+              },
+              "da-DK": {
+                "subject": "{{number}} — hvis den er gledet forbi",
+                "preheader": "Der mangler stadig {{balance}} på {{number}}",
+                "blocks": [
+                  {
+                    "block": "email.text",
+                    "id": "body",
+                    "data": {
+                      "paras": [
+                        "Hej {{contact_first_name}},",
+                        "Ingen grund til bekymring — {{number}} forfaldt {{due_on}}, og jeg tror ikke, betalingen er kommet endnu. Er den allerede på vej, så se bort fra denne mail.",
+                        "Der mangler stadig {{balance}}."
+                      ]
+                    }
+                  },
+                  {
+                    "block": "email.button",
+                    "id": "action",
+                    "data": {
+                      "label": "Se {{number}}",
+                      "url": "{{signInLink}}"
+                    }
+                  }
+                ],
+                "footer": "{{letterhead_name}}"
+              },
+              "zh-CN": {
+                "subject": "{{number}}——以防您错过",
+                "preheader": "{{number}} 仍有 {{balance}} 未付",
+                "blocks": [
+                  {
+                    "block": "email.text",
+                    "id": "body",
+                    "data": {
+                      "paras": [
+                        "{{contact_first_name}}，您好：",
+                        "不必担心——{{number}} 已于 {{due_on}} 到期，款项似乎还没有到账。如果已在付款流程中，请忽略这封邮件。",
+                        "目前仍有 {{balance}} 未付。"
+                      ]
+                    }
+                  },
+                  {
+                    "block": "email.button",
+                    "id": "action",
+                    "data": {
+                      "label": "查看 {{number}}",
+                      "url": "{{signInLink}}"
+                    }
+                  }
+                ],
+                "footer": "{{letterhead_name}}"
+              },
+              "zh-TW": {
+                "subject": "{{number}}——以防您錯過",
+                "preheader": "{{number}} 仍有 {{balance}} 未付",
+                "blocks": [
+                  {
+                    "block": "email.text",
+                    "id": "body",
+                    "data": {
+                      "paras": [
+                        "{{contact_first_name}}，您好：",
+                        "不必擔心——{{number}} 已於 {{due_on}} 到期，款項似乎還沒有入帳。如果已在付款流程中，請忽略這封郵件。",
+                        "目前仍有 {{balance}} 未付。"
+                      ]
+                    }
+                  },
+                  {
+                    "block": "email.button",
+                    "id": "action",
+                    "data": {
+                      "label": "查看 {{number}}",
+                      "url": "{{signInLink}}"
+                    }
+                  }
+                ],
+                "footer": "{{letterhead_name}}"
+              },
+              "ar-EG": {
+                "subject": "{{number}} — تحسباً لأن تكون قد فاتتك",
+                "preheader": "ما زال {{balance}} مستحقاً على {{number}}",
+                "blocks": [
+                  {
+                    "block": "email.text",
+                    "id": "body",
+                    "data": {
+                      "paras": [
+                        "مرحباً {{contact_first_name}}،",
+                        "لا داعي للقلق — استحقت {{number}} في {{due_on}} ولا أظن أن الدفعة وصلت بعد. إن كانت في طريقها بالفعل، فتجاهل هذه الرسالة.",
+                        "ما زال {{balance}} مستحقاً عليها."
+                      ]
+                    }
+                  },
+                  {
+                    "block": "email.button",
+                    "id": "action",
+                    "data": {
+                      "label": "عرض {{number}}",
+                      "url": "{{signInLink}}"
+                    }
+                  }
+                ],
+                "footer": "{{letterhead_name}}"
+              }
+            }
+          },
+          {
+            "kind": "invoice-rung-2",
+            "name": {
+              "en-US": "Reminder 2 — plainer",
+              "de-DE": "Erinnerung 2 — deutlicher",
+              "fr-FR": "Relance 2 — plus directe",
+              "cs-CZ": "Upomínka 2 — důraznější",
+              "da-DK": "Rykker 2 — tydeligere",
+              "zh-CN": "提醒 2——更直接",
+              "zh-TW": "提醒 2——更直接",
+              "ar-EG": "تذكير ٢ — أوضح"
+            },
+            "vars": [
+              "number",
+              "balance",
+              "days_late",
+              "contact_first_name",
+              "letterhead_name"
+            ],
+            "locales": {
+              "en-US": {
+                "subject": "{{number}} is now {{days_late}} days past due",
+                "preheader": "{{balance}} outstanding on {{number}}",
+                "blocks": [
+                  {
+                    "block": "email.text",
+                    "id": "body",
+                    "data": {
+                      "paras": [
+                        "Hello {{contact_first_name}},",
+                        "{{number}} is {{days_late}} days past due — {{balance}} outstanding. Can you tell me when it will be paid, or whether it needs splitting in two?",
+                        "Part payments are fine and easy to set up. Silence is the only thing that makes this awkward."
+                      ]
+                    }
+                  },
+                  {
+                    "block": "email.button",
+                    "id": "action",
+                    "data": {
+                      "label": "View {{number}}",
+                      "url": "{{signInLink}}"
+                    }
+                  }
+                ],
+                "footer": "{{letterhead_name}}"
+              },
+              "de-DE": {
+                "subject": "{{number}} ist jetzt {{days_late}} Tage überfällig",
+                "preheader": "Auf {{number}} sind {{balance}} offen",
+                "blocks": [
+                  {
+                    "block": "email.text",
+                    "id": "body",
+                    "data": {
+                      "paras": [
+                        "Hallo {{contact_first_name}},",
+                        "{{number}} ist seit {{days_late}} Tagen überfällig — {{balance}} sind offen. Können Sie mir sagen, wann sie bezahlt wird oder ob wir sie in zwei Teile aufteilen sollen?",
+                        "Teilzahlungen sind kein Problem und schnell vereinbart. Nur Schweigen macht es unangenehm."
+                      ]
+                    }
+                  },
+                  {
+                    "block": "email.button",
+                    "id": "action",
+                    "data": {
+                      "label": "{{number}} ansehen",
+                      "url": "{{signInLink}}"
+                    }
+                  }
+                ],
+                "footer": "{{letterhead_name}}"
+              },
+              "fr-FR": {
+                "subject": "{{number}} a maintenant {{days_late}} jours de retard",
+                "preheader": "{{balance}} restent dus sur {{number}}",
+                "blocks": [
+                  {
+                    "block": "email.text",
+                    "id": "body",
+                    "data": {
+                      "paras": [
+                        "Bonjour {{contact_first_name}},",
+                        "{{number}} a {{days_late}} jours de retard — {{balance}} restent dus. Pouvez-vous me dire quand elle sera réglée, ou s’il faut la scinder en deux ?",
+                        "Les règlements partiels ne posent aucun problème et se mettent en place vite. Seul le silence rend les choses gênantes."
+                      ]
+                    }
+                  },
+                  {
+                    "block": "email.button",
+                    "id": "action",
+                    "data": {
+                      "label": "Voir {{number}}",
+                      "url": "{{signInLink}}"
+                    }
+                  }
+                ],
+                "footer": "{{letterhead_name}}"
+              },
+              "cs-CZ": {
+                "subject": "{{number}} je už {{days_late}} dní po splatnosti",
+                "preheader": "Na {{number}} zbývá {{balance}}",
+                "blocks": [
+                  {
+                    "block": "email.text",
+                    "id": "body",
+                    "data": {
+                      "paras": [
+                        "Dobrý den, {{contact_first_name}},",
+                        "{{number}} je {{days_late}} dní po splatnosti — zbývá uhradit {{balance}}. Můžete mi dát vědět, kdy bude zaplacena, nebo jestli ji máme rozdělit na dvě části?",
+                        "Platby po částech nejsou problém a domluvíme je rychle. Nepříjemné je jen mlčení."
+                      ]
+                    }
+                  },
+                  {
+                    "block": "email.button",
+                    "id": "action",
+                    "data": {
+                      "label": "Zobrazit {{number}}",
+                      "url": "{{signInLink}}"
+                    }
+                  }
+                ],
+                "footer": "{{letterhead_name}}"
+              },
+              "da-DK": {
+                "subject": "{{number}} er nu {{days_late}} dage over forfald",
+                "preheader": "Der mangler {{balance}} på {{number}}",
+                "blocks": [
+                  {
+                    "block": "email.text",
+                    "id": "body",
+                    "data": {
+                      "paras": [
+                        "Hej {{contact_first_name}},",
+                        "{{number}} er {{days_late}} dage over forfald — der mangler {{balance}}. Kan du fortælle mig, hvornår den bliver betalt, eller om den skal deles i to?",
+                        "Delbetalinger er helt i orden og nemme at aftale. Det eneste, der gør det akavet, er tavshed."
+                      ]
+                    }
+                  },
+                  {
+                    "block": "email.button",
+                    "id": "action",
+                    "data": {
+                      "label": "Se {{number}}",
+                      "url": "{{signInLink}}"
+                    }
+                  }
+                ],
+                "footer": "{{letterhead_name}}"
+              },
+              "zh-CN": {
+                "subject": "{{number}} 已逾期 {{days_late}} 天",
+                "preheader": "{{number}} 尚欠 {{balance}}",
+                "blocks": [
+                  {
+                    "block": "email.text",
+                    "id": "body",
+                    "data": {
+                      "paras": [
+                        "{{contact_first_name}}，您好：",
+                        "{{number}} 已逾期 {{days_late}} 天，尚欠 {{balance}}。能否告诉我预计何时付款，或是否需要分两次支付？",
+                        "分期付款没有问题，也很容易安排。唯一让事情尴尬的是没有回音。"
+                      ]
+                    }
+                  },
+                  {
+                    "block": "email.button",
+                    "id": "action",
+                    "data": {
+                      "label": "查看 {{number}}",
+                      "url": "{{signInLink}}"
+                    }
+                  }
+                ],
+                "footer": "{{letterhead_name}}"
+              },
+              "zh-TW": {
+                "subject": "{{number}} 已逾期 {{days_late}} 天",
+                "preheader": "{{number}} 尚欠 {{balance}}",
+                "blocks": [
+                  {
+                    "block": "email.text",
+                    "id": "body",
+                    "data": {
+                      "paras": [
+                        "{{contact_first_name}}，您好：",
+                        "{{number}} 已逾期 {{days_late}} 天，尚欠 {{balance}}。能否告訴我預計何時付款，或是否需要分兩次支付？",
+                        "分期付款沒有問題，也很容易安排。唯一讓事情尷尬的是沒有回音。"
+                      ]
+                    }
+                  },
+                  {
+                    "block": "email.button",
+                    "id": "action",
+                    "data": {
+                      "label": "查看 {{number}}",
+                      "url": "{{signInLink}}"
+                    }
+                  }
+                ],
+                "footer": "{{letterhead_name}}"
+              },
+              "ar-EG": {
+                "subject": "تأخرت {{number}} الآن {{days_late}} يوماً عن موعدها",
+                "preheader": "ما زال {{balance}} مستحقاً على {{number}}",
+                "blocks": [
+                  {
+                    "block": "email.text",
+                    "id": "body",
+                    "data": {
+                      "paras": [
+                        "مرحباً {{contact_first_name}}،",
+                        "تأخرت {{number}} {{days_late}} يوماً عن موعد استحقاقها — وما زال {{balance}} مستحقاً. هل يمكنك أن تخبرني متى ستُدفع، أو إن كانت تحتاج إلى تقسيمها على دفعتين؟",
+                        "الدفع على أجزاء لا مشكلة فيه ويسهل ترتيبه. الصمت وحده هو ما يجعل الأمر محرجاً."
+                      ]
+                    }
+                  },
+                  {
+                    "block": "email.button",
+                    "id": "action",
+                    "data": {
+                      "label": "عرض {{number}}",
+                      "url": "{{signInLink}}"
+                    }
+                  }
+                ],
+                "footer": "{{letterhead_name}}"
+              }
+            }
+          },
+          {
+            "kind": "invoice-rung-3",
+            "name": {
+              "en-US": "Reminder 3 — the last one",
+              "de-DE": "Erinnerung 3 — die letzte",
+              "fr-FR": "Relance 3 — la dernière",
+              "cs-CZ": "Upomínka 3 — poslední",
+              "da-DK": "Rykker 3 — den sidste",
+              "zh-CN": "提醒 3——最后一次",
+              "zh-TW": "提醒 3——最後一次",
+              "ar-EG": "تذكير ٣ — الأخير"
+            },
+            "vars": [
+              "number",
+              "balance",
+              "days_late",
+              "contact_first_name",
+              "letterhead_name"
+            ],
+            "locales": {
+              "en-US": {
+                "subject": "{{number}} is {{days_late}} days past due — a last reminder",
+                "preheader": "{{balance}} still outstanding on {{number}}",
+                "blocks": [
+                  {
+                    "block": "email.text",
+                    "id": "body",
+                    "data": {
+                      "paras": [
+                        "Hello {{contact_first_name}},",
+                        "{{number}} is {{days_late}} days past due, and {{balance}} is still outstanding. This is the last reminder we send before we stop further work for you until it clears. It is not personal.",
+                        "Nothing is lost. The day it clears, we pick up where we stopped — or reply to this email and tell us what is holding it up."
+                      ]
+                    }
+                  },
+                  {
+                    "block": "email.button",
+                    "id": "action",
+                    "data": {
+                      "label": "View {{number}}",
+                      "url": "{{signInLink}}"
+                    }
+                  }
+                ],
+                "footer": "{{letterhead_name}}"
+              },
+              "de-DE": {
+                "subject": "{{number}} ist {{days_late}} Tage überfällig — eine letzte Erinnerung",
+                "preheader": "Auf {{number}} sind noch {{balance}} offen",
+                "blocks": [
+                  {
+                    "block": "email.text",
+                    "id": "body",
+                    "data": {
+                      "paras": [
+                        "Hallo {{contact_first_name}},",
+                        "{{number}} ist seit {{days_late}} Tagen überfällig, und {{balance}} sind noch offen. Dies ist die letzte Erinnerung, bevor wir weitere Arbeit für Sie ruhen lassen, bis sie beglichen ist. Das ist nicht persönlich gemeint.",
+                        "Es geht nichts verloren. Sobald sie beglichen ist, machen wir dort weiter, wo wir aufgehört haben — oder antworten Sie auf diese E-Mail und sagen Sie uns, woran es hängt."
+                      ]
+                    }
+                  },
+                  {
+                    "block": "email.button",
+                    "id": "action",
+                    "data": {
+                      "label": "{{number}} ansehen",
+                      "url": "{{signInLink}}"
+                    }
+                  }
+                ],
+                "footer": "{{letterhead_name}}"
+              },
+              "fr-FR": {
+                "subject": "{{number}} a {{days_late}} jours de retard — un dernier rappel",
+                "preheader": "{{balance}} restent dus sur {{number}}",
+                "blocks": [
+                  {
+                    "block": "email.text",
+                    "id": "body",
+                    "data": {
+                      "paras": [
+                        "Bonjour {{contact_first_name}},",
+                        "{{number}} a {{days_late}} jours de retard, et {{balance}} restent dus. C’est le dernier rappel avant que nous suspendions tout nouveau travail pour vous jusqu’au règlement. Ce n’est pas personnel.",
+                        "Rien n’est perdu. Le jour du règlement, nous reprenons là où nous nous étions arrêtés — ou répondez à cet e-mail pour nous dire ce qui bloque."
+                      ]
+                    }
+                  },
+                  {
+                    "block": "email.button",
+                    "id": "action",
+                    "data": {
+                      "label": "Voir {{number}}",
+                      "url": "{{signInLink}}"
+                    }
+                  }
+                ],
+                "footer": "{{letterhead_name}}"
+              },
+              "cs-CZ": {
+                "subject": "{{number}} je {{days_late}} dní po splatnosti — poslední upomínka",
+                "preheader": "Na {{number}} zbývá {{balance}}",
+                "blocks": [
+                  {
+                    "block": "email.text",
+                    "id": "body",
+                    "data": {
+                      "paras": [
+                        "Dobrý den, {{contact_first_name}},",
+                        "{{number}} je {{days_late}} dní po splatnosti a stále zbývá uhradit {{balance}}. Je to poslední upomínka, než pozastavíme další práci, dokud nebude uhrazena. Nemyslíme to osobně.",
+                        "Nic se neztratí. Jakmile bude uhrazena, navážeme tam, kde jsme skončili — nebo odpovězte na tento e-mail a napište, co platbu zdržuje."
+                      ]
+                    }
+                  },
+                  {
+                    "block": "email.button",
+                    "id": "action",
+                    "data": {
+                      "label": "Zobrazit {{number}}",
+                      "url": "{{signInLink}}"
+                    }
+                  }
+                ],
+                "footer": "{{letterhead_name}}"
+              },
+              "da-DK": {
+                "subject": "{{number}} er {{days_late}} dage over forfald — en sidste påmindelse",
+                "preheader": "Der mangler stadig {{balance}} på {{number}}",
+                "blocks": [
+                  {
+                    "block": "email.text",
+                    "id": "body",
+                    "data": {
+                      "paras": [
+                        "Hej {{contact_first_name}},",
+                        "{{number}} er {{days_late}} dage over forfald, og der mangler stadig {{balance}}. Dette er den sidste påmindelse, før vi sætter videre arbejde for jer på pause, indtil den er betalt. Det er ikke personligt ment.",
+                        "Intet går tabt. Den dag den er betalt, fortsætter vi, hvor vi slap — eller svar på denne mail og fortæl os, hvad der holder den tilbage."
+                      ]
+                    }
+                  },
+                  {
+                    "block": "email.button",
+                    "id": "action",
+                    "data": {
+                      "label": "Se {{number}}",
+                      "url": "{{signInLink}}"
+                    }
+                  }
+                ],
+                "footer": "{{letterhead_name}}"
+              },
+              "zh-CN": {
+                "subject": "{{number}} 已逾期 {{days_late}} 天——最后一次提醒",
+                "preheader": "{{number}} 仍欠 {{balance}}",
+                "blocks": [
+                  {
+                    "block": "email.text",
+                    "id": "body",
+                    "data": {
+                      "paras": [
+                        "{{contact_first_name}}，您好：",
+                        "{{number}} 已逾期 {{days_late}} 天，仍欠 {{balance}}。这是最后一次提醒，之后我们将暂停为您开展的后续工作，直至付清。这并非针对个人。",
+                        "什么都不会丢失。付清当天，我们就从停下的地方继续——也可以直接回复这封邮件，告诉我们是什么耽搁了付款。"
+                      ]
+                    }
+                  },
+                  {
+                    "block": "email.button",
+                    "id": "action",
+                    "data": {
+                      "label": "查看 {{number}}",
+                      "url": "{{signInLink}}"
+                    }
+                  }
+                ],
+                "footer": "{{letterhead_name}}"
+              },
+              "zh-TW": {
+                "subject": "{{number}} 已逾期 {{days_late}} 天——最後一次提醒",
+                "preheader": "{{number}} 仍欠 {{balance}}",
+                "blocks": [
+                  {
+                    "block": "email.text",
+                    "id": "body",
+                    "data": {
+                      "paras": [
+                        "{{contact_first_name}}，您好：",
+                        "{{number}} 已逾期 {{days_late}} 天，仍欠 {{balance}}。這是最後一次提醒，之後我們將暫停為您進行的後續工作，直至付清。這並非針對個人。",
+                        "什麼都不會遺失。付清當天，我們就從停下的地方繼續——也可以直接回覆這封郵件，告訴我們是什麼耽擱了付款。"
+                      ]
+                    }
+                  },
+                  {
+                    "block": "email.button",
+                    "id": "action",
+                    "data": {
+                      "label": "查看 {{number}}",
+                      "url": "{{signInLink}}"
+                    }
+                  }
+                ],
+                "footer": "{{letterhead_name}}"
+              },
+              "ar-EG": {
+                "subject": "تأخرت {{number}} {{days_late}} يوماً — تذكير أخير",
+                "preheader": "ما زال {{balance}} مستحقاً على {{number}}",
+                "blocks": [
+                  {
+                    "block": "email.text",
+                    "id": "body",
+                    "data": {
+                      "paras": [
+                        "مرحباً {{contact_first_name}}،",
+                        "تأخرت {{number}} {{days_late}} يوماً عن موعد استحقاقها، وما زال {{balance}} مستحقاً. هذا آخر تذكير قبل أن نوقف أي عمل إضافي لك حتى تُسدَّد. الأمر ليس شخصياً.",
+                        "لن يضيع شيء. في يوم السداد نكمل من حيث توقفنا — أو ردّ على هذه الرسالة وأخبرنا بما يؤخرها."
+                      ]
+                    }
+                  },
+                  {
+                    "block": "email.button",
+                    "id": "action",
+                    "data": {
+                      "label": "عرض {{number}}",
+                      "url": "{{signInLink}}"
+                    }
+                  }
+                ],
+                "footer": "{{letterhead_name}}"
+              }
+            }
+          },
+          {
+            "kind": "payment-receipt",
+            "name": {
+              "en-US": "Payment receipt",
+              "de-DE": "Zahlungsquittung",
+              "fr-FR": "Reçu de règlement",
+              "cs-CZ": "Stvrzenka o platbě",
+              "da-DK": "Betalingskvittering",
+              "zh-CN": "付款收据",
+              "zh-TW": "付款收據",
+              "ar-EG": "إيصال الدفع"
+            },
+            "attach": {
+              "kind": "receipt",
+              "link": "payment"
+            },
+            "vars": [
+              "number",
+              "amount",
+              "invoice_number",
+              "balance",
+              "contact_first_name",
+              "letterhead_name"
+            ],
+            "locales": {
+              "en-US": {
+                "subject": "Thank you — we received {{amount}}",
+                "preheader": "{{number}} · for {{invoice_number}} · {{amount}}",
+                "blocks": [
+                  {
+                    "block": "email.text",
+                    "id": "body",
+                    "data": {
+                      "paras": [
+                        "Hello {{contact_first_name}},",
+                        "Thank you — we received {{amount}} against {{invoice_number}}. The receipt is attached."
+                      ]
+                    }
+                  },
+                  {
+                    "block": "email.box",
+                    "id": "receipt",
+                    "data": {
+                      "label": "{{number}} · for {{invoice_number}}",
+                      "value": "{{amount}}"
+                    }
+                  },
+                  {
+                    "block": "email.box",
+                    "id": "balance",
+                    "data": {
+                      "label": "Balance left on {{invoice_number}}",
+                      "value": "{{balance}}"
+                    }
+                  },
+                  {
+                    "block": "email.button",
+                    "id": "action",
+                    "data": {
+                      "label": "View the receipt",
+                      "url": "{{signInLink}}"
+                    }
+                  }
+                ],
+                "footer": "{{letterhead_name}}"
+              },
+              "de-DE": {
+                "subject": "Vielen Dank — wir haben {{amount}} erhalten",
+                "preheader": "{{number}} · zu {{invoice_number}} · {{amount}}",
+                "blocks": [
+                  {
+                    "block": "email.text",
+                    "id": "body",
+                    "data": {
+                      "paras": [
+                        "Hallo {{contact_first_name}},",
+                        "vielen Dank — wir haben {{amount}} zu {{invoice_number}} erhalten. Die Quittung liegt bei."
+                      ]
+                    }
+                  },
+                  {
+                    "block": "email.box",
+                    "id": "receipt",
+                    "data": {
+                      "label": "{{number}} · zu {{invoice_number}}",
+                      "value": "{{amount}}"
+                    }
+                  },
+                  {
+                    "block": "email.box",
+                    "id": "balance",
+                    "data": {
+                      "label": "Restbetrag auf {{invoice_number}}",
+                      "value": "{{balance}}"
+                    }
+                  },
+                  {
+                    "block": "email.button",
+                    "id": "action",
+                    "data": {
+                      "label": "Quittung ansehen",
+                      "url": "{{signInLink}}"
+                    }
+                  }
+                ],
+                "footer": "{{letterhead_name}}"
+              },
+              "fr-FR": {
+                "subject": "Merci — nous avons reçu {{amount}}",
+                "preheader": "{{number}} · pour {{invoice_number}} · {{amount}}",
+                "blocks": [
+                  {
+                    "block": "email.text",
+                    "id": "body",
+                    "data": {
+                      "paras": [
+                        "Bonjour {{contact_first_name}},",
+                        "Merci — nous avons reçu {{amount}} pour {{invoice_number}}. Le reçu est joint."
+                      ]
+                    }
+                  },
+                  {
+                    "block": "email.box",
+                    "id": "receipt",
+                    "data": {
+                      "label": "{{number}} · pour {{invoice_number}}",
+                      "value": "{{amount}}"
+                    }
+                  },
+                  {
+                    "block": "email.box",
+                    "id": "balance",
+                    "data": {
+                      "label": "Reste à régler sur {{invoice_number}}",
+                      "value": "{{balance}}"
+                    }
+                  },
+                  {
+                    "block": "email.button",
+                    "id": "action",
+                    "data": {
+                      "label": "Voir le reçu",
+                      "url": "{{signInLink}}"
+                    }
+                  }
+                ],
+                "footer": "{{letterhead_name}}"
+              },
+              "cs-CZ": {
+                "subject": "Děkujeme — přijali jsme {{amount}}",
+                "preheader": "{{number}} · k {{invoice_number}} · {{amount}}",
+                "blocks": [
+                  {
+                    "block": "email.text",
+                    "id": "body",
+                    "data": {
+                      "paras": [
+                        "Dobrý den, {{contact_first_name}},",
+                        "děkujeme — přijali jsme {{amount}} k {{invoice_number}}. Stvrzenka je v příloze."
+                      ]
+                    }
+                  },
+                  {
+                    "block": "email.box",
+                    "id": "receipt",
+                    "data": {
+                      "label": "{{number}} · k {{invoice_number}}",
+                      "value": "{{amount}}"
+                    }
+                  },
+                  {
+                    "block": "email.box",
+                    "id": "balance",
+                    "data": {
+                      "label": "Zbývá uhradit na {{invoice_number}}",
+                      "value": "{{balance}}"
+                    }
+                  },
+                  {
+                    "block": "email.button",
+                    "id": "action",
+                    "data": {
+                      "label": "Zobrazit stvrzenku",
+                      "url": "{{signInLink}}"
+                    }
+                  }
+                ],
+                "footer": "{{letterhead_name}}"
+              },
+              "da-DK": {
+                "subject": "Tak — vi har modtaget {{amount}}",
+                "preheader": "{{number}} · til {{invoice_number}} · {{amount}}",
+                "blocks": [
+                  {
+                    "block": "email.text",
+                    "id": "body",
+                    "data": {
+                      "paras": [
+                        "Hej {{contact_first_name}},",
+                        "Tak — vi har modtaget {{amount}} til {{invoice_number}}. Kvitteringen er vedhæftet."
+                      ]
+                    }
+                  },
+                  {
+                    "block": "email.box",
+                    "id": "receipt",
+                    "data": {
+                      "label": "{{number}} · til {{invoice_number}}",
+                      "value": "{{amount}}"
+                    }
+                  },
+                  {
+                    "block": "email.box",
+                    "id": "balance",
+                    "data": {
+                      "label": "Resterende på {{invoice_number}}",
+                      "value": "{{balance}}"
+                    }
+                  },
+                  {
+                    "block": "email.button",
+                    "id": "action",
+                    "data": {
+                      "label": "Se kvitteringen",
+                      "url": "{{signInLink}}"
+                    }
+                  }
+                ],
+                "footer": "{{letterhead_name}}"
+              },
+              "zh-CN": {
+                "subject": "谢谢——我们已收到 {{amount}}",
+                "preheader": "{{number}} · 对应 {{invoice_number}} · {{amount}}",
+                "blocks": [
+                  {
+                    "block": "email.text",
+                    "id": "body",
+                    "data": {
+                      "paras": [
+                        "{{contact_first_name}}，您好：",
+                        "谢谢——我们已收到 {{invoice_number}} 的付款 {{amount}}。收据见附件。"
+                      ]
+                    }
+                  },
+                  {
+                    "block": "email.box",
+                    "id": "receipt",
+                    "data": {
+                      "label": "{{number}} · 对应 {{invoice_number}}",
+                      "value": "{{amount}}"
+                    }
+                  },
+                  {
+                    "block": "email.box",
+                    "id": "balance",
+                    "data": {
+                      "label": "{{invoice_number}} 剩余金额",
+                      "value": "{{balance}}"
+                    }
+                  },
+                  {
+                    "block": "email.button",
+                    "id": "action",
+                    "data": {
+                      "label": "查看收据",
+                      "url": "{{signInLink}}"
+                    }
+                  }
+                ],
+                "footer": "{{letterhead_name}}"
+              },
+              "zh-TW": {
+                "subject": "謝謝——我們已收到 {{amount}}",
+                "preheader": "{{number}} · 對應 {{invoice_number}} · {{amount}}",
+                "blocks": [
+                  {
+                    "block": "email.text",
+                    "id": "body",
+                    "data": {
+                      "paras": [
+                        "{{contact_first_name}}，您好：",
+                        "謝謝——我們已收到 {{invoice_number}} 的付款 {{amount}}。收據見附件。"
+                      ]
+                    }
+                  },
+                  {
+                    "block": "email.box",
+                    "id": "receipt",
+                    "data": {
+                      "label": "{{number}} · 對應 {{invoice_number}}",
+                      "value": "{{amount}}"
+                    }
+                  },
+                  {
+                    "block": "email.box",
+                    "id": "balance",
+                    "data": {
+                      "label": "{{invoice_number}} 剩餘金額",
+                      "value": "{{balance}}"
+                    }
+                  },
+                  {
+                    "block": "email.button",
+                    "id": "action",
+                    "data": {
+                      "label": "查看收據",
+                      "url": "{{signInLink}}"
+                    }
+                  }
+                ],
+                "footer": "{{letterhead_name}}"
+              },
+              "ar-EG": {
+                "subject": "شكراً لك — استلمنا {{amount}}",
+                "preheader": "{{number}} · عن {{invoice_number}} · {{amount}}",
+                "blocks": [
+                  {
+                    "block": "email.text",
+                    "id": "body",
+                    "data": {
+                      "paras": [
+                        "مرحباً {{contact_first_name}}،",
+                        "شكراً لك — استلمنا {{amount}} عن {{invoice_number}}. الإيصال مرفق."
+                      ]
+                    }
+                  },
+                  {
+                    "block": "email.box",
+                    "id": "receipt",
+                    "data": {
+                      "label": "{{number}} · عن {{invoice_number}}",
+                      "value": "{{amount}}"
+                    }
+                  },
+                  {
+                    "block": "email.box",
+                    "id": "balance",
+                    "data": {
+                      "label": "المتبقي على {{invoice_number}}",
+                      "value": "{{balance}}"
+                    }
+                  },
+                  {
+                    "block": "email.button",
+                    "id": "action",
+                    "data": {
+                      "label": "عرض الإيصال",
+                      "url": "{{signInLink}}"
+                    }
+                  }
+                ],
+                "footer": "{{letterhead_name}}"
+              }
             }
           }
         ]
@@ -1198,6 +2564,7 @@
               ],
               "except": [
                 "valid_until",
+                "decided_at",
                 "withdraw_reason"
               ]
             },
@@ -1259,7 +2626,7 @@
             {
               "ref": "discount",
               "type": "decimal",
-              "scale": "currency",
+              "scale": 3,
               "nullable": true
             },
             {
@@ -1344,11 +2711,21 @@
           "kind": "quote",
           "part": "document",
           "name": {
-            "en-US": "Proposal"
+            "en-US": "Quote",
+            "de-DE": "Angebot",
+            "fr-FR": "Devis",
+            "cs-CZ": "Nabídka",
+            "da-DK": "Tilbud",
+            "zh-CN": "报价单",
+            "zh-TW": "報價單",
+            "ar-EG": "عرض سعر"
           },
           "mapping": {
             "number": {
               "column": "number"
+            },
+            "sentOn": {
+              "column": "sent_at"
             },
             "validUntil": {
               "column": "valid_until"
@@ -1356,7 +2733,7 @@
             "currency": {
               "column": "currency"
             },
-            "taxLabel": {
+            "taxName": {
               "column": "tax_name"
             },
             "taxRate": {
@@ -1374,16 +2751,17 @@
             "status": {
               "column": "status"
             },
-            "lines": {
+            "items": {
               "collection": {
                 "table": "lines",
                 "via": "document_id",
                 "orderBy": "position",
                 "columns": {
-                  "description": "description",
+                  "desc": "description",
                   "qty": "qty",
-                  "unitPrice": "rate",
+                  "rate": "rate",
                   "discount": "discount",
+                  "discountKind": "discount_kind",
                   "amount": "amount"
                 }
               }

@@ -49,6 +49,10 @@
  * added at. A set with `"@skip": true` leaves the row out (a payment for a
  * visit that has not happened yet).
  *
+ * `"@onlyIfEmpty": true` is for a table that holds one row, the app's own
+ * settings: the row is added only when the table has none, and otherwise its
+ * `@label` names the row already there — the operator's own settings stay.
+ *
  * Pure: a format and its checks, no I/O. The server resolves the directives.
  */
 import { z } from 'zod';
@@ -107,7 +111,7 @@ export const byClockSchema = z
 export type ByClock = z.infer<typeof byClockSchema>;
 
 /** The keys of a row that are directives about the row, not columns. */
-export const ROW_DIRECTIVES: ReadonlySet<string> = new Set(['@label', '@byClock']);
+export const ROW_DIRECTIVES: ReadonlySet<string> = new Set(['@label', '@byClock', '@onlyIfEmpty']);
 
 export const sampleBundleSchema = z
   .object({
@@ -174,7 +178,8 @@ export interface SampleIssue {
 /**
  * Everything wrong with a bundle for this manifest: a table it does not
  * declare, a column the table does not have, a label used twice, a `@ref` to
- * a row that comes later or not at all, an `@asset` it does not list.
+ * a row that comes later or not at all, an `@asset` it does not list, a
+ * number without gaps the row does not spell `null`.
  */
 export function sampleBundleIssues(bundle: SampleBundle, manifest: Manifest): SampleIssue[] {
   const issues: SampleIssue[] = [];
@@ -190,8 +195,15 @@ export function sampleBundleIssues(bundle: SampleBundle, manifest: Manifest): Sa
       continue;
     }
     const columns = new Set(shape.columns.map((column) => column.ref));
+    // A number Adminium gives without gaps: a sample row names it, empty, or the load numbers it into the real series.
+    const gapless = shape.columns.filter((column) => column.rules?.sequence?.gapless === true).map((column) => column.ref);
     for (const [r, row] of table.rows.entries()) {
       const at = `tables.${String(t)}.rows.${String(r)}`;
+      for (const column of gapless) {
+        if (row[column] !== null) {
+          issues.push({ path: `${at}.${column}`, message: `"${column}" is numbered without gaps: a sample row spells it null, so it stays off the real series.` });
+        }
+      }
       for (const [column, value] of Object.entries(row)) {
         if (column === '@label') {
           if (typeof value !== 'string' || !label.safeParse(value).success) {
@@ -199,6 +211,10 @@ export function sampleBundleIssues(bundle: SampleBundle, manifest: Manifest): Sa
           } else if (seen.has(value)) {
             issues.push({ path: `${at}.@label`, message: `The label "${value}" is used twice.` });
           }
+          continue;
+        }
+        if (column === '@onlyIfEmpty') {
+          if (value !== true) issues.push({ path: `${at}.@onlyIfEmpty`, message: '"@onlyIfEmpty" is true, or absent.' });
           continue;
         }
         if (column === '@byClock') {
