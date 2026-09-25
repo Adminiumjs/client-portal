@@ -478,6 +478,23 @@ export function publicAccessIssues(entries: readonly PublicAccess[], ctx: Public
       if (!pointsUp && !pointsDown) {
         out.push({ path: at('visibleWith', 'via'), message: `neither "${entry.table}.${v.via}" points at "${v.table}" nor "${v.table}.${v.via}" at "${entry.table}"` });
       }
+      /*
+       * Where the parent points at this table, the parent's column is the
+       * link its rows are read by: a browser that could write it would
+       * re-point its own row at another person's.
+       */
+      if (pointsDown && !pointsUp) {
+        entries.forEach((other, j) => {
+          if (other.table !== v.table || (other.key ?? CUSTOMER_KEY) !== key) return;
+          const writes =
+            (other.writable ?? []).includes(v.via) ||
+            Object.prototype.hasOwnProperty.call(other.writableValues ?? {}, v.via) ||
+            Object.prototype.hasOwnProperty.call(other.defaults ?? {}, v.via);
+          if (writes) {
+            out.push({ path: ['publicAccess', j, 'writable'], message: `"${v.table}.${v.via}" is the link a child reads its rows by, so no browser writes it` });
+          }
+        });
+      }
       if (entry.methods.includes('PATCH') && entry.writable === undefined) {
         out.push({ path: at('writable'), message: 'a change through an entry visible with a parent names what it may write' });
       }
@@ -485,6 +502,7 @@ export function publicAccessIssues(entries: readonly PublicAccess[], ctx: Public
       if (root === undefined) out.push({ path: at('visibleWith'), message: 'the entries it is visible with lead to no claimed person' });
     }
     for (const ref of entry.files ?? []) {
+      if (writable.has(ref)) out.push({ path: at('files'), message: `"${ref}" is offered for download, so a browser never writes it` });
       const found = column(ref);
       if (found === undefined) out.push({ path: at('files'), message: `"${entry.table}" has no column "${ref}"` });
       else if (found.type !== 'text') out.push({ path: at('files'), message: `"${entry.table}.${ref}" is not a text column holding a file` });

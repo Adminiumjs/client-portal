@@ -475,6 +475,17 @@ export const columnRulesSchema = z
      * mark it otherwise.
      */
     personal: z.boolean().optional(),
+    /**
+     * A date that may never be later than today, on the venue's calendar — a
+     * payment is recorded when it came in, not when it might.
+     */
+    notAfter: z.literal('today').optional(),
+    /**
+     * A date that may never be earlier than another: a column of the same row,
+     * or — with `via`, a foreign key of this row — a column of the row it
+     * points at (a payment is never dated before its invoice was issued).
+     */
+    notBefore: z.object({ column: refSchema, via: refSchema.optional() }).strict().optional(),
   })
   .strict();
 export type ColumnRules = z.infer<typeof columnRulesSchema>;
@@ -1169,6 +1180,29 @@ export function appReferenceIssues(
       }
       if (rules.normalize !== undefined && column.type !== 'text') {
         out.push({ path: here('normalize'), message: 'only text is stored trimmed or in lower case' });
+      }
+      const dated = (type: string | undefined) => type === 'date' || type === 'timestamptz';
+      if ((rules.notAfter !== undefined || rules.notBefore !== undefined) && !dated(column.type)) {
+        out.push({ path: here(rules.notAfter !== undefined ? 'notAfter' : 'notBefore'), message: 'only a date is kept within dates' });
+      }
+      if (rules.notBefore !== undefined) {
+        const bound = rules.notBefore;
+        let owner = table.ref;
+        if (bound.via !== undefined) {
+          const via = index.column(table.ref, bound.via);
+          if (via?.type !== 'fk' || via.references === undefined) {
+            out.push({ path: here('notBefore', 'via'), message: `"${table.ref}.${bound.via}" is not a foreign key` });
+            owner = '';
+          } else {
+            owner = via.references;
+          }
+        }
+        if (owner !== '') {
+          const other = index.column(owner, bound.column);
+          if (other === undefined) out.push({ path: here('notBefore', 'column'), message: `"${owner}" has no column "${bound.column}"` });
+          else if (!dated(other.type)) out.push({ path: here('notBefore', 'column'), message: `"${owner}.${bound.column}" is not a date` });
+          else if (bound.via === undefined && other.ref === column.ref) out.push({ path: here('notBefore', 'column'), message: 'a date is bounded by another column' });
+        }
       }
       if (rules.default !== undefined) {
         const from = rules.default.from;
