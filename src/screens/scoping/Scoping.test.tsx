@@ -140,8 +140,8 @@ describe("how the last stages actually went", () => {
     upsert("milestones", { ...m[1]!, estimated_days: "2" });
     upsert("milestones", { ...m[6]!, estimated_days: "1" });
     upsertAll("time_entries", [
-      { id: 91, project_id: 1, client_id: 2, milestone_id: 1, person_id: 1, date: "2026-06-20", hours: "15.00", note: null, running_for: null, started_at: null, client_key: null },
-      { id: 92, project_id: 3, client_id: 3, milestone_id: 6, person_id: 2, date: "2026-06-05", hours: "6.00", note: null, running_for: null, started_at: null, client_key: null },
+      { id: 91, project_id: 1, client_id: 2, milestone_id: 1, person_id: 1, date: "2026-06-20", hours: "15.00", logged_hours: "15.00", note: null, running_for: null, started_at: null, clock_stopped: false, stopped_at: null, client_key: null },
+      { id: 92, project_id: 3, client_id: 3, milestone_id: 6, person_id: 2, date: "2026-06-05", hours: "6.00", logged_hours: "6.00", note: null, running_for: null, started_at: null, clock_stopped: false, stopped_at: null, client_key: null },
     ]);
   });
 
@@ -167,7 +167,7 @@ describe("how the last stages actually went", () => {
   });
 
   it("offers no reserve when past stages came in at or under their estimates", () => {
-    upsertAll("time_entries", [{ id: 91, project_id: 1, client_id: 2, milestone_id: 1, person_id: 1, date: "2026-06-20", hours: "10.00", note: null, running_for: null, started_at: null, client_key: null }]);
+    upsertAll("time_entries", [{ id: 91, project_id: 1, client_id: 2, milestone_id: 1, person_id: 1, date: "2026-06-20", hours: "10.00", logged_hours: "10.00", note: null, running_for: null, started_at: null, clock_stopped: false, stopped_at: null, client_key: null }]);
     const words = text(draw({ state: "ready", past: [1, 6] }));
     expect(words).toContain("on the nose");
     expect(words).toContain("Past stages came in at or under their estimates — nothing to hold back.");

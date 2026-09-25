@@ -164,6 +164,38 @@ function formulaOrder(table: string): typeof RULES.formulas {
 }
 const FORMULAS = new Map(TABLE_REFS.map((ref) => [ref, formulaOrder(ref)]));
 
+/** The columns each formula column is worked out from, by table. */
+const FORMULA_INPUTS: Partial<Record<TableRef, Map<string, Set<string>>>> = (() => {
+  const out: Partial<Record<TableRef, Map<string, Set<string>>>> = {};
+  const reads = (node: unknown, found: Set<string>): Set<string> => {
+    if (typeof node === "string") found.add(node);
+    else if (Array.isArray(node)) node.forEach((c) => reads(c, found));
+    else if (typeof node === "object" && node !== null) Object.values(node).forEach((c) => reads(c, found));
+    return found;
+  };
+  for (const f of RULES.formulas) (out[f.table as TableRef] ??= new Map()).set(f.column, reads(f.expr, new Set()));
+  return out;
+})();
+
+/**
+ * A number a column keeps within (`validation.min`/`max`), as Adminium judges
+ * it: a value the write gives, and one a formula works out from what the write
+ * changed (a stopped clock's hours), refused `VALIDATION_FAILED` naming the column.
+ */
+function keepRanges(ref: TableRef, row: Record<string, unknown>, written: Record<string, unknown>, action: "create" | "update"): void {
+  const ranges = DEMO_RULES.ranges[ref];
+  if (ranges === undefined) return;
+  for (const [column, { min, max }] of Object.entries(ranges)) {
+    const inputs = FORMULA_INPUTS[ref]?.get(column);
+    const judged = column in written || (inputs !== undefined && (action === "create" || [...inputs].some((input) => input in written)));
+    if (!judged || empty(row[column])) continue;
+    const n = Number(row[column]);
+    if (!Number.isFinite(n)) continue;
+    if (min !== undefined && n < min) refuse(422, "VALIDATION_FAILED", "Some values were refused.", { fields: { [column]: { code: "too-small", n: min } } });
+    if (max !== undefined && n > max) refuse(422, "VALIDATION_FAILED", "Some values were refused.", { fields: { [column]: { code: "too-large", n: max } } });
+  }
+}
+
 /**
  * Columns Adminium works out (formulas, rollups, balances, numbers): a
  * writer's value for one is not used. A copy is not among them: it is made
@@ -597,6 +629,7 @@ export function createEngine(opts: EngineOptions): Engine {
       rows[ref].push(row);
       settle();
       if (!history) {
+        keepRanges(ref, row, values, "create");
         capHolds(balances);
         seal(ref, "create", { ...row }, null, row);
         // A child recorded empties what its parent says it clears (a payment: "the client says they paid").
@@ -648,6 +681,7 @@ export function createEngine(opts: EngineOptions): Engine {
       unique(ref, row);
       settle();
       if (!history) {
+        keepRanges(ref, row, values, "update");
         capHolds(balances);
         seal(ref, "update", values, stored, row);
       }

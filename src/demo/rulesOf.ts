@@ -93,6 +93,8 @@ export interface DemoRules {
   normalize: Record<string, string[]>;
   /** Every foreign key: the table it points at (what the outbox fills a message's links through). */
   references: Record<string, Record<string, string>>;
+  /** The numbers a column keeps within (`validation.min`/`max`), judged on the value a write leaves, worked out ones too. */
+  ranges: Record<string, Record<string, { min?: number; max?: number }>>;
 }
 
 interface ManifestColumn {
@@ -108,6 +110,7 @@ interface ManifestColumn {
     sequence?: { gapless?: boolean; startSetting?: { addOn: string; setting: string } };
     rollup?: { cap?: boolean };
     normalize?: string;
+    validation?: { min?: number; max?: number };
   };
 }
 
@@ -134,10 +137,13 @@ export function demoRulesOf(manifest: ManifestForRules): DemoRules {
   const unique: DemoRules["unique"] = {};
   const normalize: DemoRules["normalize"] = {};
   const references: DemoRules["references"] = {};
+  const ranges: DemoRules["ranges"] = {};
   for (const table of manifest.requiredSchema.tables) {
     for (const column of table.columns) {
       if (column.type === "fk" && typeof column.references === "string") (references[table.ref] ??= {})[column.ref] = column.references;
       if (column.unique === true) (unique[table.ref] ??= []).push(column.ref);
+      const { min, max } = column.rules?.validation ?? {};
+      if (min !== undefined || max !== undefined) (ranges[table.ref] ??= {})[column.ref] = { ...(min === undefined ? {} : { min }), ...(max === undefined ? {} : { max }) };
       if (column.rules?.normalize === "email") (normalize[table.ref] ??= []).push(column.ref);
       const sequence = column.rules?.sequence;
       if (sequence?.gapless === true) {
@@ -180,7 +186,7 @@ export function demoRulesOf(manifest: ManifestForRules): DemoRules {
   for (const table of manifest.requiredSchema.tables) {
     if (hashed.has(table.ref)) kinds[table.ref] = Object.fromEntries(table.columns.map((column) => [column.ref, column.type]));
   }
-  return { decimals, states, stamps, codes, outbox, kinds, numbered, capped, unique, normalize, references };
+  return { decimals, states, stamps, codes, outbox, kinds, numbered, capped, unique, normalize, references, ranges };
 }
 
 /** `rules.ts` as `writeRules.ts` writes it. */

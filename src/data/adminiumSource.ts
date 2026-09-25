@@ -50,7 +50,7 @@ export const REQUIRED: Record<TableRef, string[]> = {
   invoice_lines: ["id", "document_id", "position", "description", "qty", "rate", "amount", "quote_id", "time_entry_id", "expense_id", "client_key"],
   payments: ["id", "document_id", "number", "amount", "method", "paid_on", "voided", "client_key"],
   messages: ["id", "kind", "status", "to", "invoice_id", "due", "client_key"],
-  time_entries: ["id", "project_id", "client_id", "milestone_id", "person_id", "date", "hours", "note", "running_for", "started_at", "client_key"],
+  time_entries: ["id", "project_id", "client_id", "milestone_id", "person_id", "date", "hours", "logged_hours", "note", "running_for", "started_at", "clock_stopped", "stopped_at", "client_key"],
   suppliers: ["id", "number", "name", "kind", "client_key"],
   expenses: ["id", "number", "date", "what", "amount", "client_id", "project_id", "supplier_id", "rebill", "receipt", "client_key"],
   running_costs: ["id", "label", "monthly_amount", "position"],

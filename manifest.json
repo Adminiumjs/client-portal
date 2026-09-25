@@ -6395,6 +6395,59 @@
             },
             "nullable": true,
             "rules": {
+              "formula": {
+                "coalesce": [
+                  "logged_hours",
+                  {
+                    "max": [
+                      0.25,
+                      {
+                        "div": [
+                          {
+                            "round": [
+                              {
+                                "mul": [
+                                  {
+                                    "hoursBetween": [
+                                      "started_at",
+                                      "stopped_at"
+                                    ]
+                                  },
+                                  4
+                                ]
+                              },
+                              0
+                            ]
+                          },
+                          4
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              "validation": {
+                "min": 0.01,
+                "max": 16
+              }
+            }
+          },
+          {
+            "ref": "logged_hours",
+            "type": "decimal",
+            "scale": 2,
+            "label": {
+              "en-US": "Hours as logged",
+              "de-DE": "Erfasste Stunden",
+              "fr-FR": "Heures saisies",
+              "da-DK": "Førte timer",
+              "cs-CZ": "Zapsané hodiny",
+              "ar-EG": "الساعات المسجَّلة",
+              "zh-CN": "登记的小时数",
+              "zh-TW": "登記的小時數"
+            },
+            "nullable": true,
+            "rules": {
               "validation": {
                 "min": 0.01,
                 "max": 16
@@ -6454,6 +6507,47 @@
                 "on": {
                   "column": "running_for",
                   "filled": true
+                }
+              }
+            }
+          },
+          {
+            "ref": "clock_stopped",
+            "type": "bool",
+            "default": false,
+            "label": {
+              "en-US": "Clock has stopped",
+              "de-DE": "Uhr ist angehalten",
+              "fr-FR": "Chrono arrêté",
+              "da-DK": "Uret er stoppet",
+              "cs-CZ": "Stopky jsou zastavené",
+              "ar-EG": "توقّف المؤقت",
+              "zh-CN": "计时已停止",
+              "zh-TW": "計時已停止"
+            }
+          },
+          {
+            "ref": "stopped_at",
+            "type": "timestamptz",
+            "label": {
+              "en-US": "Clock stopped",
+              "de-DE": "Uhr angehalten",
+              "fr-FR": "Chrono arrêté à",
+              "da-DK": "Uret stoppet",
+              "cs-CZ": "Stopky zastaveny",
+              "ar-EG": "أُوقف المؤقت",
+              "zh-CN": "停止计时",
+              "zh-TW": "停止計時"
+            },
+            "nullable": true,
+            "rules": {
+              "stamp": {
+                "set": "now",
+                "on": {
+                  "column": "clock_stopped",
+                  "values": [
+                    true
+                  ]
                 }
               }
             }
@@ -11962,6 +12056,10 @@
                 {
                   "column": "date",
                   "control": "date"
+                },
+                {
+                  "column": "logged_hours",
+                  "control": "number"
                 },
                 {
                   "column": "hours",

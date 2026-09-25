@@ -205,7 +205,10 @@ export function createWorld(source: Seed | SampleSource, base: () => number, zon
   /** A refusal as the desk's data port throws it. */
   const asSink = (error: unknown): never => {
     if (error instanceof Refusal) {
-      const column = typeof error.details["column"] === "string" ? (error.details["column"] as string) : null;
+      // The column it names, as the real sink reads one: `fields` on a refused value, `column` on a clash.
+      const fields = error.details["fields"];
+      const named = typeof fields === "object" && fields !== null ? (Object.keys(fields)[0] ?? null) : null;
+      const column = named ?? (typeof error.details["column"] === "string" ? (error.details["column"] as string) : null);
       throw new SinkError(error.message, kindOfStatus(error.status, error.code), error.status, error.code, column, error.details);
     }
     throw error;

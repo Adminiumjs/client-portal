@@ -420,9 +420,12 @@ export interface TimeEntry {
   person_id: Id;
   date: Day;
   hours: Decimal | null;
+  logged_hours: Decimal | null;
   note: string | null;
   running_for: Id | null;
   started_at: Instant | null;
+  clock_stopped: boolean;
+  stopped_at: Instant | null;
   client_key: string | null;
 }
 
@@ -617,7 +620,7 @@ export const COLUMN_KINDS = {
   brief_answers: { id: "int", brief_id: "int", client_id: "int" },
   suppliers: { id: "int", number_seq: "int", would_use_again: "bool" },
   expenses: { id: "int", number_seq: "int", date: "day", amount: "decimal", client_id: "int", project_id: "int", supplier_id: "int", rebill: "bool" },
-  time_entries: { id: "int", project_id: "int", client_id: "int", milestone_id: "int", person_id: "int", date: "day", hours: "decimal", running_for: "int", started_at: "instant" },
+  time_entries: { id: "int", project_id: "int", client_id: "int", milestone_id: "int", person_id: "int", date: "day", hours: "decimal", logged_hours: "decimal", running_for: "int", started_at: "instant", clock_stopped: "bool", stopped_at: "instant" },
   invoices: { id: "int", number_seq: "int", issued_on: "day", due_on: "day", tax_rate: "decimal", subtotal: "decimal", tax: "decimal", total: "decimal", paid: "decimal", balance: "decimal", sent_at: "instant", voided_at: "instant", from_quote_id: "int", share_pct: "decimal", client_id: "int", project_id: "int", proposal_id: "int", client_paid_amount: "decimal", client_paid_on: "day", client_paid: "bool", client_paid_at: "instant" },
   invoice_lines: { id: "int", document_id: "int", position: "int", qty: "decimal", rate: "decimal", discount: "decimal", quote_id: "int", share_pct: "decimal", amount: "decimal", client_id: "int", time_entry_id: "int", expense_id: "int" },
   payments: { id: "int", document_id: "int", number_seq: "int", amount: "decimal", paid_on: "day", recorded_at: "instant", voided: "bool", voided_at: "instant", client_id: "int" },
@@ -650,7 +653,7 @@ export const NULLABLE: Readonly<Record<TableRef, readonly string[]>> = {
   brief_answers: ["client_id", "answer", "first_answer", "client_key"],
   suppliers: ["number_seq", "number", "contact", "email", "phone", "address", "lead_time", "typical_cost", "note", "client_key"],
   expenses: ["number_seq", "number", "client_id", "project_id", "supplier_id", "receipt", "client_key"],
-  time_entries: ["client_id", "milestone_id", "hours", "note", "running_for", "started_at", "client_key"],
+  time_entries: ["client_id", "milestone_id", "hours", "logged_hours", "note", "running_for", "started_at", "stopped_at", "client_key"],
   invoices: ["number_seq", "number", "issued_on", "terms", "due_on", "currency", "tax_name", "tax_rate", "subtotal", "tax", "total", "paid", "balance", "ladder", "sent_at", "void_reason", "voided_at", "voided_by", "from_quote_id", "share_pct", "project_id", "proposal_id", "stage", "title", "client_paid_note", "client_paid_amount", "client_paid_on", "client_paid", "client_paid_at", "client_key"],
   invoice_lines: ["description", "rate", "discount", "currency", "quote_id", "share_pct", "amount", "client_id", "time_entry_id", "expense_id", "client_key"],
   payments: ["number_seq", "number", "currency", "method_note", "recorded_by", "recorded_at", "void_reason", "voided_by", "voided_at", "client_id", "client_key"],

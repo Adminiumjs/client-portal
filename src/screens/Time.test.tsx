@@ -12,7 +12,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import type { Id, TimeEntry } from "../data/types.ts";
 import { I18nProvider } from "../i18n/index.tsx";
 import { DEMO_START, setClockSource } from "../lib/clock.ts";
-import { drop, useDesk } from "../state/desk.ts";
+import { drop, upsert, useDesk } from "../state/desk.ts";
 import { usePortal } from "../state/portal.ts";
 import { useSheets } from "../state/sheets.ts";
 import { loadTime, startClock } from "../state/timeActions.ts";
@@ -186,20 +186,23 @@ describe("what the buttons write", () => {
     expect([...carried].sort()).toEqual([1, 2, 3]);
   });
 
-  it("stops a clock with the hours from Adminium's stamp, to the quarter hour", async () => {
+  it("stops a clock with Adminium's hours from its own two stamps, whatever this computer's clock says", async () => {
     const clock = ok(await startClock({ project_id: 1, person_id: 1, note: "Box artwork" }));
-    setClockSource(() => DEMO_START + 100 * 60_000);
+    studio.setNow(DEMO_START + 100 * 60_000);
+    // This computer's clock is a day out; it decides nothing.
+    setClockSource(() => DEMO_START + 24 * 3_600_000);
     const answer = await stopOrAsk(clock);
-    expect(answer).toMatchObject({ kind: "stopped", entry: { hours: "1.75", running_for: null } });
-    expect(studio.writes.at(-1)).toMatchObject({ op: "update", table: "time_entries", id: clock.id, values: { hours: "1.75", note: "Box artwork", running_for: null } });
+    expect(answer).toMatchObject({ kind: "stopped", entry: { hours: "1.75", running_for: null, stopped_at: new Date(DEMO_START + 100 * 60_000).toISOString() } });
+    expect(studio.writes.at(-1)).toEqual({ op: "update", table: "time_entries", id: clock.id, values: { note: "Box artwork", running_for: null, clock_stopped: true } });
   });
 
-  it("hands a clock left past sixteen hours back to the person, writing nothing", async () => {
+  it("hands a clock Adminium finds ran past sixteen hours back to the person, storing nothing", async () => {
     const clock = ok(await startClock({ project_id: 1, person_id: 1, note: "Box artwork" }));
-    setClockSource(() => DEMO_START + 17 * 3_600_000);
-    const writes = studio.writes.length;
+    studio.setNow(DEMO_START + 17 * 3_600_000);
+    // A computer whose clock is behind cannot slip the long clock through.
+    setClockSource(() => DEMO_START + 3_600_000);
     expect(await stopOrAsk(clock)).toEqual({ kind: "ask", why: { key: "time.error.tooLong", field: "hours" } });
-    expect(studio.writes.length).toBe(writes);
+    expect(tableOf(studio, "time_entries").find((e) => e["id"] === clock.id)).toMatchObject({ running_for: 1, hours: null, stopped_at: null });
   });
 
   it("says a clock was already stopped elsewhere", async () => {
@@ -208,6 +211,18 @@ describe("what the buttons write", () => {
     // This page still drew it running.
     const stale: TimeEntry = { ...clock };
     expect(await stopOrAsk(stale)).toMatchObject({ kind: "refused", code: "CLOCK_NOT_RUNNING", why: { key: "time.error.notRunning" } });
+  });
+
+  it("says a clock stopped elsewhere is on an invoice now, and leaves its hours as the line has them", async () => {
+    const clock = ok(await startClock({ project_id: 1, person_id: 1, note: "Box artwork" }));
+    const drawn: TimeEntry = { ...useDesk.getState().rows.time_entries[clock.id]! };
+    studio.setNow(DEMO_START + 3_600_000);
+    ok(await stopOrAsk(clock).then((a) => (a.kind === "stopped" ? { ok: true as const, value: a } : { ok: false as const, code: a.kind })));
+    ok(await moveNotInvoiced(held(), invoicedNow(), rate(), () => "Time"));
+    // This page still drew it running.
+    upsert("time_entries", drawn);
+    expect(await stopOrAsk(drawn)).toMatchObject({ kind: "refused", code: "ALREADY_INVOICED", why: { key: "time.error.invoiced", field: null } });
+    expect(tableOf(studio, "time_entries").find((e) => e["id"] === clock.id)).toMatchObject({ hours: "1.00", running_for: null });
   });
 });
 

@@ -38,7 +38,8 @@ export const DEMO_RULES: DemoRules = {
       "amount": "currency"
     },
     "time_entries": {
-      "hours": 2
+      "hours": 2,
+      "logged_hours": 2
     },
     "invoices": {
       "tax_rate": 3,
@@ -664,6 +665,16 @@ export const DEMO_RULES: DemoRules = {
         "on": {
           "column": "running_for",
           "filled": true
+        }
+      },
+      {
+        "column": "stopped_at",
+        "set": "now",
+        "on": {
+          "column": "clock_stopped",
+          "values": [
+            true
+          ]
         }
       }
     ],
@@ -1505,6 +1516,33 @@ export const DEMO_RULES: DemoRules = {
     },
     "events": {
       "person_id": "people"
+    }
+  },
+  "ranges": {
+    "expenses": {
+      "amount": {
+        "min": 0.01
+      }
+    },
+    "time_entries": {
+      "hours": {
+        "min": 0.01,
+        "max": 16
+      },
+      "logged_hours": {
+        "min": 0.01,
+        "max": 16
+      }
+    },
+    "payments": {
+      "amount": {
+        "min": 0.001
+      }
+    },
+    "running_costs": {
+      "monthly_amount": {
+        "min": 0
+      }
     }
   }
 };

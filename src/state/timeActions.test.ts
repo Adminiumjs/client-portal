@@ -6,10 +6,10 @@
  */
 import { beforeEach, describe, expect, it } from "vitest";
 
-import type { Id, TimeEntry } from "../data/types.ts";
+import type { Id } from "../data/types.ts";
 import { DEMO_START } from "../lib/clock.ts";
 import { fakeStudio, tableOf, type FakeStudio } from "../testing/fakeStudio.ts";
-import { useDesk } from "./desk.ts";
+import { upsert, useDesk } from "./desk.ts";
 import { takeOffDraft } from "./invoiceDrafts.ts";
 import type { Outcome } from "./outcome.ts";
 import * as time from "./timeActions.ts";
@@ -31,11 +31,13 @@ describe("logging time", () => {
   it("logs one entry today on the milestone under way; the client is copied from the project by Adminium", async () => {
     const entry = ok(await time.logTime({ project_id: 1, person_id: 2, hours: "1.5", note: " Proofs at 12mm " }));
     expect(trail()).toEqual(["insert time_entries"]);
-    expect(studio.writes[0]!.values).toMatchObject({ project_id: 1, milestone_id: 2, person_id: 2, date: "2026-07-28", hours: "1.5", note: "Proofs at 12mm" });
+    // The typed hours; Adminium's `hours` is worked out from them.
+    expect(studio.writes[0]!.values).toMatchObject({ project_id: 1, milestone_id: 2, person_id: 2, date: "2026-07-28", logged_hours: "1.5", note: "Proofs at 12mm" });
+    expect(studio.writes[0]!.values).not.toHaveProperty("hours");
     expect(studio.writes[0]!.values!["client_key"]).toHaveLength(36);
     // The project's client, as Adminium copies it; not a value the desk sent.
     expect(studio.writes[0]!.values).not.toHaveProperty("client_id");
-    expect(entry).toMatchObject({ client_id: 2, hours: "1.50", running_for: null });
+    expect(entry).toMatchObject({ client_id: 2, hours: "1.50", logged_hours: "1.50", running_for: null });
   });
 
   it("refuses hours outside above-zero-to-sixteen and a missing note, before anything is sent", async () => {
@@ -55,6 +57,9 @@ describe("logging time", () => {
     const refused = await time.editTime(1, { hours: "5" });
     expect(!refused.ok && refused.code).toBe("ALREADY_INVOICED");
     expect(ok(await time.editTime(2, { note: "Dieline check, again" })).note).toBe("Dieline check, again");
+    // A correction is the typed hours; Adminium's figure follows.
+    expect(ok(await time.editTime(2, { hours: "2.75" }))).toMatchObject({ hours: "2.75", logged_hours: "2.75" });
+    expect(studio.writes.at(-1)!.values).toEqual({ logged_hours: "2.75" });
   });
 });
 
@@ -70,22 +75,85 @@ describe("the running clock", () => {
     expect(time.clockOf(1)?.id).toBe(clock.id);
   });
 
-  it("stops with the hours from the stamp, to the quarter hour, and frees the person for another", async () => {
+  it("stops without sending any hours: Adminium stamps the stop and counts them from its two stamps, to the quarter hour", async () => {
     const clock = ok(await time.startClock({ project_id: 1, person_id: 1, note: "Box artwork" }));
-    const stopped = ok(await time.stopClock(clock.id, { at: DEMO_START + (2 * 60 + 20) * 60_000 }));
-    expect(stopped).toMatchObject({ hours: "2.25", running_for: null, note: "Box artwork" });
-    expect(studio.writes.at(-1)!.values).toEqual({ hours: "2.25", note: "Box artwork", running_for: null });
+    expect(studio.writes.at(-1)!.values).not.toHaveProperty("hours");
+    // 1 h 37 min on the clock (09:00 → 10:37, say) is 1.50 to the quarter hour.
+    studio.setNow(DEMO_START + (60 + 37) * 60_000);
+    const stopped = ok(await time.stopClock(clock.id));
+    expect(studio.writes.at(-1)!.values).toEqual({ note: "Box artwork", running_for: null, clock_stopped: true });
+    expect(stopped).toMatchObject({ hours: "1.50", logged_hours: null, running_for: null, clock_stopped: true, note: "Box artwork" });
+    expect(stopped.stopped_at).toBe(new Date(DEMO_START + (60 + 37) * 60_000).toISOString());
     expect(ok(await time.startClock({ project_id: 1, person_id: 1 })).running_for).toBe(1);
   });
 
-  it("asks for the hours rather than guessing a clock left running past sixteen, and for a note", async () => {
-    const clock = ok(await time.startClock({ project_id: 1, person_id: 2 }));
-    const long = await time.stopClock(clock.id, { at: DEMO_START + 17 * 3_600_000, note: "Artwork" });
+  it("counts a quarter at least, and a person's own hours over the clock's", async () => {
+    const quick = ok(await time.startClock({ project_id: 1, person_id: 1, note: "Call" }));
+    studio.setNow(DEMO_START + 2 * 60_000);
+    expect(ok(await time.stopClock(quick.id)).hours).toBe("0.25");
+    const typed = ok(await time.startClock({ project_id: 1, person_id: 2, note: "Proofs" }));
+    studio.setNow(DEMO_START + 5 * 3_600_000);
+    const stopped = ok(await time.stopClock(typed.id, { hours: "3" }));
+    expect(studio.writes.at(-1)!.values).toEqual({ logged_hours: "3", note: "Proofs", running_for: null, clock_stopped: true });
+    expect(stopped).toMatchObject({ hours: "3.00", logged_hours: "3.00" });
+  });
+
+  it("stores nothing for a clock left running past sixteen hours: Adminium refuses the count, and the hours are asked for", async () => {
+    const clock = ok(await time.startClock({ project_id: 1, person_id: 2, note: "Artwork" }));
+    studio.setNow(DEMO_START + 17 * 3_600_000);
+    const long = await time.stopClock(clock.id);
     expect(!long.ok && [long.code, long.field]).toEqual(["CLOCK_TOO_LONG", "hours"]);
-    const noNote = await time.stopClock(clock.id, { at: DEMO_START + 3_600_000 });
+    // Refused whole: the clock still runs, with no stop and no hours.
+    expect(tableOf(studio, "time_entries").find((e) => e["id"] === clock.id)).toMatchObject({ running_for: 2, hours: null, stopped_at: null, clock_stopped: false });
+    const typed = ok(await time.stopClock(clock.id, { hours: "7" }));
+    expect(typed).toMatchObject({ hours: "7.00", running_for: null, clock_stopped: true });
+    expect(typed.stopped_at).toBe(new Date(DEMO_START + 17 * 3_600_000).toISOString());
+  });
+
+  it("will not stop again a clock another computer stopped — nor touch its hours once a line carries them", async () => {
+    const clock = ok(await time.startClock({ project_id: 1, person_id: 1, note: "Box artwork" }));
+    const running = { ...useDesk.getState().rows.time_entries[clock.id]! };
+    // Another computer stops it at two hours…
+    studio.setNow(DEMO_START + 2 * 3_600_000);
+    const there = await studio.world.writes.update("time_entries", clock.id, { running_for: null, clock_stopped: true });
+    expect(there).toMatchObject({ hours: "2.00" });
+    // …while this page still holds it running, and its person types five hours.
+    upsert("time_entries", running);
+    studio.setNow(DEMO_START + 5 * 3_600_000);
+    const sent = studio.writes.length;
+    const stale = await time.stopClock(clock.id, { hours: "5" });
+    expect(!stale.ok && stale.code).toBe("CLOCK_NOT_RUNNING");
+    expect(studio.writes.length).toBe(sent);
+    // The page now holds the truth.
+    expect(useDesk.getState().rows.time_entries[clock.id]).toMatchObject({ running_for: null, hours: "2.00" });
+    // Moved onto an invoice there, and pressed again here from the stale row: refused, the line and the entry agree.
+    ok(await time.moveTimeOntoInvoice([clock.id], MOVE));
+    upsert("time_entries", running);
+    const invoiced = await time.stopClock(clock.id, { hours: "5" });
+    expect(!invoiced.ok && invoiced.code).toBe("ALREADY_INVOICED");
+    const line = lines().find((l) => l["time_entry_id"] === clock.id)!;
+    const stored = tableOf(studio, "time_entries").find((e) => e["id"] === clock.id)!;
+    expect([stored["hours"], stored["logged_hours"], line["qty"]]).toEqual(["2.00", null, "2.000"]);
+  });
+
+  it("stamps the stop once: a second stop written to Adminium keeps the first moment and the hours", async () => {
+    const clock = ok(await time.startClock({ project_id: 1, person_id: 1, note: "Box artwork" }));
+    studio.setNow(DEMO_START + 3_600_000);
+    const first = ok(await time.stopClock(clock.id));
+    studio.setNow(DEMO_START + 9 * 3_600_000);
+    // Sent again with a change beside it, so the write is not a no-op.
+    const again = await studio.world.writes.update("time_entries", clock.id, { running_for: null, clock_stopped: true, note: "Box artwork, again" });
+    expect([again.stopped_at, again.hours, again.note]).toEqual([first.stopped_at, "1.00", "Box artwork, again"]);
+  });
+
+  it("asks what a clock was on before stopping it, and refuses typed hours out of range before anything is sent", async () => {
+    const clock = ok(await time.startClock({ project_id: 1, person_id: 2 }));
+    const sent = studio.writes.length;
+    const noNote = await time.stopClock(clock.id);
     expect(!noNote.ok && noNote.code).toBe("NOTE_REQUIRED");
-    expect(ok(await time.stopClock(clock.id, { hours: "7", note: "Artwork" })).hours).toBe("7.00");
-    expect(time.clockHours({ started_at: new Date(DEMO_START).toISOString() } as TimeEntry, DEMO_START + 60_000)).toBe("0.25");
+    const tooMany = await time.stopClock(clock.id, { hours: "16.5", note: "Artwork" });
+    expect(!tooMany.ok && [tooMany.code, tooMany.field]).toEqual(["HOURS_OUT_OF_RANGE", "hours"]);
+    expect(studio.writes.length).toBe(sent);
   });
 });
 

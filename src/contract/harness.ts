@@ -12,7 +12,8 @@
  */
 import { spawn, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { gzipSync } from "node:zlib";
@@ -178,6 +179,8 @@ export interface Server {
   sink: string;
   /** What the server has said so far (its log), for a failure to show. */
   log(): string;
+  /** Move the server's clock on by `ms` at once (a night passing over a running clock); resolves once it has moved. */
+  pass(ms: number): Promise<void>;
   stop(): Promise<void>;
 }
 
@@ -193,6 +196,8 @@ export const PORTS_PER_ENGINE = 3;
  * `database` names the Postgres/MySQL database the run owns (dropped and made again at boot).
  */
 export async function boot(engine: Engine, port: number, now: number, options: { database?: string } = {}): Promise<Server> {
+  const clockFile = join(tmpdir(), `cp-contract-clock-${String(port)}`);
+  writeFileSync(clockFile, "");
   const env: NodeJS.ProcessEnv = {
     ...process.env,
     E2E_ENGINE: engine,
@@ -203,6 +208,7 @@ export async function boot(engine: Engine, port: number, now: number, options: {
     // Its own database, so a contract never meets another run's rows (`CONTRACT_DB_SUFFIX` keeps two checkouts' runs apart).
     E2E_DATABASE: options.database ?? `cp_contract_${engine}${process.env["CONTRACT_DB_SUFFIX"] ?? ""}`,
     CONTRACT_NOW: String(now),
+    CONTRACT_CLOCK_FILE: clockFile,
     NODE_OPTIONS: `${process.env["NODE_OPTIONS"] ?? ""} --import=${pathToFileURL(fileURLToPath(new URL("./clock.mjs", import.meta.url))).href}`.trim(),
   };
   const child: ChildProcess = spawn(process.execPath, [E2E_SERVER], { cwd: join(ADMINIUM_REPO, "apps", "e2e"), env, stdio: ["ignore", "pipe", "pipe"] });
@@ -229,6 +235,15 @@ export async function boot(engine: Engine, port: number, now: number, options: {
     base,
     sink: `http://127.0.0.1:${String(port + 2)}`,
     log: () => log,
+    async pass(ms: number) {
+      writeFileSync(clockFile, String(ms));
+      child.kill("SIGUSR2");
+      const by = Date.now() + 10_000;
+      while (readFileSync(clockFile, "utf8") !== "") {
+        if (Date.now() > by) throw new Error("the server's clock did not move");
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+    },
     stop: () =>
       new Promise<void>((resolve) => {
         if (child.exitCode !== null) return resolve();

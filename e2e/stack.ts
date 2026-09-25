@@ -41,7 +41,8 @@ export interface Stack {
 
 /** Boot, install the add-on and the app (built surfaces), set the studio up as the demo's, and add the sample. */
 export async function stackUp(engine: Engine, port: number): Promise<Stack> {
-  const database = `cp_t57_e2e_${engine}`;
+  // `CONTRACT_DB_SUFFIX` keeps two checkouts' runs on one Postgres or MySQL apart, as the contract's.
+  const database = `cp_t57_e2e_${engine}${process.env["CONTRACT_DB_SUFFIX"] ?? ""}`;
   const server = await boot(engine, port, DEMO_START, { database });
   try {
     const staff = new Caller(server.base, { origin: server.base });

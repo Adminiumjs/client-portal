@@ -7,6 +7,8 @@
  */
 import { describe, expect, it } from "vitest";
 
+import { workOut, type Formula } from "../data/sampleRows.ts";
+import { evaluateFormula, type FormulaExpr } from "../testing/manifest/formula.ts";
 import { validateManifest } from "../testing/manifest/index.ts";
 import { buildManifest } from "./build.ts";
 import { EMAIL_EN } from "./emails.ts";
@@ -36,15 +38,50 @@ describe("the back office's tables", () => {
     }
   });
 
-  it("keeps hours to two places, above zero and at most sixteen, on a day that has happened", () => {
-    expect(column("time_entries", "hours")).toMatchObject({ type: "decimal", scale: 2, nullable: true, rules: { validation: { min: 0.01, max: 16 } } });
+  it("keeps hours to two places, above zero and at most sixteen — typed ones and Adminium's own — on a day that has happened", () => {
+    const hours = column("time_entries", "hours");
+    expect(hours).toMatchObject({ type: "decimal", scale: 2, nullable: true, rules: { validation: { min: 0.01, max: 16 } } });
+    // Adminium's figure: nothing a writer sends is kept.
+    expect(Object.keys(hours["rules"]!).sort()).toEqual(["formula", "validation"]);
+    expect(column("time_entries", "logged_hours")).toMatchObject({ type: "decimal", scale: 2, nullable: true, rules: { validation: { min: 0.01, max: 16 } } });
     expect(column("time_entries", "date")["rules"]).toEqual({ notAfter: "today" });
     expect(column("expenses", "date")["rules"]).toEqual({ notAfter: "today" });
   });
 
-  it("allows one running clock per person, stamped by Adminium when it starts", () => {
+  it("allows one running clock per person, stamped by Adminium when it starts and when it stops", () => {
     expect(column("time_entries", "running_for")).toMatchObject({ type: "fk", references: "people", unique: true, nullable: true });
     expect(column("time_entries", "started_at")["rules"]).toEqual({ stamp: { set: "now", on: { column: "running_for", filled: true } } });
+    expect(column("time_entries", "clock_stopped")).toMatchObject({ type: "bool", default: false });
+    expect(column("time_entries", "stopped_at")).toMatchObject({ type: "timestamptz", nullable: true, rules: { stamp: { set: "now", on: { column: "clock_stopped", values: [true] } } } });
+  });
+
+  it("counts a clock's hours from its two stamps to the nearest quarter hour, a quarter at least — the typed hours first — as Adminium does", () => {
+    const formula = column("time_entries", "hours")["rules"]!["formula"];
+    const at = (minutes: number) => new Date(Date.UTC(2026, 6, 28, 13, 0) + minutes * 60_000).toISOString();
+    const row = (minutes: number | null, logged: string | null = null) => ({ started_at: at(0), stopped_at: minutes === null ? null : at(minutes), logged_hours: logged });
+    const cases: [ReturnType<typeof row>, string | null][] = [
+      // 09:00 → 10:37: an hour and 37 minutes is an hour and a half.
+      [row(97), "1.50"],
+      [row(2), "0.25"],
+      [row(0), "0.25"],
+      // Half a quarter goes up.
+      [row(22.5), "0.50"],
+      [row(22.49), "0.25"],
+      [row(8 * 60 + 7), "8.00"],
+      [row(17 * 60), "17.00"],
+      // A person's own hours are the hours, however long the clock ran.
+      [row(17 * 60, "7.00"), "7.00"],
+      [row(null, "2.50"), "2.50"],
+      // Still running, or a stop before its start: no hours at all.
+      [row(null), null],
+      [row(-5), null],
+    ];
+    for (const [values, expected] of cases) {
+      expect(evaluateFormula(formula as FormulaExpr, values, 2), JSON.stringify(values)).toBe(expected);
+      // The demo's and the sample's own reckoning agrees with Adminium's.
+      const own = workOut(formula as Formula, values, 2);
+      expect(own === null ? null : own.toFixed(2), JSON.stringify(values)).toBe(expected);
+    }
   });
 
   it("makes the invoice line the one record of what it carries: unique, so nothing is invoiced twice", () => {

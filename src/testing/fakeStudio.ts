@@ -29,10 +29,12 @@ export interface FakeStudio {
   writes: Write[];
   /** Drop the answer to the n-th write from now: `"after"` it saved (the answer was lost), `"before"` it reached the server. */
   failWrite(n: number, when?: "before" | "after"): void;
+  /** Move the clock the world and the desk read (epoch ms): time passing, a clock left running. */
+  setNow(at: number): void;
 }
 
 export async function fakeStudio(opts: { at?: number } = {}): Promise<FakeStudio> {
-  const at = opts.at ?? DEMO_START;
+  let at = opts.at ?? DEMO_START;
   setZone(DEMO_ZONE);
   setClockSource(() => at);
   const world = createWorld(DEMO_ROWS, () => at, DEMO_ZONE, { name: "Nadia Cole" });
@@ -77,6 +79,9 @@ export async function fakeStudio(opts: { at?: number } = {}): Promise<FakeStudio
     failWrite(n, w = "before") {
       countdown = n;
       when = w;
+    },
+    setNow(moment) {
+      at = moment;
     },
   };
 }

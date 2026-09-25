@@ -5,10 +5,11 @@
  *   Move onto an invoice   the entries the filter shows that no line carries
  *                          yet, at the rate card's hourly rate, onto each
  *                          client's draft (a new one titled for the project)
- *   Stop                   the clock's hours from Adminium's stamp; what Stop
- *                          alone cannot settle (a clock past sixteen hours, a
- *                          clock with nothing said about what it is on) is
- *                          handed back for the stop sheet to ask
+ *   Stop                   the clock stops; Adminium stamps the moment and
+ *                          works the hours out from its two stamps. What Stop
+ *                          alone cannot settle (a clock Adminium finds ran
+ *                          past sixteen hours, a clock with nothing said about
+ *                          what it is on) is handed back for the stop sheet to ask
  */
 import type { Decimal, Id, TimeEntry } from "../../data/types.ts";
 import type { OntoDrafts } from "../../state/invoiceDrafts.ts";
@@ -28,7 +29,7 @@ export function moveNotInvoiced(entries: readonly TimeEntry[], invoiced: Readonl
 
 export type StopAnswer = { kind: "stopped"; entry: TimeEntry } | { kind: "ask"; why: Words } | { kind: "refused"; why: Words; code: string; reason: string };
 
-/** Stop a clock with the hours it ran; what needs the person's say comes back as `ask`. */
+/** Stop a clock (Adminium counts its hours); what needs the person's say comes back as `ask`. */
 export async function stopOrAsk(entry: TimeEntry): Promise<StopAnswer> {
   const out = await stopClock(entry.id);
   if (out.ok) return { kind: "stopped", entry: out.value };

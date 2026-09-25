@@ -171,9 +171,9 @@ export const DEMO_ROWS: Seed = {
     { id: 3, number: "EX-003", date: "2026-07-08", what: "Image library, monthly", amount: "29.00", client_id: null, project_id: null, supplier_id: null, rebill: false, receipt: null },
   ],
   time_entries: [
-    { id: 1, project_id: 1, client_id: 2, milestone_id: 2, person_id: 1, date: "2026-07-27", hours: "3.50", note: "Box artwork, second pass" },
-    { id: 2, project_id: 1, client_id: 2, milestone_id: 2, person_id: 2, date: "2026-07-24", hours: "2.00", note: "Dieline check with the printer" },
-    { id: 3, project_id: 2, client_id: 1, milestone_id: 4, person_id: 1, date: "2026-07-23", hours: "4.00", note: "Window sketches A and B" },
+    { id: 1, project_id: 1, client_id: 2, milestone_id: 2, person_id: 1, date: "2026-07-27", logged_hours: "3.50", note: "Box artwork, second pass" },
+    { id: 2, project_id: 1, client_id: 2, milestone_id: 2, person_id: 2, date: "2026-07-24", logged_hours: "2.00", note: "Dieline check with the printer" },
+    { id: 3, project_id: 2, client_id: 1, milestone_id: 4, person_id: 1, date: "2026-07-23", logged_hours: "4.00", note: "Window sketches A and B" },
   ],
   running_costs: [
     { id: 1, label: "Studio rent", monthly_amount: "1450.00", position: 0 },

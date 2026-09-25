@@ -16,7 +16,10 @@
  * Beside the shots, what the stored rows must say after each press: a logged
  * entry dated today on the milestone under way, its client copied by
  * Adminium; a clock that is a row with Adminium's start stamp and no hours,
- * one per person; a stop that writes the quarter-hours and frees the person;
+ * one per person; a stop that sends no hours — Adminium stamps it and counts
+ * them, to the quarter hour, whatever the browser's clock says — and frees
+ * the person; a clock left running overnight whose count Adminium refuses,
+ * storing nothing, until the person types the hours;
  * a move that puts each entry on exactly one line of the client's draft at
  * the hourly rate, with Adminium's amount — and nothing twice.
  */
@@ -40,6 +43,8 @@ let stack: Stack;
 let engine: string;
 /** When the server's clock started at 10:00 on 28 July (its own clock runs on from there). */
 let bootedAt = 0;
+/** How far the server's clock has been moved on at once (a night passing). */
+let passed = 0;
 
 async function rows<T>(ref: TableRef): Promise<T[]> {
   return normaliseAll(ref, await stack.rows(ref)) as unknown as T[];
@@ -50,9 +55,10 @@ async function rows<T>(ref: TableRef): Promise<T[]> {
  * server's is now — so a clock's face (the server's start stamp to the page's
  * now) reads the time that has passed, as it would on a real desk.
  */
-async function context(browser: Browser, variant: Variant): Promise<BrowserContext> {
+async function context(browser: Browser, variant: Variant, skew = 0): Promise<BrowserContext> {
   const ctx = await browser.newContext({ ...contextOptions(variant), baseURL: stack.server.base });
-  const target = DEMO_START + (Date.now() - bootedAt);
+  // `skew`: a computer whose clock is wrong by that much.
+  const target = DEMO_START + (Date.now() - bootedAt) + passed + skew;
   await ctx.addInitScript(`(() => {
     const target = ${String(target)};
     const RealDate = Date;
@@ -217,7 +223,7 @@ test("the running clock is stored: it survives a reload, shows on another comput
   const before = await rows<TimeEntry>("time_entries");
   const ctx = await context(browser, "light");
   const page = await ctx.newPage();
-  const d = await openTime(page, logged(before));
+  await openTime(page, logged(before));
 
   // Start: the studio's first open project, the first person, what it is on.
   await page.locator("[data-clock=idle] button").click();
@@ -262,15 +268,26 @@ test("the running clock is stored: it survives a reload, shows on another comput
   }
   expect((await rows<TimeEntry>("time_entries")).filter((e) => e.running_for !== null)).toHaveLength(1);
 
-  // Stop: the hours from the stamp, to the quarter hour (a quarter at least), and the person is free again.
-  await page.locator(".time-clock--on button").click();
-  await expect(page.locator(".toasts")).toContainText("0.25 h logged on Hearth & Loaf.");
-  await expect(page.locator(".time-clock--on")).toHaveCount(0);
-  await expect(page.locator("main")).toContainText(d.word("time.clock.nothing"));
-  const stopped = (await rows<TimeEntry>("time_entries")).find((e) => e.id === clock.id)!;
-  expect(stopped).toMatchObject({ running_for: null, note: "Wordmark spacing at 12 mm" });
-  expect(Number(stopped.hours)).toBe(0.25);
   await ctx.close();
+
+  // Stop, from a computer whose clock is twenty hours ahead: it sends no hours. Adminium stamps the
+  // stop and counts them from its own two stamps, to the quarter hour (a quarter at least).
+  const wrong = await context(browser, "light", 20 * 3_600_000);
+  const stopPage = await wrong.newPage();
+  const ds = await openTime(stopPage, logged(before));
+  await expect(stopPage.locator(".time-clock--on .time-clock-face")).toHaveText(/^20:\d{2}:\d{2}$/);
+  await stopPage.locator(".time-clock--on button").click();
+  await expect(stopPage.locator(".toasts")).toContainText("0.25 h logged on Hearth & Loaf.");
+  await expect(stopPage.locator(".time-clock--on")).toHaveCount(0);
+  await expect(dialog(stopPage)).toHaveCount(0);
+  await expect(stopPage.locator("main")).toContainText(ds.word("time.clock.nothing"));
+  const stopped = (await rows<TimeEntry>("time_entries")).find((e) => e.id === clock.id)!;
+  expect(stopped).toMatchObject({ running_for: null, note: "Wordmark spacing at 12 mm", logged_hours: null, clock_stopped: true });
+  expect(Number(stopped.hours)).toBe(0.25);
+  const ran = Date.parse(stopped.stopped_at!) - Date.parse(stopped.started_at!);
+  expect(ran).toBeGreaterThanOrEqual(0);
+  expect(ran).toBeLessThan(10 * 60_000);
+  await wrong.close();
 });
 
 test("move onto an invoice: each entry on one line of the client's draft, at the hourly rate, Adminium's amount — nothing twice", async ({ browser }) => {
@@ -338,3 +355,71 @@ test("the invoiced chip opens the invoice that carries the entry", async ({ brow
   await ctx.close();
 });
 
+// Last: it moves the server's clock on a night, and nothing after it may read the time.
+test("a clock with nothing said stops with Adminium's count; one left running overnight is refused until its hours are typed", async ({ browser }) => {
+  const people = (await rows<Person>("people")).sort((a, b) => a.position - b.position);
+  const [nadia, tomas] = [people[0]!, people[1]!];
+  const projects = await rows<Project>("projects");
+  const bakehouse = projects.find((p) => p.name === "Bakehouse rebrand")!;
+  const entries = await rows<TimeEntry>("time_entries");
+  const start = async (person: Person, note: string | null): Promise<TimeEntry> => {
+    const made = await stack.staff.post<{ data: Record<string, unknown> }>(stack.data("time_entries"), { values: { project_id: bakehouse.id, person_id: person.id, running_for: person.id, date: "2026-07-28", note } });
+    expect(made.status, JSON.stringify(made.body).slice(0, 400)).toBe(201);
+    return normaliseAll("time_entries", [made.body.data])[0] as unknown as TimeEntry;
+  };
+
+  // Started elsewhere with nothing said: Stop asks what it was on; the hours left empty are Adminium's.
+  const quiet = await start(tomas, null);
+  const ctx = await context(browser, "light");
+  const page = await ctx.newPage();
+  await openTime(page, logged(entries));
+  await page.locator(".time-clock--on").filter({ hasText: tomas.name }).locator("button").click();
+  await expect(dialog(page)).toBeVisible();
+  await expect(dialog(page).locator(".time-sheet-lead")).toContainText("Leave Hours empty to log the clock’s own time, to the quarter hour.");
+  await expect(dialog(page).locator("input[inputmode=decimal]")).toHaveValue("");
+  await check(page, engine, "time-stop-note", "light");
+  await dialog(page).locator("input").nth(1).fill("Press proofs, by the window");
+  await dialog(page).locator("button[type=submit]").click();
+  await expect(dialog(page)).toHaveCount(0);
+  await expect(page.locator(".toasts")).toContainText("0.25 h logged on Hearth & Loaf.");
+  const quietStopped = (await rows<TimeEntry>("time_entries")).find((e) => e.id === quiet.id)!;
+  expect(quietStopped).toMatchObject({ running_for: null, logged_hours: null, clock_stopped: true, note: "Press proofs, by the window" });
+  expect(Number(quietStopped.hours)).toBe(0.25);
+  await ctx.close();
+
+  // Left running overnight: seventeen hours pass on Adminium's clock.
+  const long = await start(nadia, "Type specimen, overnight");
+  await stack.server.pass(17 * 3_600_000);
+  passed += 17 * 3_600_000;
+  for (const variant of VARIANTS) {
+    const other = await context(browser, variant);
+    const there = await other.newPage();
+    const dv = deskIn(there, variant);
+    await openTime(there, logged(await rows<TimeEntry>("time_entries")));
+    await there.locator(".time-clock--on").filter({ hasText: nadia.name }).locator("button").click();
+    // Adminium refused its own count: the sheet asks for the hours, and nothing was stored.
+    await expect(dialog(there)).toBeVisible();
+    await expect(dialog(there)).toContainText(dv.word("time.error.tooLong"));
+    await expect(dialog(there).locator("input[inputmode=decimal]")).toHaveValue("");
+    await check(there, engine, "time-stop-long", variant);
+    const held = (await rows<TimeEntry>("time_entries")).find((e) => e.id === long.id)!;
+    expect(held).toMatchObject({ running_for: nadia.id, hours: null, stopped_at: null, clock_stopped: false });
+    if (variant !== "phone") {
+      await closeSheet(there);
+      await other.close();
+      continue;
+    }
+    // Empty hours are not taken: past sixteen, the person must say.
+    await dialog(there).locator("button[type=submit]").click();
+    await expect(dialog(there)).toContainText(dv.word("time.error.hours"));
+    await dialog(there).locator("input[inputmode=decimal]").fill("7");
+    await dialog(there).locator("button[type=submit]").click();
+    await expect(dialog(there)).toHaveCount(0);
+    await expect(there.locator(".toasts")).toContainText("7 h logged on Hearth & Loaf.");
+    await other.close();
+  }
+  const typed = (await rows<TimeEntry>("time_entries")).find((e) => e.id === long.id)!;
+  expect(typed).toMatchObject({ running_for: null, clock_stopped: true, note: "Type specimen, overnight" });
+  expect([Number(typed.hours), Number(typed.logged_hours)]).toEqual([7, 7]);
+  expect(Date.parse(typed.stopped_at!) - Date.parse(typed.started_at!)).toBeGreaterThanOrEqual(17 * 3_600_000);
+});

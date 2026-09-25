@@ -272,7 +272,7 @@ const SPECS: PageSpec[] = [
     order: 9,
     table: "time_entries",
     config: form(
-      [f("project_id", { control: "reference" }), f("milestone_id", { control: "reference" }), f("person_id", { control: "reference" }), f("date", { control: "date" }), f("hours", { control: "number" })],
+      [f("project_id", { control: "reference" }), f("milestone_id", { control: "reference" }), f("person_id", { control: "reference" }), f("date", { control: "date" }), f("logged_hours", { control: "number" }), f("hours", { control: "number" })],
       [wide("note", "text")],
     ),
   },

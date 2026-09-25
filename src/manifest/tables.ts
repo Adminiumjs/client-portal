@@ -117,6 +117,14 @@ function when(column: string, ...values: (string | boolean)[]): Record<string, u
   return { column, values };
 }
 
+/**
+ * A time entry's hours: the typed ones, else the clock's from its start to its stop, to the
+ * nearest quarter hour and never under a quarter.
+ */
+const CLOCK_HOURS = {
+  coalesce: ["logged_hours", { max: [0.25, { div: [{ round: [{ mul: [{ hoursBetween: ["started_at", "stopped_at"] }, 4] }, 0] }, 4] }] }],
+};
+
 // ── the add-on's shapes, spelled out ────────────────────────────────────────
 
 interface ShapeColumn extends Omit<Column, "label"> {
@@ -796,13 +804,21 @@ export const TABLES: Table[] = [
       fk("person_id", "people", "Who"),
       // Logged for a day that has happened, never one still to come.
       date("date", "Day", { rules: { notAfter: "today" } }),
-      // Empty only while the clock runs; nobody works more than sixteen hours in a day.
-      decimal("hours", "Hours", 2, { ...opt, rules: { validation: { min: 0.01, max: 16 } } }),
+      // The hours the entry counts, worked out by Adminium: the ones a person typed, else the
+      // clock's own, from its start to its stop (both Adminium's moments) to the nearest quarter
+      // hour, a quarter at least. Empty while the clock runs. Nobody works more than sixteen
+      // hours in a day: a clock left running longer is refused at its stop, and asks for the hours.
+      decimal("hours", "Hours", 2, { ...opt, rules: { formula: CLOCK_HOURS, validation: { min: 0.01, max: 16 } } }),
+      // Hours a person typed: time logged by hand, or the real figure for a clock.
+      decimal("logged_hours", "Hours as logged", 2, { ...opt, rules: { validation: { min: 0.01, max: 16 } } }),
       text("note", 500, "What it went on", opt),
       // Whose clock is running on this entry, emptied when it stops. Unique, so one person
       // never has two clocks running, whichever computer started the second.
       fk("running_for", "people", "Clock running for", true, { unique: true }),
       at("started_at", "Clock started", { ...opt, rules: stamp("now", { column: "running_for", filled: true }) }),
+      // Set as the clock stops, so the moment it stopped is Adminium's too.
+      bool("clock_stopped", "Clock has stopped", false),
+      at("stopped_at", "Clock stopped", { ...opt, rules: stamp("now", when("clock_stopped", true)) }),
       clientKey,
     ],
   },

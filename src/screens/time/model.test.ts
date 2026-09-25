@@ -67,7 +67,7 @@ describe("the sample at 28 July", () => {
 });
 
 describe("the figures, exactly", () => {
-  const entry = (id: number, patch: Partial<TimeEntry>): TimeEntry => ({ id, project_id: 1, client_id: 1, milestone_id: null, person_id: 1, date: "2026-07-20", hours: "1.00", note: "x", running_for: null, started_at: null, client_key: null, ...patch });
+  const entry = (id: number, patch: Partial<TimeEntry>): TimeEntry => ({ id, project_id: 1, client_id: 1, milestone_id: null, person_id: 1, date: "2026-07-20", hours: "1.00", logged_hours: "1.00", note: "x", running_for: null, started_at: null, clock_stopped: false, stopped_at: null, client_key: null, ...patch });
 
   it("adds hours to the hundredth, leaves a running clock out, and counts only this month's", () => {
     const list = [entry(1, { hours: "0.10" }), entry(2, { hours: "0.20" }), entry(3, { hours: null, running_for: 1, started_at: "2026-07-28T13:00:00.000Z" }), entry(4, { date: "2026-06-30", hours: "7.25" })];

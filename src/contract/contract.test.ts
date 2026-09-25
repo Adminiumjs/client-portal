@@ -17,12 +17,15 @@
  *   7. the back office: purchases and suppliers numbered without gaps under
  *      parallel creates; the desk's own "Move onto an invoice" and "Pass on",
  *      pressed twice at once, put each entry and purchase on ONE line; one
- *      running clock per person; an invoiced entry kept; a line taken off a
+ *      running clock per person, its hours counted by Adminium from its own
+ *      start and stop stamps; an invoiced entry kept; a line taken off a
  *      draft frees it, a sent one's lines are locked;
  *   8. an enquiry from the studio's site: behind the human check, only its
  *      own columns, landing as a new enquiry from the web, and the studio
  *      emailed about it; the per-address limit;
- *   9. the sample removed, keeping what the studio and the client made of it.
+ *   9. the sample removed, keeping what the studio and the client made of it;
+ *  10. a clock left running past sixteen hours (the server's clock moved on a
+ *      night): its count refused, nothing stored, the typed hours stop it.
  *
  * The demo's stand-in world plays the same scenario (`demo/world.test.ts`),
  * and the figures here are held to it: the same receipt number, the same
@@ -43,10 +46,10 @@ import { createSessionTransport } from "../data/sessionSource.ts";
 import { sessionSink } from "../data/sink.ts";
 import { realTables } from "../data/tableOfRef.ts";
 import { setClockSource, setZone } from "../lib/clock.ts";
-import { resetDesk, setDeskReads, setDeskWrites } from "../state/desk.ts";
+import { resetDesk, setDeskReads, setDeskWrites, upsert } from "../state/desk.ts";
 import { takeOffDraft } from "../state/invoiceDrafts.ts";
 import { addPurchase, passOn } from "../state/officeActions.ts";
-import { logTime, moveTimeOntoInvoice, removeTime, startClock, stopClock } from "../state/timeActions.ts";
+import { editTime, logTime, moveTimeOntoInvoice, removeTime, startClock, stopClock } from "../state/timeActions.ts";
 import { COLUMNS, resolveSample } from "../data/sampleRows.ts";
 import { setServerZone } from "../data/venueTime.ts";
 import type { Id, TableRef } from "../data/types.ts";
@@ -325,7 +328,7 @@ describe.skipIf(why !== null)(`the contract with a built Adminium${why === null 
         expect(!locked.ok && ["RECORD_LOCKED", "DELETE_REFUSED"].includes(locked.code)).toBe(true);
       }, 180_000);
 
-      it("keeps one running clock per person, started by Adminium's stamp", async () => {
+      it("keeps one running clock per person, started and stopped by Adminium's stamps, its hours Adminium's", async () => {
         const project = byNumber(await rows("projects"), "PRJ-S01");
         const nadia = (await rows("people")).find((p) => p["name"] === "Nadia Cole")!.id;
         const [a, b] = await Promise.all([startClock({ project_id: project.id, person_id: nadia }), startClock({ project_id: project.id, person_id: nadia })]);
@@ -335,8 +338,38 @@ describe.skipIf(why !== null)(`the contract with a built Adminium${why === null 
         expect(!refused[0]!.ok && refused[0]!.code).toBe("UNIQUE_VIOLATION");
         const clock = started[0]!.ok ? started[0]!.value : null;
         expect(clock?.started_at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
-        const stopped = await stopClock(clock!.id, { hours: "0.5", note: "Contract clock" });
-        expect(stopped.ok && [Number(stopped.value.hours), stopped.value.running_for]).toEqual([0.5, null]);
+        expect(clock?.hours).toBeNull();
+        // An hour and 37 minutes pass on Adminium's clock (09:00 → 10:37, say); the desk's own clock
+        // still says 10:00 — it is not asked. The stop sends no hours: Adminium stamps the stop and
+        // counts them from its two stamps, to the quarter hour.
+        await server.pass(97 * 60_000);
+        const stopped = await stopClock(clock!.id, { note: "Contract clock" });
+        expect(stopped.ok, JSON.stringify(stopped)).toBe(true);
+        const row = stopped.ok ? stopped.value : null;
+        expect([Number(row?.hours), row?.logged_hours, row?.running_for, row?.clock_stopped]).toEqual([1.5, null, null, true]);
+        const ran = Date.parse(String(row?.stopped_at)) - Date.parse(String(row?.started_at));
+        expect(ran).toBeGreaterThanOrEqual(97 * 60_000);
+        expect(ran).toBeLessThan(97 * 60_000 + 30_000);
+        // What the desk holds is what Adminium stored.
+        const held = (await rows("time_entries")).find((e) => e.id === clock!.id)!;
+        expect([Number(held["hours"]), held["stopped_at"], held["running_for"]]).toEqual([1.5, row?.stopped_at, null]);
+        // A person's correction is their own figure; Adminium's hours follow it.
+        const corrected = await editTime(clock!.id, { hours: "1.25" });
+        expect(corrected.ok && [Number(corrected.value.hours), Number(corrected.value.logged_hours)]).toEqual([1.25, 1.25]);
+        // Hours a writer sends for Adminium's own figure, or a stop moment of its own, are not kept.
+        ok(await staff.patch(`${data("time_entries")}/${String(clock!.id)}`, { values: { hours: "12", stopped_at: "2026-07-28T23:00:00Z" } }));
+        const kept = (await rows("time_entries")).find((e) => e.id === clock!.id)!;
+        expect([Number(kept["hours"]), kept["stopped_at"]]).toEqual([1.25, row?.stopped_at]);
+        // The stop is stamped once: stopped again an hour later, straight to Adminium, it keeps its moment.
+        await server.pass(60 * 60_000);
+        ok(await staff.patch(`${data("time_entries")}/${String(clock!.id)}`, { values: { running_for: null, clock_stopped: true, note: "Contract clock, again" } }));
+        const once = (await rows("time_entries")).find((e) => e.id === clock!.id)!;
+        expect([once["stopped_at"], Number(once["hours"])]).toEqual([row?.stopped_at, 1.25]);
+        // A page that still drew it running reads it again before its Stop, and writes nothing.
+        upsert("time_entries", clock!);
+        const stale = await stopClock(clock!.id, { hours: "4", note: "Contract clock" });
+        expect(!stale.ok && stale.code).toBe("CLOCK_NOT_RUNNING");
+        expect(Number((await rows("time_entries")).find((e) => e.id === clock!.id)!["hours"])).toBe(1.25);
         expect((await startClock({ project_id: project.id, person_id: nadia })).ok).toBe(true);
       }, 120_000);
 
@@ -418,6 +451,30 @@ describe.skipIf(why !== null)(`the contract with a built Adminium${why === null 
         expect(left["proposals"]!.map((p) => p["number"])).toContain("QUO-S1142");
         expect(ok(await staff.get<{ loaded: boolean }>("/api/v1/apps/clients/sample-data")).loaded).toBe(false);
       }, 180_000);
+
+      // Last, as it moves the server's clock on a night: nothing after it reads the time.
+      it("stores no hours for a clock left running past sixteen: Adminium refuses its own count, and the typed hours stop it", async () => {
+        const client = ok(await staff.post<{ data: Row }>(data("clients"), { values: { company: "Overnight Ltd", contact_name: "Ola Night", email: "ola@overnight.example" } }), 201).data;
+        const project = ok(await staff.post<{ data: Row }>(data("projects"), { values: { client_id: client.id, name: "Night shift" } }), 201).data;
+        const person = ok(await staff.post<{ data: Row }>(data("people"), { values: { name: "Ola Night", position: 9 } }), 201).data;
+        const started = await startClock({ project_id: project.id, person_id: person.id, milestone_id: null, note: "Left running overnight" });
+        expect(started.ok, JSON.stringify(started)).toBe(true);
+        const clock = started.ok ? started.value : null;
+        await server.pass(17 * 3_600_000);
+        const refused = await stopClock(clock!.id);
+        expect(!refused.ok && [refused.code, refused.field]).toEqual(["CLOCK_TOO_LONG", "hours"]);
+        // Adminium's own answer, under the desk: the count is refused, naming the hours.
+        const raw = await staff.patch(`${data("time_entries")}/${String(clock!.id)}`, { values: { running_for: null, clock_stopped: true } });
+        expect([raw.status, raw.code, Object.keys((raw.details["fields"] ?? {}) as object)]).toEqual([422, "VALIDATION_FAILED", ["hours"]]);
+        // Nothing of the stop was stored: the clock still runs, with no stop and no hours.
+        const still = (await rows("time_entries")).find((e) => e.id === clock!.id)!;
+        expect([still["running_for"], still["hours"], still["stopped_at"], still["clock_stopped"]]).toEqual([person.id, null, null, false]);
+        // The person says how many it really was: those are the hours, and the stop is Adminium's moment.
+        const typed = await stopClock(clock!.id, { hours: "7" });
+        expect(typed.ok && [Number(typed.value.hours), Number(typed.value.logged_hours), typed.value.running_for]).toEqual([7, 7, null]);
+        const ran = typed.ok ? Date.parse(String(typed.value.stopped_at)) - Date.parse(String(typed.value.started_at)) : 0;
+        expect(ran).toBeGreaterThanOrEqual(17 * 3_600_000);
+      }, 120_000);
     });
   });
 });

@@ -9,9 +9,13 @@
  *                       the person. Adminium keeps `running_for` unique, so a
  *                       person has one clock, whichever computer started a
  *                       second; the moment it started is Adminium's stamp.
- *                       Stopping it writes the hours from that stamp to now
- *                       and empties `running_for`; the entry is then an
- *                       ordinary one
+ *                       Stopping it empties `running_for` and says the clock
+ *                       has stopped: Adminium stamps that moment too and works
+ *                       the hours out from the two stamps. The browser's own
+ *                       clock never decides them
+ *   the hours           `hours` is Adminium's figure: the ones a person typed
+ *                       (`logged_hours`: time logged by hand, or a clock's
+ *                       real hours), else the clock's, to the quarter hour
  *   move onto invoice   one line per entry on the client's draft
  *                       (`invoiceDrafts.ts`); the line is the record that the
  *                       hours are invoiced
@@ -22,15 +26,15 @@
  */
 import { SinkError } from "../data/sink.ts";
 import type { Day, Id, Milestone, TimeEntry } from "../data/types.ts";
-import { now, today } from "../lib/clock.ts";
-import { deskWrites, drop, ensureRows, loadWhere, rowsOf, upsert, useDesk } from "./desk.ts";
+import { today } from "../lib/clock.ts";
+import { deskWrites, drop, ensureRows, loadWhere, refreshRows, rowsOf, upsert, useDesk } from "./desk.ts";
 import { linesCarrying, ontoDrafts, type OntoDrafts } from "./invoiceDrafts.ts";
 import { attempt, refusalOf, type Outcome } from "./outcome.ts";
 import { createOne, decimalText, invalid } from "./officeWrites.ts";
 
 export type { Outcome } from "./outcome.ts";
 
-/** The most hours one entry may hold (Adminium refuses more): nobody works more than that in a day. */
+/** The most hours one entry may hold (Adminium refuses more, a clock's too): nobody works more than that in a day. */
 export const MOST_HOURS = 16;
 
 // ── reading ─────────────────────────────────────────────────────────────────
@@ -116,7 +120,7 @@ async function milestoneFor(projectId: Id, named: Id | null | undefined): Promis
   return currentMilestone(projectId)?.id ?? null;
 }
 
-/** Log time: one entry (the hours are the person's own; its client is copied from the project by Adminium). */
+/** Log time: one entry (the hours are the person's own, as typed; its client is copied from the project by Adminium). */
 export async function logTime(input: TimeInput): Promise<Outcome<TimeEntry>> {
   const problem = hoursProblem(input.hours);
   if (problem !== null) return invalid(problem, "hours");
@@ -132,7 +136,7 @@ export async function logTime(input: TimeInput): Promise<Outcome<TimeEntry>> {
     milestone_id: milestone,
     person_id: input.person_id,
     date: input.date ?? today(),
-    hours: decimalText(input.hours),
+    logged_hours: decimalText(input.hours),
     note: input.note.trim(),
   });
 }
@@ -160,7 +164,8 @@ export async function editTime(entryId: Id, change: TimeChange): Promise<Outcome
   if (linesCarrying("time_entry_id", [entryId]).length > 0) return refusalOf(new SinkError("on an invoice", "refused", 409, "ALREADY_INVOICED", "hours"));
   return attempt(async () => {
     const patch = {
-      ...(change.hours === undefined ? {} : { hours: decimalText(change.hours) }),
+      // The typed hours: Adminium's `hours` follows them, a stopped clock's too.
+      ...(change.hours === undefined ? {} : { logged_hours: decimalText(change.hours) }),
       ...(change.note === undefined ? {} : { note: change.note.trim() }),
       ...(change.date === undefined ? {} : { date: change.date }),
       ...(change.milestone_id === undefined ? {} : { milestone_id: change.milestone_id }),
@@ -211,46 +216,55 @@ export async function startClock(input: ClockInput): Promise<Outcome<TimeEntry>>
     person_id: input.person_id,
     running_for: input.person_id,
     date: today(),
-    hours: null,
     note: note === "" ? null : note,
   });
 }
 
-/** The hours a clock has run, from Adminium's stamp to `at`, to the nearest quarter hour (a quarter at least). */
-export function clockHours(entry: TimeEntry, at: number = now()): string | null {
-  if (entry.started_at === null) return null;
-  const minutes = Math.max(0, (at - Date.parse(entry.started_at)) / 60_000);
-  const quarters = Math.max(1, Math.round(minutes / 15));
-  return (quarters / 4).toFixed(2);
-}
-
 /**
- * Stop a clock: the hours it ran (or the ones the person typed instead), and
- * `running_for` emptied so the person may start another. A clock left
- * running past sixteen hours is not guessed at: it asks for the hours
- * (`CLOCK_TOO_LONG`).
+ * Stop a clock: `running_for` emptied so the person may start another, and the
+ * clock marked stopped, which Adminium stamps with the moment; the hours are
+ * Adminium's, from its two stamps — or the ones the person typed instead
+ * (`logged_hours`). A clock that ran past sixteen hours is refused by
+ * Adminium rather than stored: it asks for the hours (`CLOCK_TOO_LONG`).
  */
-export async function stopClock(entryId: Id, opts: { hours?: string; note?: string | null; at?: number } = {}): Promise<Outcome<TimeEntry>> {
+export async function stopClock(entryId: Id, opts: { hours?: string; note?: string | null } = {}): Promise<Outcome<TimeEntry>> {
+  // Read afresh, never from what this page holds: another computer may have stopped it, and even
+  // put its hours on an invoice, since this page drew it running.
   let entry: TimeEntry | undefined;
+  let invoiced: boolean;
   try {
-    await ensureRows("time_entries", [entryId]);
-    entry = useDesk.getState().rows.time_entries[entryId];
+    const [rows, lines] = await Promise.all([
+      refreshRows("time_entries", [entryId]),
+      loadWhere("invoice_lines", { column: "time_entry_id", op: "eq", value: entryId }, undefined, 1),
+    ]);
+    entry = rows[0];
+    invoiced = lines.length > 0;
   } catch (error) {
     return refusalOf(error);
   }
   if (entry === undefined) return refusalOf(new SinkError("gone", "refused", 404, "NOT_FOUND"));
+  if (invoiced) return refusalOf(new SinkError("on an invoice", "refused", 409, "ALREADY_INVOICED"));
   if (entry.running_for === null) return refusalOf(new SinkError("not running", "refused", 409, "CLOCK_NOT_RUNNING"));
-  const hours = opts.hours ?? clockHours(entry, opts.at ?? now());
-  if (hours === null) return invalid("HOURS_NOT_A_NUMBER", "hours");
-  const problem = hoursProblem(hours);
-  if (problem !== null) return invalid(opts.hours === undefined && problem === "HOURS_OUT_OF_RANGE" ? "CLOCK_TOO_LONG" : problem, "hours");
+  const typed = opts.hours === undefined || opts.hours.trim() === "" ? null : opts.hours;
+  if (typed !== null) {
+    const problem = hoursProblem(typed);
+    if (problem !== null) return invalid(problem, "hours");
+  }
   const note = opts.note === undefined ? entry.note : opts.note === null || opts.note.trim() === "" ? null : opts.note.trim();
   if (note === null) return invalid("NOTE_REQUIRED", "note");
-  return attempt(async () => {
-    const row = await deskWrites().update("time_entries", entryId, { hours: decimalText(hours), note, running_for: null });
+  const out = await attempt(async () => {
+    const row = await deskWrites().update("time_entries", entryId, {
+      ...(typed === null ? {} : { logged_hours: decimalText(typed) }),
+      note,
+      running_for: null,
+      clock_stopped: true,
+    });
     upsert("time_entries", { ...row, id: entryId });
     return useDesk.getState().rows.time_entries[entryId]!;
   });
+  // Adminium's hours from its two stamps are more than an entry may hold: the clock was left running.
+  if (!out.ok && typed === null && out.reason === "invalid" && out.field === "hours") return invalid("CLOCK_TOO_LONG", "hours");
+  return out;
 }
 
 /** Throw a clock away (started by mistake): the entry goes. A studio manager's, as every removal is. */

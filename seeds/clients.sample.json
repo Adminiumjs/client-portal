@@ -5325,7 +5325,7 @@
           "date": {
             "@day": -47
           },
-          "hours": 4,
+          "logged_hours": 4,
           "note": {
             "@t": {
               "en-US": "Audit of the old bags, boxes and signs",
@@ -5353,7 +5353,7 @@
           "date": {
             "@day": -46
           },
-          "hours": 3,
+          "logged_hours": 3,
           "note": {
             "@t": {
               "en-US": "Shop visit and photographs",
@@ -5381,7 +5381,7 @@
           "date": {
             "@day": -33
           },
-          "hours": 6,
+          "logged_hours": 6,
           "note": {
             "@t": {
               "en-US": "Logo direction, three routes",
@@ -5409,7 +5409,7 @@
           "date": {
             "@day": -32
           },
-          "hours": 5,
+          "logged_hours": 5,
           "note": {
             "@t": {
               "en-US": "The routes set on the bag and the fascia",
@@ -5437,7 +5437,7 @@
           "date": {
             "@day": -29
           },
-          "hours": 3,
+          "logged_hours": 3,
           "note": {
             "@t": {
               "en-US": "Presenting the routes to Amara",
@@ -5465,7 +5465,7 @@
           "date": {
             "@day": -1
           },
-          "hours": 3.5,
+          "logged_hours": 3.5,
           "note": {
             "@t": {
               "en-US": "Redrew the L, tightened the ligature",
@@ -5493,7 +5493,7 @@
           "date": {
             "@day": -1
           },
-          "hours": 1.5,
+          "logged_hours": 1.5,
           "note": {
             "@t": {
               "en-US": "Proofs at 12mm and 400mm",
@@ -5521,7 +5521,7 @@
           "date": {
             "@day": -4
           },
-          "hours": 2,
+          "logged_hours": 2,
           "note": {
             "@t": {
               "en-US": "Call with Amara, third round notes",
@@ -5549,7 +5549,7 @@
           "date": {
             "@day": -14
           },
-          "hours": 5,
+          "logged_hours": 5,
           "note": {
             "@t": {
               "en-US": "Pattern studies, round two",
@@ -5577,7 +5577,7 @@
           "date": {
             "@day": -13
           },
-          "hours": 4,
+          "logged_hours": 4,
           "note": {
             "@t": {
               "en-US": "Pattern studies, colour",
@@ -5605,7 +5605,7 @@
           "date": {
             "@day": -5
           },
-          "hours": 4,
+          "logged_hours": 4,
           "note": {
             "@t": {
               "en-US": "Dieline for the 240mm sleeve",
@@ -5633,7 +5633,7 @@
           "date": {
             "@day": -6
           },
-          "hours": 5.5,
+          "logged_hours": 5.5,
           "note": {
             "@t": {
               "en-US": "Pattern selection, four sheets",
@@ -5661,7 +5661,7 @@
           "date": {
             "@day": -22
           },
-          "hours": 3,
+          "logged_hours": 3,
           "note": {
             "@t": {
               "en-US": "Second round of marks",
@@ -5690,7 +5690,7 @@
             "@month": -2,
             "@dom": 27
           },
-          "hours": 6,
+          "logged_hours": 6,
           "note": {
             "@t": {
               "en-US": "Cup marks, three sizes",
@@ -5719,7 +5719,7 @@
             "@month": -2,
             "@dom": 28
           },
-          "hours": 4,
+          "logged_hours": 4,
           "note": {
             "@t": {
               "en-US": "Cup wrap artwork",
@@ -5748,7 +5748,7 @@
             "@month": -1,
             "@dom": 15
           },
-          "hours": 2.5,
+          "logged_hours": 2.5,
           "note": {
             "@t": {
               "en-US": "Press check, cup wraps",
@@ -5777,7 +5777,7 @@
             "@month": -1,
             "@dom": 17
           },
-          "hours": 3,
+          "logged_hours": 3,
           "note": {
             "@t": {
               "en-US": "Source files and fonts for the handover",

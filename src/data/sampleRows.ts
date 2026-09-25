@@ -96,7 +96,8 @@ export type Formula =
   | { max: Formula[] }
   | { round: Formula | [Formula, number] }
   | { coalesce: [Formula, Formula] }
-  | { if: [Condition, Formula, Formula] };
+  | { if: [Condition, Formula, Formula] }
+  | { hoursBetween: [string, string] };
 
 export type Condition =
   | { eq: [string, string | number | boolean] }
@@ -166,7 +167,7 @@ export const COLUMNS: Record<string, Record<string, Fill>> = {
   brief_answers: { brief_id: REQUIRED, client_id: null, question_key: REQUIRED, answer: null, first_answer: null, client_key: null },
   suppliers: { number_seq: null, number: null, name: REQUIRED, kind: "other", contact: null, email: null, phone: null, address: null, lead_time: null, typical_cost: null, note: null, would_use_again: true, client_key: null },
   expenses: { number_seq: null, number: null, date: REQUIRED, what: REQUIRED, amount: REQUIRED, client_id: null, project_id: null, supplier_id: null, rebill: false, receipt: null, client_key: null },
-  time_entries: { project_id: REQUIRED, client_id: null, milestone_id: null, person_id: REQUIRED, date: REQUIRED, hours: null, note: null, running_for: null, started_at: null, client_key: null },
+  time_entries: { project_id: REQUIRED, client_id: null, milestone_id: null, person_id: REQUIRED, date: REQUIRED, hours: null, logged_hours: null, note: null, running_for: null, started_at: null, clock_stopped: false, stopped_at: null, client_key: null },
   invoices: { number_seq: null, number: null, status: "draft", issued_on: null, terms: null, due_on: null, currency: null, tax_name: null, tax_rate: null, subtotal: null, tax: null, total: null, paid: null, balance: null, ladder: null, sent_at: null, void_reason: null, voided_at: null, voided_by: null, from_quote_id: null, share_pct: null, client_id: REQUIRED, project_id: null, proposal_id: null, stage: null, title: null, client_paid_note: null, client_paid_amount: null, client_paid_on: null, client_paid: null, client_paid_at: null, client_key: null },
   invoice_lines: { document_id: REQUIRED, position: 0, description: null, qty: 1, rate: null, discount_kind: "amount", discount: null, currency: null, quote_id: null, share_pct: null, amount: null, client_id: null, time_entry_id: null, expense_id: null, client_key: null },
   payments: { document_id: REQUIRED, number_seq: null, number: null, amount: REQUIRED, currency: null, method: "bank-transfer", method_note: null, paid_on: REQUIRED, recorded_by: null, recorded_at: null, voided: false, void_reason: null, voided_by: null, voided_at: null, client_id: null, client_key: null },
@@ -211,6 +212,7 @@ export const RULES: Rules = {
     { table: "proposals", column: "tax", scale: "currency", expr: {"round":{"div":[{"mul":["subtotal",{"coalesce":["tax_rate",0]}]},100]}} },
     { table: "proposals", column: "total", scale: "currency", expr: {"add":[{"coalesce":["subtotal",0]},{"coalesce":["tax",0]}]} },
     { table: "proposal_lines", column: "amount", scale: "currency", expr: {"max":[0,{"if":[{"eq":["discount_kind","percent"]},{"mul":["qty","rate",{"sub":[1,{"div":[{"coalesce":["discount",0]},100]}]}]},{"sub":[{"mul":["qty","rate"]},{"coalesce":["discount",0]}]}]}]} },
+    { table: "time_entries", column: "hours", scale: 2, expr: {"coalesce":["logged_hours",{"max":[0.25,{"div":[{"round":[{"mul":[{"hoursBetween":["started_at","stopped_at"]},4]},0]},4]}]}]} },
     { table: "invoices", column: "tax", scale: "currency", expr: {"round":{"div":[{"mul":["subtotal",{"coalesce":["tax_rate",0]}]},100]}} },
     { table: "invoices", column: "total", scale: "currency", expr: {"add":[{"coalesce":["subtotal",0]},{"coalesce":["tax",0]}]} },
     { table: "invoice_lines", column: "amount", scale: "currency", expr: {"if":[{"isNull":"quote_id"},{"max":[0,{"if":[{"eq":["discount_kind","percent"]},{"mul":["qty","rate",{"sub":[1,{"div":[{"coalesce":["discount",0]},100]}]}]},{"sub":[{"mul":["qty","rate"]},{"coalesce":["discount",0]}]}]}]},{"round":{"div":[{"mul":["rate","share_pct"]},100]}}]} },
@@ -497,9 +499,38 @@ function evaluate(expr: Formula, row: Readonly<Record<string, unknown>>, scale: 
       const [condition, then, otherwise] = args as [Condition, Formula, Formula];
       return evaluate(holds(condition, row, scale) ? then : otherwise, row, scale);
     }
+    case "hoursBetween": {
+      // The time that passed from one moment of the row to another; none for a missing or backwards span.
+      const [start, stop] = (args as [string, string]).map((column) => momentOf(row[column]));
+      if (start === null || start === undefined || stop === null || stop === undefined || stop < start) return null;
+      return ratio(BigInt(stop - start), 3_600_000n);
+    }
     default:
       return null;
   }
+}
+
+const MOMENT = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.(\d+))?)?(?: ?(Z|[+-]\d{2}(?::?\d{2})?))?$/i;
+
+/**
+ * A stored moment as milliseconds since 1970, as Adminium reads one: a zoned
+ * text as the moment it names, a zone-less one on this clock, a number as
+ * seconds since 1970; null when it is empty or no time the calendar has.
+ */
+function momentOf(value: unknown): number | null {
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value.getTime();
+  if (typeof value === "number") return Number.isFinite(value) ? Math.round(value * 1000) : null;
+  if (typeof value !== "string") return null;
+  const found = MOMENT.exec(value.trim());
+  if (found === null) return null;
+  const [y, mo, d, h, mi, sec] = found.slice(1, 7).map((part) => Number(part ?? 0)) as [number, number, number, number, number, number];
+  if (mo < 1 || mo > 12 || d < 1 || h > 23 || mi > 59 || sec > 59 || d > new Date(Date.UTC(y, mo, 0)).getUTCDate()) return null;
+  const ms = Number((found[7] ?? "").slice(0, 3).padEnd(3, "0"));
+  const zone = found[8];
+  if (zone === undefined) return new Date(y, mo - 1, d, h, mi, sec, ms).getTime();
+  const [, sign, hours, minutes] = /^([+-])(\d{2}):?(\d{2})?$/.exec(zone) ?? [];
+  const offset = sign === undefined ? 0 : (sign === "-" ? -1 : 1) * (Number(hours) * 60 + Number(minutes ?? 0));
+  return Date.UTC(y, mo - 1, d, h, mi, sec, ms) - offset * 60_000;
 }
 
 /** A formula's value for the row at `scale` places, as a number; null when it has none. */
