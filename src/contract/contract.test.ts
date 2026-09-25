@@ -65,7 +65,7 @@ import { addOnBundle, addOnVersions, appBundle, boot, Caller, ENGINES, missing, 
 type Row = Record<string, unknown> & { id: Id };
 
 const why = missing();
-if (why !== null && process.env["ADMINIUM_REQUIRE_CONTRACT"] === "1") throw new Error(`the contract must run here, and cannot: ${why}`);
+if (why !== null && ["1", "true"].includes(process.env["ADMINIUM_REQUIRE_CONTRACT"] ?? "")) throw new Error(`the contract must run here, and cannot: ${why}`);
 const PORT_BASE = Number(process.env["CONTRACT_PORT_BASE"] ?? 4870);
 const ADMIN = { email: process.env["E2E_ADMIN_EMAIL"] ?? "e2e@adminium.local", password: process.env["E2E_ADMIN_PASSWORD"] ?? "adminium-e2e-password" };
 const CLEO = { email: "cleo@marigoldlane.example", name: "Cleo Nkemdi" };

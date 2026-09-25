@@ -13,6 +13,12 @@
 #                  sealed acceptance, the sample removed. It skips without the
 #                  two checkouts; here `ADMINIUM_REQUIRE_CONTRACT=1` makes a
 #                  skip a failure, so it cannot go quietly green.
+#   the update     `src/contract/update.test.ts`: the RELEASED 0.2.0 (the
+#                  published file, checked against RELEASES.json) installed,
+#                  worked in, and updated in place to this build — nothing
+#                  the studio or its clients made is lost or changed.
+#   the roles      `src/contract/roles.test.ts`: real people holding only
+#                  one of the app's roles, and what each is refused.
 #   drift          the copies this repo keeps of other repos' files — the
 #                  lexicon and the add-on's shapes (add-ons), the manifest
 #                  validator (Adminium), and the demo's printed copies, drawn
@@ -108,6 +114,11 @@ jobs:
           mv "$GITHUB_WORKSPACE/.adminium-product" "$RUNNER_TEMP/adminium-product"
           mv "$GITHUB_WORKSPACE/.add-ons" "$RUNNER_TEMP/add-ons"
 
+      - name: The released 0.2.0, which the update contract installs and then updates
+        # The published file's own bytes; the test refuses them unless they hash to
+        # what RELEASES.json recorded for 0.2.0.
+        run: curl -fsSL https://downloads.adminium.dev/apps/clients/clients-0.2.0.tgz -o "$RUNNER_TEMP/clients-0.2.0.tgz"
+
       - name: Types
         run: npx tsc -b
 
@@ -117,6 +128,7 @@ jobs:
           ADD_ONS_REPO: ${{ runner.temp }}/add-ons
           ADMINIUM_REQUIRE_CONTRACT: "1"
           ADMINIUM_REQUIRE_VALIDATOR: "true"
+          CONTRACT_FROM_TARBALL: ${{ runner.temp }}/clients-0.2.0.tgz
           TEST_POSTGRES_URL: postgres://postgres:postgres@127.0.0.1:5432/postgres
           TEST_MYSQL_URL: mysql://root@127.0.0.1:3306
         run: npx vitest run

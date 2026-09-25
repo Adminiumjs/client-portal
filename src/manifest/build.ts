@@ -19,8 +19,12 @@ import { PUBLIC_ACCESS, PUBLIC_KEYS } from "./public.ts";
 import { ROLES } from "./roles.ts";
 import { TABLES } from "./tables.ts";
 
-/** This release. The version moves 0.1.3 → 0.2.0 once: its tables are new. */
-export const VERSION = "0.2.0";
+/**
+ * This release. The version moved 0.1.3 → 0.2.0 once (its tables were new);
+ * 0.2.1 adds the back office to 0.2.0's tables and updates an install of it in
+ * place (`updatesFrom` below; proved by `contract/update.test.ts`).
+ */
+export const VERSION = "0.2.1";
 
 /**
  * The Adminium release that first reads everything below: formulas, numbers

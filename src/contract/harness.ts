@@ -11,12 +11,13 @@
  * Tests only; nothing that ships imports it.
  */
 import { spawn, type ChildProcess } from "node:child_process";
+import { createRequire } from "node:module";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { gzipSync } from "node:zlib";
+import { gunzipSync, gzipSync } from "node:zlib";
 
 export type Engine = "sqlite" | "postgres" | "mysql";
 
@@ -375,3 +376,220 @@ export const until = async <T>(read: () => Promise<T | undefined>, label: string
     await new Promise((resolve) => setTimeout(resolve, 1_000));
   }
 };
+
+// ════════════════════════════════════════════════════════════════════════════
+// ADDED FOR THE UPDATE CONTRACT (`update.test.ts`) — additive only: nothing
+// above this line reads anything below it.
+// ════════════════════════════════════════════════════════════════════════════
+
+/** One release as RELEASES.json records it: the integrity the published tarball must hash to. */
+export function recordedRelease(version: string): { name: string; version: string; integrity: string } | null {
+  const releases = JSON.parse(read(join(REPO, "RELEASES.json"))) as { releases: { name: string; version: string; integrity: string }[] };
+  return releases.releases.find((r) => r.version === version) ?? null;
+}
+
+/** The members of an npm tarball, by their path below `package/`. */
+export function untar(buffer: Buffer): Record<string, Buffer> {
+  const raw = gunzipSync(buffer);
+  const files: Record<string, Buffer> = {};
+  for (let at = 0; at + BLOCK <= raw.length; ) {
+    const header = raw.subarray(at, at + BLOCK);
+    if (header.every((byte) => byte === 0)) break;
+    const text = (from: number, length: number) => header.subarray(from, from + length).toString("latin1").replace(/\0.*$/s, "");
+    const prefix = text(345, 155);
+    const name = prefix === "" ? text(0, 100) : `${prefix}/${text(0, 100)}`;
+    const size = parseInt(text(124, 12).trim() || "0", 8);
+    const type = text(156, 1);
+    if (type === "0" || type === "") files[name.replace(/^package\//, "")] = Buffer.from(raw.subarray(at + BLOCK, at + BLOCK + size));
+    at += BLOCK + Math.ceil(size / BLOCK) * BLOCK;
+  }
+  return files;
+}
+
+/**
+ * THE RELEASED APP, as its operator's Adminium was handed it: the published
+ * tarball's own bytes (`CONTRACT_FROM_TARBALL`, e.g. `npm pack
+ * @adminiumjs/app-clients@0.2.0`), refused unless it hashes to the integrity
+ * RELEASES.json recorded for its version — so the update is proved from what
+ * was really shipped, never from a rebuild of its tag.
+ */
+export const FROM_TARBALL = process.env["CONTRACT_FROM_TARBALL"] ?? "";
+
+/** Why the released tarball cannot be used here, or null when it can. */
+export function releasedMissing(): string | null {
+  if (FROM_TARBALL === "") return "CONTRACT_FROM_TARBALL is not set (the published tarball of the release this one updates)";
+  if (!existsSync(FROM_TARBALL)) return `no tarball at ${FROM_TARBALL}`;
+  return null;
+}
+
+export function releasedBundle(): Bundle & { key: string; version: string; files: Record<string, Buffer>; manifest: Record<string, unknown> } {
+  const buffer = readFileSync(FROM_TARBALL);
+  const integrity = `sha512-${createHash("sha512").update(buffer).digest("base64")}`;
+  const files = untar(buffer);
+  const pkg = JSON.parse(files["package.json"]!.toString("utf8")) as { version: string };
+  const recorded = recordedRelease(pkg.version);
+  if (recorded === null) throw new Error(`RELEASES.json records no ${pkg.version}`);
+  if (recorded.integrity !== integrity) throw new Error(`${FROM_TARBALL} is not the published ${pkg.version}: ${integrity} ≠ ${recorded.integrity}`);
+  const manifest = JSON.parse(files["manifest.json"]!.toString("utf8")) as Record<string, unknown> & { key: string; version: string };
+  return { buffer, integrity, key: manifest.key, version: manifest.version, files, manifest };
+}
+
+/** One table read straight from the studio's database: its columns as the engine declares them, and every row as exact text. */
+export interface RawTable {
+  /** name → the engine's own declaration (type, nullability, default). */
+  columns: Record<string, string>;
+  /** Every row, in key order, each value as the engine spells it (`quote()` on SQLite, `::text` on Postgres, `CAST(… AS CHAR)` on MySQL). */
+  rows: Record<string, string | null>[];
+  key: string[];
+  /**
+   * The table's indexes, foreign keys and checks, each described by what it
+   * holds rather than its name (a rebuild may rename one), sorted.
+   */
+  constraints: string[];
+}
+
+/** Asked for when used, so listing the tests needs no Adminium checkout. */
+const driver = (name: string): unknown => createRequire(join(ADMINIUM_REPO, "apps", "e2e", "package.json"))(name);
+
+/**
+ * Every table whose name starts with `prefix`, read past HTTP from the
+ * engine's source database (the drivers are the Adminium checkout's own; this
+ * repo adds none) — what "byte for byte" is measured on.
+ */
+export async function rawTables(engine: Engine, port: number, database: string, prefix: string): Promise<Record<string, RawTable>> {
+  const out: Record<string, RawTable> = {};
+  const plain = (name: string) => {
+    if (!/^[A-Za-z0-9_]+$/.test(name)) throw new Error(`not a plain name: ${name}`);
+    return name;
+  };
+  if (engine === "sqlite") {
+    type Db = { prepare(sql: string): { all(...args: unknown[]): Record<string, unknown>[] }; close(): void };
+    const Database = driver("better-sqlite3") as new (file: string, options: { readonly: boolean }) => Db;
+    const db = new Database(join(tmpdir(), `adminium-e2e-source-sqlite-${String(port)}.db`), { readonly: true });
+    try {
+      const names = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name").all().map((r) => String(r["name"])).filter((n) => n.startsWith(prefix));
+      for (const name of names) {
+        const info = db.prepare(`PRAGMA table_info(${plain(name)})`).all() as { name: string; type: string; notnull: number; dflt_value: string | null; pk: number }[];
+        const columns = Object.fromEntries(info.map((c) => [c.name, `${c.type}${c.notnull ? " NOT NULL" : ""}${c.dflt_value === null ? "" : ` DEFAULT ${c.dflt_value}`}${c.pk ? ` PK${String(c.pk)}` : ""}`]));
+        const key = info.filter((c) => c.pk > 0).sort((a, b) => a.pk - b.pk).map((c) => c.name);
+        const select = info.map((c) => `quote("${plain(c.name)}") AS "${c.name}"`).join(", ");
+        const order = (key.length > 0 ? key : ["rowid"]).map((c) => `"${c}"`).join(", ");
+        const rows = db.prepare(`SELECT ${select} FROM "${name}" ORDER BY ${order}`).all() as Record<string, string | null>[];
+        const constraints: string[] = [];
+        for (const index of db.prepare(`PRAGMA index_list("${name}")`).all() as { name: string; unique: number; origin: string; partial: number }[]) {
+          const on = (db.prepare(`PRAGMA index_info("${plain(index.name)}")`).all() as { name: string }[]).map((c) => c.name).join(",");
+          constraints.push(`index ${index.unique ? "unique " : ""}${index.origin}${index.partial ? " partial" : ""} (${on})`);
+        }
+        for (const fk of db.prepare(`PRAGMA foreign_key_list("${name}")`).all() as { from: string; table: string; to: string; on_update: string; on_delete: string }[]) {
+          constraints.push(`fk (${fk.from}) → ${fk.table}(${fk.to}) on update ${fk.on_update} on delete ${fk.on_delete}`);
+        }
+        const create = String(db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?").all(name)[0]?.["sql"] ?? "");
+        for (const check of create.match(/CHECK\s*\((?:[^()]|\((?:[^()]|\([^()]*\))*\))*\)/gi) ?? []) constraints.push(check.replace(/\s+/g, " "));
+        out[name] = { columns, rows: rows.map((r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, v === "NULL" ? null : String(v)]))), key, constraints: constraints.sort() };
+      }
+    } finally {
+      db.close();
+    }
+    return out;
+  }
+  if (engine === "postgres") {
+    type Client = { connect(): Promise<void>; query(sql: string, args?: unknown[]): Promise<{ rows: Record<string, unknown>[] }>; end(): Promise<void> };
+    const pg = driver("pg") as { Client: new (options: { connectionString: string }) => Client };
+    const url = new URL(process.env["TEST_POSTGRES_URL"] ?? "");
+    url.pathname = `/${database}`;
+    const client = new pg.Client({ connectionString: url.toString() });
+    await client.connect();
+    try {
+      const cols = (
+        await client.query(
+          `SELECT table_name, column_name, data_type, udt_name, character_maximum_length, numeric_precision, numeric_scale, is_nullable, column_default
+             FROM information_schema.columns WHERE table_schema = current_schema() ORDER BY table_name, ordinal_position`,
+        )
+      ).rows.filter((r) => String(r["table_name"]).startsWith(prefix));
+      const keys = (
+        await client.query(
+          `SELECT c.relname AS table_name, a.attname AS column_name, array_position(i.indkey, a.attnum) AS pos
+             FROM pg_index i JOIN pg_class c ON c.oid = i.indrelid JOIN pg_attribute a ON a.attrelid = c.oid AND a.attnum = ANY(i.indkey)
+            WHERE i.indisprimary AND c.relnamespace = current_schema()::regnamespace`,
+        )
+      ).rows;
+      for (const name of [...new Set(cols.map((c) => String(c["table_name"])))]) {
+        const mine = cols.filter((c) => c["table_name"] === name);
+        const columns = Object.fromEntries(
+          mine.map((c) => [
+            String(c["column_name"]),
+            `${String(c["data_type"])}/${String(c["udt_name"])}(${String(c["character_maximum_length"] ?? "")},${String(c["numeric_precision"] ?? "")},${String(c["numeric_scale"] ?? "")})${c["is_nullable"] === "NO" ? " NOT NULL" : ""}${c["column_default"] === null ? "" : ` DEFAULT ${String(c["column_default"])}`}`,
+          ]),
+        );
+        const key = keys.filter((k) => k["table_name"] === name).sort((a, b) => Number(a["pos"]) - Number(b["pos"])).map((k) => String(k["column_name"]));
+        const select = mine.map((c) => `"${plain(String(c["column_name"]))}"::text AS "${String(c["column_name"])}"`).join(", ");
+        const order = (key.length > 0 ? key : mine.map((c) => String(c["column_name"]))).map((c) => `"${c}"`).join(", ");
+        const rows = (await client.query(`SELECT ${select} FROM "${plain(name)}" ORDER BY ${order}`)).rows as Record<string, string | null>[];
+        const defs = (
+          await client.query(
+            `SELECT pg_get_constraintdef(o.oid) AS def FROM pg_constraint o JOIN pg_class c ON c.oid = o.conrelid
+              WHERE c.relname = $1 AND c.relnamespace = current_schema()::regnamespace
+             UNION ALL
+             SELECT regexp_replace(indexdef, '^CREATE (UNIQUE )?INDEX \\S+ ON ', 'CREATE \\1INDEX ON ') FROM pg_indexes WHERE tablename = $1 AND schemaname = current_schema()`,
+            [name],
+          )
+        ).rows.map((r) => String(r["def"]));
+        out[name] = { columns, rows, key, constraints: defs.sort() };
+      }
+    } finally {
+      await client.end();
+    }
+    return out;
+  }
+  type Connection = { query(sql: string, args?: unknown[]): Promise<[Record<string, unknown>[]]>; end(): Promise<void> };
+  const mysql = driver("mysql2/promise") as { createConnection(uri: string): Promise<Connection> };
+  const url = new URL(process.env["TEST_MYSQL_URL"] ?? "");
+  url.pathname = `/${database}`;
+  const connection = await mysql.createConnection(url.toString());
+  try {
+    const [cols] = await connection.query(
+      `SELECT TABLE_NAME AS t, COLUMN_NAME AS c, COLUMN_TYPE AS type, IS_NULLABLE AS nullable, COLUMN_DEFAULT AS dflt, COLUMN_KEY AS k, EXTRA AS extra
+         FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? ORDER BY TABLE_NAME, ORDINAL_POSITION`,
+      [database],
+    );
+    const mine = cols.filter((r) => String(r["t"]).startsWith(prefix));
+    for (const name of [...new Set(mine.map((c) => String(c["t"])))]) {
+      const list = mine.filter((c) => c["t"] === name);
+      const columns = Object.fromEntries(
+        list.map((c) => [String(c["c"]), `${String(c["type"])}${c["nullable"] === "NO" ? " NOT NULL" : ""}${c["dflt"] === null ? "" : ` DEFAULT ${String(c["dflt"])}`}${String(c["extra"]) === "" ? "" : ` ${String(c["extra"])}`}`]),
+      );
+      const [keyRows] = await connection.query(
+        "SELECT COLUMN_NAME AS c FROM information_schema.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND CONSTRAINT_NAME = 'PRIMARY' ORDER BY ORDINAL_POSITION",
+        [database, name],
+      );
+      const key = keyRows.map((k) => String(k["c"]));
+      const select = list.map((c) => `CAST(\`${plain(String(c["c"]))}\` AS CHAR) AS \`${String(c["c"])}\``).join(", ");
+      const order = (key.length > 0 ? key : list.map((c) => String(c["c"]))).map((c) => `\`${c}\``).join(", ");
+      const [rows] = await connection.query(`SELECT ${select} FROM \`${plain(name)}\` ORDER BY ${order}`);
+      const [indexes] = await connection.query(
+        "SELECT INDEX_NAME AS i, NON_UNIQUE AS nu, GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX) AS cols FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? GROUP BY INDEX_NAME, NON_UNIQUE",
+        [database, name],
+      );
+      const [fks] = await connection.query(
+        `SELECT k.COLUMN_NAME AS c, k.REFERENCED_TABLE_NAME AS t, k.REFERENCED_COLUMN_NAME AS rc, r.UPDATE_RULE AS u, r.DELETE_RULE AS d
+           FROM information_schema.KEY_COLUMN_USAGE k JOIN information_schema.REFERENTIAL_CONSTRAINTS r ON r.CONSTRAINT_SCHEMA = k.TABLE_SCHEMA AND r.CONSTRAINT_NAME = k.CONSTRAINT_NAME
+          WHERE k.TABLE_SCHEMA = ? AND k.TABLE_NAME = ? AND k.REFERENCED_TABLE_NAME IS NOT NULL`,
+        [database, name],
+      );
+      const [checks] = await connection.query(
+        `SELECT cc.CHECK_CLAUSE AS c FROM information_schema.TABLE_CONSTRAINTS tc JOIN information_schema.CHECK_CONSTRAINTS cc ON cc.CONSTRAINT_SCHEMA = tc.CONSTRAINT_SCHEMA AND cc.CONSTRAINT_NAME = tc.CONSTRAINT_NAME
+          WHERE tc.TABLE_SCHEMA = ? AND tc.TABLE_NAME = ? AND tc.CONSTRAINT_TYPE = 'CHECK'`,
+        [database, name],
+      );
+      const constraints = [
+        ...indexes.map((x) => `index ${Number(x["nu"]) === 0 ? "unique " : ""}${String(x["i"]) === "PRIMARY" ? "primary " : ""}(${String(x["cols"])})`),
+        ...fks.map((x) => `fk (${String(x["c"])}) → ${String(x["t"])}(${String(x["rc"])}) on update ${String(x["u"])} on delete ${String(x["d"])}`),
+        ...checks.map((x) => `CHECK ${String(x["c"])}`),
+      ];
+      out[name] = { columns, rows: rows.map((r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, v === null ? null : String(v)]))), key, constraints: constraints.sort() };
+    }
+  } finally {
+    await connection.end();
+  }
+  return out;
+}
