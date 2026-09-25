@@ -22,7 +22,7 @@
     "row-types": "vite-node scripts/write-row-types.ts"
   },
   "dependencies": {
-    "@adminiumjs/public-client": "0.3.0",
+    "@adminiumjs/public-client": "0.3.1",
     "lucide-react": "^0.462.0",
     "pdfjs-dist": "6.3.289",
     "react": "^19.0.0",
