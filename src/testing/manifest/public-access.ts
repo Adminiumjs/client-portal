@@ -288,6 +288,10 @@ export function publicAccessIssues(entries: readonly PublicAccess[], ctx: Public
         }
       });
       if (!entries.some((entry) => entry.key === name)) out.push({ path: at, message: `no entry is served through "${name}"` });
+      // Nothing would read it: a shared link is switched off in its own row (the claim's `stopped`).
+      if (key.enabledBy !== undefined) {
+        out.push({ path: [...at, 'enabledBy'], message: `"${name}" opens a row by its link, which is switched off in that row, not by a setting` });
+      }
       continue;
     }
     const role = ctx.roles.find((candidate) => candidate.key === key.requiresStaff!.role);

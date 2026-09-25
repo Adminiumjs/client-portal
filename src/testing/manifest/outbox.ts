@@ -509,7 +509,11 @@ export function outboxIssues(
       }
       if ('before' in producer) out.push({ path: here('due'), message: 'a reminder before a moment is due by its lead, not by due' });
     }
-    if (producer.supersede !== undefined && producer.due === undefined) {
+    // A batch comes due when its window closes: that is its due, and it takes no other.
+    if (producer.batchMinutes !== undefined && producer.due !== undefined) {
+      out.push({ path: here('due'), message: 'a batch comes due when its window closes, so it takes no due of its own' });
+    }
+    if (producer.supersede !== undefined && producer.due === undefined && producer.batchMinutes === undefined) {
       out.push({ path: here('supersede'), message: 'one message overtakes another when it comes due: name its due' });
     }
     (producer.dropWhen ?? []).forEach((drop, d) => {
@@ -519,7 +523,7 @@ export function outboxIssues(
         if (!valueFits(found, value)) out.push({ path: here('dropWhen', d), message: `${JSON.stringify(value)} is not a value of "${linked}.${drop.column}"` });
       }
     });
-    if (producer.dropWhen !== undefined && producer.hold !== true && producer.due === undefined) {
+    if (producer.dropWhen !== undefined && producer.hold !== true && producer.due === undefined && producer.batchMinutes === undefined) {
       out.push({ path: here('dropWhen'), message: 'only a message that waits (held, or due later) can be dropped' });
     }
     if (producer.recipient !== undefined) setting(producer.recipient.setting, here('recipient', 'setting'));
