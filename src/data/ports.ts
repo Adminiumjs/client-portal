@@ -134,7 +134,11 @@ export interface DeskReads {
    * (or no longer readable by this person).
    */
   rows<R extends TableRef>(ref: R, ids: readonly Id[]): Promise<Tables[R][]>;
-  /** Every row a condition matches, up to `limit` (bounded; paged underneath). */
+  /**
+   * Every row a condition matches, up to `limit` (bounded; paged underneath).
+   * Adminium refuses an `in` list of more than 200 values, and so does the
+   * demo's world; the desk's `setDeskReads` asks a longer one in pieces.
+   */
   where<R extends TableRef>(ref: R, where: ListCondition, order?: string, limit?: number): Promise<Tables[R][]>;
   /** One page of a list, for the screens that list more than the open work. */
   page<R extends TableRef>(ref: R, query: PageQuery): Promise<Page<Tables[R]>>;
@@ -188,6 +192,12 @@ export interface DeskWrites {
    * link in it. Absent where nothing sends email (the demo).
    */
   testEmail?(templateId: string, to: readonly string[], document: EmailDocument): Promise<{ queued: number }>;
+  /**
+   * The Adminium system actions the signed-in person holds (`settings.manage`
+   * for a test send and Email Templates …), as Adminium's bootstrap lists them
+   * for anyone signed in. Absent where no Adminium says (the demo).
+   */
+  systemActions?(): Promise<string[]>;
 }
 
 /** An email as Adminium's templates keep it: a subject, a preheader, its blocks and a footer. */

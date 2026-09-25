@@ -45,6 +45,8 @@ export function PurchaseSheet({ expense, onClose }: { expense: Expense; onClose:
   const suppliers = useDesk((s) => s.rows.suppliers);
   const settings = useDesk((s) => Object.values(s.rows.settings)[0] ?? null);
   const mayRemove = useCan("expenses", "delete");
+  // Taking a line off a draft removes the line: a studio manager's, as every removal is.
+  const mayTakeOff = useCan("invoice_lines", "delete");
   const receipt = useFileInfo(expense.receipt);
 
   const carriers = useMemo(() => carriersOf(lines, invoices), [lines, invoices]);
@@ -133,11 +135,13 @@ export function PurchaseSheet({ expense, onClose }: { expense: Expense; onClose:
       ? t("expenses.sheet.ours")
       : standing === "to-pass-on"
         ? t("expenses.sheet.waiting", { company: company ?? "" })
-        : where === "draft"
-          ? t("expenses.sheet.onDraft", { company: company ?? "" })
-          : where === "locked"
-            ? t("expenses.sheet.onSent", { number: carrier?.invoice?.number ?? "" })
-            : t("expenses.sheet.onInvoice");
+        : standing === "voided"
+          ? t("expenses.sheet.onVoided", { number: carrier?.invoice?.number ?? "" })
+          : where === "draft"
+            ? t("expenses.sheet.onDraft", { company: company ?? "" })
+            : where === "locked"
+              ? t("expenses.sheet.onSent", { number: carrier?.invoice?.number ?? "" })
+              : t("expenses.sheet.onInvoice");
 
   return (
     <Sheet title={expense.what} sub={[expense.number, dayLabel(expense.date, locale, "long")].filter((x) => x !== null && x !== "").join(" · ")} icon={Wallet} onClose={onClose}>
@@ -179,12 +183,13 @@ export function PurchaseSheet({ expense, onClose }: { expense: Expense; onClose:
               {t("expenses.tag.to-pass-on")}
             </Button>
           )}
-          {standing === "passed-on" && where === "draft" && confirm !== "take-off" && (
+          {standing === "passed-on" && where === "draft" && confirm !== "take-off" && mayTakeOff && (
             <Button icon={Undo2} onClick={() => setConfirm("take-off")}>
               {t("expenses.sheet.takeOff")}
             </Button>
           )}
-          {standing === "passed-on" && where === "locked" && carrier?.invoice && (
+          {standing === "passed-on" && where === "draft" && !mayTakeOff && <p>{t("expenses.sheet.takeOffManager")}</p>}
+          {((standing === "passed-on" && where === "locked") || standing === "voided") && carrier?.invoice && (
             <Button icon={ReceiptText} onClick={() => openView("invoice", carrier.invoice!.id as Id)}>
               {t("expenses.sheet.openInvoice", { number: carrier.invoice.number ?? "" })}
             </Button>

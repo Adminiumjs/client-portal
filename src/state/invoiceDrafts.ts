@@ -14,14 +14,19 @@
  * points at it; removing the line from a draft frees it again; once the
  * invoice is sent, its lines are locked and so is what they carry.
  *
- * The action runs under a key made from WHAT it moves (`keyFor`), not a random
- * one: pressing twice, or in two tabs, finds the draft and the lines the
- * first press saved, by their keys, and writes nothing twice. A line another
- * action got to first is skipped, not refused: that entry is invoiced, which
- * is what was asked.
+ * Each action runs under a key of its OWN, drawn when it starts: "Finish it"
+ * of that action reuses its keys and finds what it saved, and nothing else
+ * ever does — a later move of the same hours is a new action, and can never
+ * land on a draft an earlier one made that has since gone to another client
+ * or been sent. A row read back by its key is still checked (a draft, of this
+ * client, not a stage invoice; a line on that draft carrying this entry)
+ * before anything goes on it. Charging twice is Adminium's to refuse: the
+ * line's link is unique, so a line another action got to first is skipped,
+ * not refused — that entry is invoiced, which is what was asked. Presses in
+ * one window wait for each other, so pressing twice makes one draft.
  */
 import type { RowValues } from "../data/ports.ts";
-import { asSinkError, keyFor, newRun, type Step, type StepContext } from "../data/sink.ts";
+import { asSinkError, newRun, SinkError, type Step, type StepContext } from "../data/sink.ts";
 import type { Id, Invoice, InvoiceLine } from "../data/types.ts";
 import { deskWrites, drop, loadWhere, refreshRows, rowsOf, upsert, useDesk } from "./desk.ts";
 import { attempt, attemptSteps, refusalOf, type Outcome } from "./outcome.ts";
@@ -82,7 +87,14 @@ export async function readForDrafts(column: Carried, ids: readonly Id[], clientI
     200,
   );
   const draftIds = open.map((i) => i.id);
-  if (draftIds.length > 0) await loadWhere("invoice_lines", { column: "document_id", op: "in", value: draftIds }, "position.asc", 2000);
+  // A draft the desk still holds that is no longer one (sent or voided a moment ago, elsewhere): read it again.
+  const listed = new Set(draftIds);
+  const wanted = new Set(clientIds);
+  const stale = rowsOf(useDesk.getState(), "invoices").filter((i) => i.status === "draft" && wanted.has(i.client_id) && !listed.has(i.id)).map((i) => i.id);
+  await Promise.all([
+    draftIds.length === 0 ? Promise.resolve() : loadWhere("invoice_lines", { column: "document_id", op: "in", value: draftIds }, "position.asc", 2000),
+    stale.length === 0 ? Promise.resolve() : refreshRows("invoices", stale),
+  ]);
 }
 
 /** The next free position on a draft the desk holds. */
@@ -97,11 +109,32 @@ async function insertLine(values: RowValues): Promise<InvoiceLine> {
   return row;
 }
 
+/** A row read back that is not the one this step made: nothing goes on it. */
+const notOurs = (what: string): SinkError => new SinkError(`the ${what} read back is not this action's`, "refused", 409, "PRECONDITION_FAILED");
+
+/** Whether an invoice can take this client's lines: a draft of theirs, not drawn from a proposal. */
+const takesLines = (invoice: Invoice, clientId: Id): boolean => invoice.status === "draft" && invoice.client_id === clientId && invoice.from_quote_id === null;
+
+/** The moves this window is making: the next waits for the one before, so two presses make one draft. */
+let queue: Promise<unknown> = Promise.resolve();
+
 /**
- * Put these lines on their clients' drafts, under a key made from `kind` and
- * the ids. `newTitle` names a draft this has to make for a client.
+ * Put these lines on their clients' drafts, under a fresh action key.
+ * `newTitle` names a draft this has to make for a client. A draft sent a
+ * moment ago (the desk still held it as a draft) is read again and the lines
+ * go where they now can.
  */
-export async function ontoDrafts(kind: string, column: Carried, lines: readonly DraftLine[], newTitle: (clientId: Id, projectId: Id | null) => string | null): Promise<Outcome<OntoDrafts>> {
+export function ontoDrafts(column: Carried, lines: readonly DraftLine[], newTitle: (clientId: Id, projectId: Id | null) => string | null): Promise<Outcome<OntoDrafts>> {
+  const next = queue.then(async () => {
+    const first = await ontoDraftsNow(column, lines, newTitle);
+    // The draft went out between this desk's read and the line: read again, and go where the lines can.
+    return !first.ok && first.code === "RECORD_LOCKED" ? ontoDraftsNow(column, lines, newTitle) : first;
+  });
+  queue = next.catch(() => undefined);
+  return next;
+}
+
+async function ontoDraftsNow(column: Carried, lines: readonly DraftLine[], newTitle: (clientId: Id, projectId: Id | null) => string | null): Promise<Outcome<OntoDrafts>> {
   const ids = [...new Set(lines.map((l) => l.id))].sort((a, b) => a - b);
   const clientIds = [...new Set(lines.map((l) => l.clientId))];
   try {
@@ -115,7 +148,7 @@ export async function ontoDrafts(kind: string, column: Carried, lines: readonly 
   const skipped = lines.filter((l) => carried.has(l.id)).map((l) => l.id);
   if (todo.length === 0) return { ok: true, value: { invoices: [], lines: [], skipped } };
 
-  const run = newRun(keyFor(kind, ...ids.map(String)));
+  const run = newRun();
   const byClient = new Map<Id, DraftLine[]>();
   for (const line of todo) byClient.set(line.clientId, [...(byClient.get(line.clientId) ?? []), line]);
 
@@ -134,6 +167,8 @@ export async function ontoDrafts(kind: string, column: Carried, lines: readonly 
               run: async (ctx: StepContext) => {
                 const row = await deskWrites().insert("invoices", { client_id: clientId, project_id: projectId, title: newTitle(clientId, projectId), client_key: ctx.key });
                 upsert("invoices", row);
+                // Read back by its key after a lost answer: it must still be this client's draft.
+                if (!takesLines(row, clientId)) throw notOurs("draft");
                 return row;
               },
             },
@@ -154,7 +189,10 @@ export async function ontoDrafts(kind: string, column: Carried, lines: readonly 
               client_key: ctx.key,
             };
             try {
-              return await insertLine(values);
+              const saved = await insertLine(values);
+              // Read back by its key after a lost answer: it must be this entry's line on this draft.
+              if (saved.document_id !== invoice.id || saved[column] !== line.id) throw notOurs("line");
+              return saved;
             } catch (error) {
               // Another action put this one on a line first: it is invoiced, which is what was asked.
               const refused = asSinkError(error);

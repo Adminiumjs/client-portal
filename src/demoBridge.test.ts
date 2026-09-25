@@ -32,7 +32,7 @@ beforeEach(async () => {
   setDeskReads(world.reads);
   setDeskWrites(world.writes);
   setPortalPort(world.portal(1));
-  useUi.setState({ persona: "studio", view: "home", toasts: [], token: null, selected: { proposal: null, invoice: null, project: null, client: null, deliverable: null, payment: null } });
+  useUi.setState({ persona: "studio", view: "home", toasts: [], token: null, selected: { proposal: null, invoice: null, project: null, client: null, deliverable: null, payment: null, enquiry: null } });
   signals.length = 0;
   await loadDesk();
 });
@@ -142,5 +142,31 @@ describe("the chips", () => {
     goToScreen("c404");
     expect(useUi.getState()).toMatchObject({ persona: "client", view: "notfound" });
     expect(currentScreen()).toBe("c404");
+  });
+});
+
+describe("the card's report", () => {
+  it("reports the page's state again once a language is on screen, not only when it was asked for", async () => {
+    const { setAmbient, t, money, number } = await import("./i18n/ambient.ts");
+    const { startDemoBridge } = await import("./demoBridge.ts");
+    const posted: { type: string; locale?: string }[] = [];
+    const parent = { postMessage: (message: { type: string; locale?: string }) => posted.push(message) };
+    const fakeWindow = { parent, location: { origin: "https://demo.example" }, addEventListener: () => undefined, removeEventListener: () => undefined };
+    vi.stubGlobal("window", fakeWindow);
+    const stop = startDemoBridge();
+    try {
+      setAmbient("en-US", t, money, number);
+      await Promise.resolve();
+      const before = posted.length;
+      // The render that puts German on screen: the card hears German, with nothing else moving.
+      setAmbient("de-DE", t, money, number);
+      await Promise.resolve();
+      const after = posted.slice(before).filter((m) => m.type === "adminium:demo:state");
+      expect(after.map((m) => m.locale)).toEqual(["de-DE"]);
+    } finally {
+      stop();
+      setAmbient("en-US", t, money, number);
+      vi.unstubAllGlobals();
+    }
   });
 });

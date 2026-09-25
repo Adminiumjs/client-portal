@@ -7,11 +7,11 @@
 import { describe, expect, it } from "vitest";
 
 import type { Rate } from "../../data/types.ts";
+import { dayRateOf } from "../../lib/rateCard.ts";
 import type { WorksheetFigures } from "../../state/scoping.ts";
 import {
   addExpense,
   addRate,
-  dayRateOnCard,
   dropExpense,
   dropRow,
   editExpense,
@@ -91,8 +91,9 @@ describe("what the page says", () => {
 
   it("holds the effective day rate against the rate that is one working day", () => {
     const rates = [rate(1, "400.00", "3"), rate(2, "750.00", "6"), rate(3, "90.00", null)];
-    expect(dayRateOnCard(rates, 6)?.id).toBe(2);
-    expect(dayRateOnCard(rates, 8)?.id).toBe(1);
+    expect(dayRateOf(rates, 6)?.id).toBe(2);
+    // No rate on the card is an eight-hour day: there is no day rate to hold against, and none is guessed.
+    expect(dayRateOf(rates, 8)).toBeNull();
     expect([thinRate(700, rates[1]!), thinRate(749.5, rates[1]!), thinRate(null, rates[1]!)]).toEqual([true, false, false]);
   });
 

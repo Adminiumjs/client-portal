@@ -18,6 +18,7 @@ import { ArrowRight, Building2, Check, Eraser, History, Minus, PenTool, Plus, Ru
 import { Alert, UnfinishedLine } from "../components/ui.tsx";
 import type { Id, Proposal } from "../data/types.ts";
 import { useI18n, type MessageKey } from "../i18n/index.tsx";
+import { dayRateOf } from "../lib/rateCard.ts";
 import { useAddOnSettings, useCan, useDesk, useRows, useSettings } from "../state/desk.ts";
 import { refusalKey, type Outcome, type Unfinished } from "../state/outcome.ts";
 import { turnIntoProposal, workSheet, type Worksheet, type WorksheetInputs } from "../state/scoping.ts";
@@ -26,7 +27,6 @@ import {
   addExpense,
   addRate,
   CHIP_LIMIT,
-  dayRateOnCard,
   driftPct,
   driftTone,
   dropExpense,
@@ -126,7 +126,8 @@ export function ScopingPage({ reading, onRetry }: { reading: Reading; onRetry: (
   const f = workSheet(sheet, inputs);
   const view = shown(f, settings?.hours_per_day);
   const week = studioWeek(peopleRows, settings);
-  const cardRate = dayRateOnCard(rates, settings?.hours_per_day);
+  // The card's day rate (the rate that is one working day); none on the card, and the check says nothing.
+  const cardRate = dayRateOf(rates, settings?.hours_per_day);
   const thin = thinRate(view.dayRate, cardRate);
   const monthly = costs.reduce((sum, c) => sum + Number(c.monthly_amount), 0);
   const drift = f.drift;
@@ -384,10 +385,6 @@ export function ScopingPage({ reading, onRetry }: { reading: Reading; onRetry: (
                 <dd className={`money${reserveOn ? " scope-tone--warn" : " scope-dim"}`}>{reserveOn ? money(f.contingency) : "—"}</dd>
               </div>
               <div className="scope-break-row">
-                <dt>{t("scoping.break.expenses")}</dt>
-                <dd className="money">{money(f.expensesAtCost)}</dd>
-              </div>
-              <div className="scope-break-row">
                 <dt>{tax.rate === null ? t("scoping.break.taxUnknown") : t("scoping.break.tax", { tax: t("scoping.taxLabel", { name: tax.name ?? t("scoping.taxName"), rate: number(Number(tax.rate), { maximumFractionDigits: 2 }) }) })}</dt>
                 <dd className="money scope-dim">{tax.rate === null ? "—" : money(f.tax)}</dd>
               </div>
@@ -396,6 +393,11 @@ export function ScopingPage({ reading, onRetry }: { reading: Reading; onRetry: (
                 <dd className="money" data-figure="total">
                   {money(f.priceWithTax)}
                 </dd>
+              </div>
+              {/* Purchases are not in the proposal: they go on the invoice at cost, with their receipts. */}
+              <div className="scope-break-row">
+                <dt>{t("scoping.break.apart")}</dt>
+                <dd className="money scope-dim">{money(f.expensesAtCost)}</dd>
               </div>
             </dl>
             <ul className="scope-checks" role="list" aria-label={t("scoping.checks")}>

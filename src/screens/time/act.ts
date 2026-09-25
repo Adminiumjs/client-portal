@@ -14,6 +14,7 @@
 import type { Decimal, Id, TimeEntry } from "../../data/types.ts";
 import type { OntoDrafts } from "../../state/invoiceDrafts.ts";
 import type { Outcome } from "../../state/outcome.ts";
+import { invalid } from "../../state/officeWrites.ts";
 import { moveTimeOntoInvoice, stopClock } from "../../state/timeActions.ts";
 import { isLogged } from "./model.ts";
 import { refusalWords, type Words } from "./words.ts";
@@ -21,8 +22,13 @@ import { refusalWords, type Words } from "./words.ts";
 /** The entries a move takes: logged, on no line yet. */
 export const toMove = (entries: readonly TimeEntry[], invoiced: ReadonlySet<Id>): TimeEntry[] => entries.filter((e) => isLogged(e) && !invoiced.has(e.id));
 
-/** Move the entries not yet invoiced onto their clients' drafts. */
-export function moveNotInvoiced(entries: readonly TimeEntry[], invoiced: ReadonlySet<Id>, rate: Decimal, titleFor: (projectId: Id | null) => string): Promise<Outcome<OntoDrafts>> {
+/**
+ * Move the entries not yet invoiced onto their clients' drafts, at the day
+ * rate's hourly rate. With no day rate on the card nothing is sent: the move
+ * is refused (`NO_DAY_RATE`), never billed at a rate guessed from another.
+ */
+export function moveNotInvoiced(entries: readonly TimeEntry[], invoiced: ReadonlySet<Id>, rate: Decimal | null, titleFor: (projectId: Id | null) => string): Promise<Outcome<OntoDrafts>> {
+  if (rate === null) return Promise.resolve(invalid("NO_DAY_RATE", "rate"));
   const ids = toMove(entries, invoiced).map((e) => e.id);
   return moveTimeOntoInvoice(ids, { rate, newTitle: (_client, projectId) => titleFor(projectId) });
 }

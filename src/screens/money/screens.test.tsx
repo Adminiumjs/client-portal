@@ -127,4 +127,27 @@ describe("Every email we send", () => {
     expect(page).toContain("A test goes to hello@outline.example, the studio’s own address, and nowhere else.");
     expect(studio.writes).toEqual([]);
   });
+
+  it("offers a test send and Email templates only to someone who manages Adminium's settings, and says who can otherwise", async () => {
+    await loadSampleRows();
+    const { deskWrites, loadSystemActions, setDeskWrites } = await import("../../state/desk.ts");
+    const writes = deskWrites();
+    const holding = async (held: string[] | Error) => {
+      useDesk.setState({ systemActions: null });
+      setDeskWrites({ ...writes, systemActions: async () => (held instanceof Error ? Promise.reject(held) : held) });
+      await loadSystemActions();
+      return draw(<Emails />);
+    };
+    const manager = await holding(["users.manage", "settings.manage"]);
+    expect(text(manager)).toContain("Send a test to ourselves");
+    expect(manager).toContain('href="/email-templates"');
+    expect(text(manager)).toContain("Change the words in Email templates");
+
+    for (const html of [await holding(["audit.read"]), await holding(new Error("refused"))]) {
+      expect(text(html)).not.toContain("Send a test to ourselves");
+      expect(html).not.toContain("/email-templates");
+      expect(text(html)).toContain("Only someone who manages Adminium’s settings can send a test.");
+    }
+    setDeskWrites(writes);
+  });
 });

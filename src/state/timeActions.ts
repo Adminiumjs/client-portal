@@ -300,7 +300,6 @@ export async function moveTimeOntoInvoice(entryIds: readonly Id[], input: MoveTi
   const entries = entryIds.map((id) => held[id]).filter((e): e is TimeEntry => e !== undefined && e.running_for === null && e.hours !== null && e.client_id !== null);
   if (entries.length === 0) return { ok: true, value: { invoices: [], lines: [], skipped: [] } };
   return ontoDrafts(
-    "time-onto-invoice",
     "time_entry_id",
     entries.map((e) => ({
       id: e.id,

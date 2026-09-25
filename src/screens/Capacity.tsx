@@ -30,9 +30,9 @@ import { today as clockToday } from "../lib/clock.ts";
 import { dayLabel } from "../lib/dates.ts";
 import AddDate, { type DatePrefill } from "../sheets/schedule/AddDate.tsx";
 import { capacityWeeks } from "../state/capacity.ts";
-import { isInDate, loadWhere, useAddOnSettings, useCan, useDesk, useRows, useSettings } from "../state/desk.ts";
+import { isInDate, loadWhere, useAddOnSettings, useCan, useDesk, useDeskReads, useRows, useSettings } from "../state/desk.ts";
 import { loadStudioDates } from "../state/officeActions.ts";
-import { go, open, toast } from "../state/ui.ts";
+import { go, open, openEnquiry, toast } from "../state/ui.ts";
 import { afterView, enquiriesAsking, fitOf, loadBefore, proposalDays, SIZES, squaresOf, weekRows, type LoadItem, type OutProposal, type SizeKey } from "./capacity/model.ts";
 import { dayMonthLabel, firstNameOf, holidaysOf, monthName } from "./schedule/model.ts";
 import { showDay } from "./schedule/state.ts";
@@ -81,14 +81,16 @@ export default function Capacity() {
   // The studio's dates over the weeks shown, and the lines of the proposals still out.
   const out = useMemo(() => proposals.filter((p) => isInDate(p, day)), [proposals, day]);
   const outIds = out.map((p) => p.id).join(",");
+  // Again after a reconnect: what moved while it was down was never announced.
+  const reads = useDeskReads();
   useEffect(() => {
     void loadStudioDates(day, lastDay).catch(() => undefined);
-  }, [day, lastDay]);
+  }, [day, lastDay, reads]);
   useEffect(() => {
     if (out.length === 0) return;
     void loadWhere("proposal_lines", { column: "document_id", op: "in", value: out.map((p) => p.id) }, "position.asc", 1000).catch(() => undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [outIds]);
+  }, [outIds, reads]);
 
   const studioDays = settings?.days_per_week ?? 5;
   const hoursPerDay = settings?.hours_per_day ?? 6;
@@ -297,7 +299,7 @@ export default function Capacity() {
             <Button kind="primary" icon={Copy} onClick={() => void copy(sentence, t("capacity.copied"), t("capacity.blocked"))}>
               {t("capacity.copy")}
             </Button>
-            <Button icon={Inbox} onClick={() => go("enquiries")}>
+            <Button icon={Inbox} onClick={() => (enquiry === null ? go("enquiries") : openEnquiry(enquiry.id))}>
               {t("capacity.openEnquiry")}
             </Button>
             {canHold && (

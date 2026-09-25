@@ -27,6 +27,7 @@ const BY_CODE: Record<string, Words> = {
   CLOCK_NOT_RUNNING: { key: "time.error.notRunning", field: null },
   ALREADY_INVOICED: { key: "time.error.invoiced", field: null },
   RATE_NOT_A_NUMBER: { key: "time.error.noRate", field: null },
+  NO_DAY_RATE: { key: "time.error.noDayRate", field: null },
   DATE_NOT_A_DAY: { key: "time.error.date", field: "date" },
 };
 

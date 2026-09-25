@@ -59,10 +59,11 @@ describe("the worksheet's figures", () => {
     ]);
     expect([f.fees, f.hours, f.days]).toEqual([5980, 39, 6.5]);
     expect([f.expensesAtCost, f.expensesCarried]).toEqual([420, 38]);
-    expect([f.price, f.tax, f.priceWithTax]).toEqual([6400, 544, 6944]);
+    // The price is what the proposal carries: the fees. The licence passed on at cost is not in it.
+    expect([f.price, f.tax, f.priceWithTax]).toEqual([5980, 508.3, 6488.3]);
     // Two people at the studio's four days: eight days a week.
-    expect([f.studioDaysAWeek, f.weeks, f.dayRate, f.monthsCovered]).toEqual([8, 0.8, 920, 2.2]);
-    expect(f.stages).toEqual([3472, 3472]);
+    expect([f.studioDaysAWeek, f.weeks, f.dayRate, f.monthsCovered]).toEqual([8, 0.8, 920, 2.1]);
+    expect(f.stages).toEqual([3244.15, 3244.15]);
   });
 
   it("learns from finished stages: estimated days against the hours logged on them", () => {
@@ -72,14 +73,17 @@ describe("the worksheet's figures", () => {
     ]);
     const f = workSheet({ ...sheet, contingency: true }, inputs);
     // Stages ran 12.5 % over on average; the reserve is that share of the fees.
-    expect([f.drift, f.contingency, f.price]).toEqual([0.13, 777.4, 7177.4]);
+    expect([f.drift, f.contingency, f.price]).toEqual([0.13, 777.4, 6757.4]);
     // The reserve is held per row, in thousandths of the rate: what the lines will carry.
     expect([reserveQty("6", 0.13), reserveQty("1", 0.13), reserveQty("12", 0.13), reserveQty("0.5", 0.13), reserveQty("1.25", 0.13), reserveQty("3", 0)]).toEqual(["0.78", "0.13", "1.56", "0.065", "0.163", "0"]);
     expect(workSheet({ ...sheet, contingency: true }, { ...inputs, milestones: [] }).contingency).toBe(0);
   });
 
-  it("splits the price with tax into the stages, the last taking what rounding left", () => {
-    expect(workSheet({ ...sheet, split: "403030", rows: [{ rateId: 3, qty: "1" }], expenses: [] }, inputs).stages).toEqual([39.06, 29.3, 29.29]);
+  it("splits the price into the stages as each stage invoice will read: its share, and the tax on that share", () => {
+    // $90 at 8.5 %: 36 + 3.06, then 27 + 2.30 twice (2.295 rounds away from zero) — a cent over the total, as the invoices will be.
+    expect(workSheet({ ...sheet, split: "403030", rows: [{ rateId: 3, qty: "1" }], expenses: [] }, inputs).stages).toEqual([39.06, 29.3, 29.3]);
+    // $11.07: the first stage is 4.43 and its 0.38 tax — not 40 % of the $12.01 total.
+    expect(workSheet({ ...sheet, split: "403030", rows: [{ rateId: 3, qty: "0.123" }], expenses: [] }, inputs).stages).toEqual([4.81, 3.6, 3.6]);
   });
 });
 
@@ -110,9 +114,26 @@ describe("turning it into a proposal", () => {
     ]);
     // The expenses stay on the worksheet: they reach the invoice with their receipts.
     expect(studio.writes.some((w) => w.values?.["description"] === "Type licence — two weights")).toBe(false);
-    // The totals are Adminium's: 5980 + 585 + 52 + 140.40.
+    // The totals are Adminium's: 5980 + 585 + 52 + 140.40 — and what the page said, to the cent.
     expect(proposal).toMatchObject({ status: "draft", subtotal: "6757.40" });
+    const page = workSheet({ ...sheet, contingency: true }, { ...inputs, taxRate: proposal.tax_rate });
+    expect([page.price, page.tax, page.priceWithTax]).toEqual([Number(proposal.subtotal), Number(proposal.tax), Number(proposal.total)]);
     expect(tableOf(studio, "proposals").filter((p) => p["status"] === "draft")).toHaveLength(2);
+  });
+
+  it("shows each payment as the stage invoice Adminium will draw from the proposal: its share of the subtotal, and that share's tax", async () => {
+    for (const [split, rows] of [["5050", sheet.rows], ["403030", sheet.rows], ["403030", [{ rateId: 3, qty: "0.123" }]]] as const) {
+      const worked = { ...sheet, split, rows: [...rows], contingency: true };
+      const proposal = ok(await turnIntoProposal(worked, inputs, { contingencyWords: (label) => `Held — ${label}` }));
+      const page = workSheet(worked, { ...inputs, taxRate: proposal.tax_rate });
+      const drawn: number[] = [];
+      for (const pct of split === "5050" ? ["50", "50"] : ["40", "30", "30"]) {
+        const invoice = await studio.world.writes.insert("invoices", { client_id: 4, proposal_id: proposal.id, from_quote_id: proposal.id, share_pct: pct, tax_rate: proposal.tax_rate, title: "Stage" });
+        await studio.world.writes.insert("invoice_lines", { document_id: invoice.id, quote_id: proposal.id, position: 0, description: "Stage" });
+        drawn.push(Number(tableOf(studio, "invoices").find((i) => i["id"] === invoice.id)!["total"]));
+      }
+      expect(page.stages).toEqual(drawn);
+    }
   });
 
   it("asks for a client and a stage name before saving anything", async () => {

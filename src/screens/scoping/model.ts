@@ -158,12 +158,6 @@ export function studioWeek(people: readonly Pick<Person, "days_per_week">[], set
   return { kind: "mixed", people: days.length, total };
 }
 
-/** The card's day rate the effective rate is held against: the rate that is one working day, else the card's first. */
-export function dayRateOnCard(rates: readonly Rate[], hoursPerDay: number | null | undefined): Rate | null {
-  const perDay = hoursPerDay ?? 6;
-  return rates.find((r) => r.hours_per_unit !== null && num(r.hours_per_unit) === perDay) ?? rates[0] ?? null;
-}
-
 /** Whether the effective day rate falls short of the card's (a dollar's grace). */
 export const thinRate = (effective: number | null, card: Rate | null): boolean => effective !== null && card !== null && effective < num(card.amount) - 1;
 

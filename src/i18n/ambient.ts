@@ -129,6 +129,18 @@ let activeT: TFunction = fallbackT;
 let activeMoney: MoneyFn = fallbackMoney;
 let activeNumber: NumberFn = fallbackNumber;
 
+const localeListeners = new Set<(tag: LocaleTag) => void>();
+
+/**
+ * Told once the page is drawn in another language (after the render that
+ * applied it, not when it was asked for) — so whatever reports the page's
+ * language reports the one on screen.
+ */
+export function onLocaleApplied(listener: (tag: LocaleTag) => void): () => void {
+  localeListeners.add(listener);
+  return () => localeListeners.delete(listener);
+}
+
 /** Called by `<App>` on every render — cheap, idempotent, and always current. */
 export function setAmbient(
   next: LocaleTag,
@@ -136,10 +148,13 @@ export function setAmbient(
   money: MoneyFn,
   number: NumberFn,
 ): void {
+  const moved = next !== activeLocale;
   activeLocale = next;
   activeT = t;
   activeMoney = money;
   activeNumber = number;
+  // After the render that called this, never inside it.
+  if (moved) for (const listener of localeListeners) queueMicrotask(() => listener(next));
 }
 
 /** The tag every `Intl.*` formatter outside React is built against. */

@@ -8,6 +8,10 @@
  *                 still a draft, come from the line
  *   to pass on    marked to go to the client at cost, and no line carries it yet
  *   ours          the studio's own to carry (not marked to pass on)
+ *   voided        the line carrying it is on a voided invoice: nothing was
+ *                 charged, so it counts as not passed on (with the purchases
+ *                 still to pass on, or the studio's own) — but the voided line
+ *                 still holds it, so it cannot go on another invoice
  *
  * Every sum here is for showing only: the stored costs added up exactly
  * (`sumDecimals`), never a figure that is saved.
@@ -15,7 +19,7 @@
 import type { Decimal, Expense, Id, Invoice, InvoiceLine } from "../../data/types.ts";
 import { sumDecimals } from "../../lib/money.ts";
 
-export type PurchaseStanding = "passed-on" | "to-pass-on" | "ours";
+export type PurchaseStanding = "passed-on" | "to-pass-on" | "ours" | "voided";
 
 export const PURCHASE_FILTERS = ["all", "to-pass-on", "passed-on", "ours"] as const;
 export type PurchaseFilter = (typeof PURCHASE_FILTERS)[number];
@@ -37,7 +41,15 @@ export function carriersOf(lines: readonly InvoiceLine[], invoices: Readonly<Rec
 }
 
 export function standingOf(expense: Expense, carriers: ReadonlyMap<Id, Carrier>): PurchaseStanding {
-  if (carriers.has(expense.id)) return "passed-on";
+  const carrier = carriers.get(expense.id);
+  if (carrier !== undefined) return carrier.invoice?.status === "void" ? "voided" : "passed-on";
+  return expense.rebill ? "to-pass-on" : "ours";
+}
+
+/** The pile (and filter) a purchase counts in: one on a voided invoice was never passed on. */
+function pileOf(expense: Expense, carriers: ReadonlyMap<Id, Carrier>): Exclude<PurchaseStanding, "voided"> {
+  const standing = standingOf(expense, carriers);
+  if (standing !== "voided") return standing;
   return expense.rebill ? "to-pass-on" : "ours";
 }
 
@@ -61,15 +73,16 @@ export interface ExpenseFigures {
 const pile = (list: readonly Expense[]): Pile => ({ count: list.length, sum: sumDecimals(list.map((e) => e.amount)), ids: list.map((e) => e.id) });
 
 export function expenseFigures(expenses: readonly Expense[], carriers: ReadonlyMap<Id, Carrier>): ExpenseFigures {
-  const by = (s: PurchaseStanding) => expenses.filter((e) => standingOf(e, carriers) === s);
+  const by = (s: PurchaseStanding) => expenses.filter((e) => pileOf(e, carriers) === s);
   return { all: pile(expenses), "to-pass-on": pile(by("to-pass-on")), "passed-on": pile(by("passed-on")), ours: pile(by("ours")) };
 }
 
-export const inFilter = (filter: PurchaseFilter, expense: Expense, carriers: ReadonlyMap<Id, Carrier>): boolean => filter === "all" || standingOf(expense, carriers) === filter;
+export const inFilter = (filter: PurchaseFilter, expense: Expense, carriers: ReadonlyMap<Id, Carrier>): boolean => filter === "all" || pileOf(expense, carriers) === filter;
 
 /**
  * The purchases "Pass on" takes: every one marked to pass on, with a client,
- * that no line carries yet — whichever filter is on show.
+ * that no line carries yet — whichever filter is on show. (One on a voided
+ * invoice is still held by the voided line, so it is not among them.)
  */
 export const passable = (expenses: readonly Expense[], carriers: ReadonlyMap<Id, Carrier>): Expense[] =>
   expenses.filter((e) => standingOf(e, carriers) === "to-pass-on" && e.client_id !== null).sort(newestFirst);

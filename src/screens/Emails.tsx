@@ -15,6 +15,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
+  ArrowUpRight,
   Bell,
   BellRing,
   CircleCheck,
@@ -45,7 +46,7 @@ import {
 
 import { Alert, Button } from "../components/ui.tsx";
 import { LOCALES, LOCALE_TAGS, useI18n, type LocaleTag, type MessageKey } from "../i18n/index.tsx";
-import { addOnText, deskWrites, useAddOnSettings, useDesk, useSettings } from "../state/desk.ts";
+import { addOnText, deskWrites, loadSystemActions, useAddOnSettings, useDesk, useHoldsSystemAction, useSettings } from "../state/desk.ts";
 import { previewClient } from "../state/preview.ts";
 import { go, open, toast, useUi } from "../state/ui.ts";
 import { EmailCard, type Mode } from "./emails/EmailCard.tsx";
@@ -89,6 +90,9 @@ const RULES: readonly { key: MessageKey; icon: LucideIcon }[] = [
   { key: "emails.rules.handover", icon: PackageCheck },
   { key: "emails.rules.studio", icon: BellRing },
 ];
+
+/** Adminium's Email Templates, where the words of every email are changed. */
+const EMAIL_TEMPLATES = "/email-templates";
 
 const PROBLEM_KEYS: Readonly<Record<TestProblem, MessageKey>> = {
   "no-sender": "emails.test.noSender",
@@ -146,6 +150,12 @@ export default function Emails() {
   const [sending, setSending] = useState(false);
   const [problem, setProblem] = useState<TestProblem | null>(null);
   useEffect(() => setTag(locale), [locale]);
+  // A test send and Email Templates are for someone who manages Adminium's settings: ask Adminium who that is.
+  const manages = useHoldsSystemAction("settings.manage");
+  const asks = typeof deskWrites().systemActions === "function";
+  useEffect(() => {
+    void loadSystemActions();
+  }, []);
 
   const studio = isStudioEmail(kind);
   const mode: Mode = studio ? "plain" : chosenMode;
@@ -312,11 +322,25 @@ export default function Emails() {
             <Button icon={ExternalLink} onClick={() => void follow(followTarget)}>
               {t("emails.try.follow")}
             </Button>
-            <Button icon={MailCheck} busy={sending} onClick={() => void test()}>
-              {t("emails.try.test")}
-            </Button>
+            {/* Where nothing says who manages Adminium (the demo) the button stays, and says what it needs when pressed. */}
+            {(manages === true || !asks) && (
+              <Button icon={MailCheck} busy={sending} onClick={() => void test()}>
+                {t("emails.try.test")}
+              </Button>
+            )}
             {problem !== null && <Alert tone={problem === "live-link" || problem === "refused" ? "danger" : "warn"}>{t(PROBLEM_KEYS[problem], { to: settings?.reply_to ?? "" })}</Alert>}
-            <p className="em-try-note">{t("emails.try.testNote", { to: settings?.reply_to ?? "" })}</p>
+            {manages === false ? (
+              <p className="em-try-note">{t("emails.test.notAllowed")}</p>
+            ) : (
+              <p className="em-try-note">{t("emails.try.testNote", { to: settings?.reply_to ?? "" })}</p>
+            )}
+            {manages === true && (
+              // Adminium's own editor, where the words of every email are changed (at the root of the Adminium this desk runs in).
+              <a className="btn ol-gi em-templates-link" href={EMAIL_TEMPLATES} target="_blank" rel="noopener">
+                <ArrowUpRight size={15} aria-hidden="true" />
+                {t("emails.try.templates")}
+              </a>
+            )}
           </section>
         </div>
       </div>

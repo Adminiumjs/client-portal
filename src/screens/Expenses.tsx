@@ -8,7 +8,8 @@
  * purchase" opens a form in place (what, the cost, whose it is, the day, the
  * supplier, a receipt). Each row's chip says how it stands: "Pass it on" puts
  * that one purchase on the client's draft invoice, "Passed on" opens where it
- * went, "Ours" is the studio's. The foot passes every waiting purchase on at
+ * went, "Ours" is the studio's, "Invoice voided" opens the purchase: the
+ * invoice it went on was voided, so nothing was charged for it. The foot passes every waiting purchase on at
  * once: one line per purchase, its cost as it was stored, on each client's
  * draft (a new draft when they have none) — Adminium works out the totals.
  *
@@ -16,13 +17,13 @@
  * comes off a draft there), changes, and removing it.
  */
 import { useEffect, useMemo, useState } from "react";
-import { Check, Minus, Plus, Paperclip, ReceiptText, Wallet } from "lucide-react";
+import { Ban, Check, Minus, Plus, Paperclip, ReceiptText, Wallet } from "lucide-react";
 
 import { Alert, Button, DayText, Empty, Filters, Money, ScreenHead, UnfinishedLine } from "../components/ui.tsx";
 import type { Expense, Id } from "../data/types.ts";
 import { useI18n, type MessageKey } from "../i18n/index.tsx";
 import { decimalValue, sumDecimals } from "../lib/money.ts";
-import { ensureRows, refreshRows, useDesk, useRows, useSettings } from "../state/desk.ts";
+import { ensureRows, refreshRows, useDesk, useDeskReads, useRows, useSettings } from "../state/desk.ts";
 import { linesCarrying, type OntoDrafts } from "../state/invoiceDrafts.ts";
 import { loadPurchases, loadSuppliers, passOn } from "../state/officeActions.ts";
 import type { Outcome, Unfinished } from "../state/outcome.ts";
@@ -32,7 +33,7 @@ import { carriersOf, expenseFigures, inFilter, newestFirst, passable, PURCHASE_F
 import { PurchaseForm } from "./expenses/PurchaseForm.tsx";
 import { passedOnWords, refusalWords } from "./expenses/words.ts";
 
-const TAG_ICON = { "to-pass-on": Plus, "passed-on": Check, ours: Minus } as const;
+const TAG_ICON = { "to-pass-on": Plus, "passed-on": Check, ours: Minus, voided: Ban } as const;
 
 export default function Expenses() {
   const { t, number, money } = useI18n();
@@ -50,7 +51,8 @@ export default function Expenses() {
   const [problem, setProblem] = useState<string | null>(null);
   const [unfinished, setUnfinished] = useState<Unfinished<OntoDrafts> | null>(null);
 
-  // Every purchase, the lines carrying them and those lines' invoices, and the address book.
+  // Every purchase, the lines carrying them and those lines' invoices, and the address book (again after a reconnect).
+  const reads = useDeskReads();
   useEffect(() => {
     let live = true;
     void (async () => {
@@ -67,12 +69,14 @@ export default function Expenses() {
     return () => {
       live = false;
     };
-  }, []);
+  }, [reads]);
 
   const carriers = useMemo(() => carriersOf(lines, invoices), [lines, invoices]);
   const figures = useMemo(() => expenseFigures(expenses, carriers), [expenses, carriers]);
   const rows = useMemo(() => expenses.filter((e) => inFilter(filter, e, carriers)).sort(newestFirst), [expenses, filter, carriers]);
   const waiting = useMemo(() => passable(expenses, carriers), [expenses, carriers]);
+  /** Marked to pass on, but held by a voided invoice's line: nothing Pass on can take, and not "nothing waiting" either. */
+  const onVoided = expenses.some((e) => e.rebill && standingOf(e, carriers) === "voided");
 
   const studio = settings?.name ?? "";
   const who = (e: Expense): string => {
@@ -247,7 +251,7 @@ export default function Expenses() {
         )}
 
         <div className="ex-foot">
-          <span className="ex-foot-label">{waiting.length > 0 ? t("expenses.foot.waiting") : t("expenses.foot.nothing")}</span>
+          <span className="ex-foot-label">{waiting.length > 0 ? t("expenses.foot.waiting") : onVoided ? t("expenses.foot.voidedOnly") : t("expenses.foot.nothing")}</span>
           <span className="ex-foot-amt money">{money(waitingSum)}</span>
           <Button kind="primary" icon={ReceiptText} busy={busy === "all"} disabled={busy !== null && busy !== "all"} onClick={() => void passAll()}>
             {waiting.length > 0 ? t("expenses.foot.passOn", { count: number(waiting.length) }, waiting.length) : t("expenses.foot.clear")}

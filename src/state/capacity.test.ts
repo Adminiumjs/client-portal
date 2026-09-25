@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { capacityWeeks, firstFit, mondayOf, type CapacityInputs } from "./capacity.ts";
+import { capacityWeeks, mondayOf, type CapacityInputs } from "./capacity.ts";
 
 // Tuesday 28 July 2026: the week starts Monday 27 July.
 const base: CapacityInputs = {
@@ -83,13 +83,5 @@ describe("capacity", () => {
     expect(view.weeks[0]!.used).toBe(3);
     expect(view.unplaced).toEqual([21, 22]);
     expect(view.weeks.slice(1).every((w) => w.used === 0)).toBe(true);
-  });
-
-  it("finds the first week a job fits", () => {
-    const view = capacityWeeks({ ...base, milestones: [{ id: 30, project_id: 1, due_on: "2026-08-07", state: "now", estimated_days: "12", position: 0 }] });
-    // Weeks free: 7 − 5.33, 7 − 6.67, 7, 7.
-    expect(firstFit(view, 3)).toEqual({ start: 2, end: 2 });
-    expect(firstFit(view, 1)).toEqual({ start: 0, end: 0 });
-    expect(firstFit(view, 30)).toBeNull();
   });
 });

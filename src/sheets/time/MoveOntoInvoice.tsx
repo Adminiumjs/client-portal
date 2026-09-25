@@ -38,7 +38,8 @@ export default function MoveOntoInvoice({ entries, invoiced, rate, companyOf, on
   const groups = useMemo(() => movePreview(entries, invoiced, rate, (clientId, projectId) => draftFor(clientId, projectId)), [entries, invoiced, rate, invoices]);
   const hours = sumHours(groups.flatMap((g) => g.entries));
   const amount = rate === null ? null : sumDecimals(groups.map((g) => g.amount));
-  const [error, setError] = useState<Words | null>(rate === null ? { key: "time.error.noRate", field: null } : null);
+  // No day rate on the card: the move is refused before anything is sent, and says so now.
+  const [error, setError] = useState<Words | null>(rate === null ? { key: "time.error.noDayRate", field: null } : null);
   const [busy, setBusy] = useState(false);
   const [unfinished, setUnfinished] = useState<Unfinished<OntoDrafts> | null>(null);
 
@@ -62,7 +63,6 @@ export default function MoveOntoInvoice({ entries, invoiced, rate, companyOf, on
   };
 
   const move = () => {
-    if (rate === null) return;
     void finish(() => moveNotInvoiced(entries, invoiced, rate, (projectId) => draftTitle(t, projectId === null ? undefined : projects[projectId])));
   };
 

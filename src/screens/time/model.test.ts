@@ -77,15 +77,16 @@ describe("the figures, exactly", () => {
   });
 
   it("works out a rate over hours to the cent, and hours × rate half away from zero", () => {
-    const rate = (amount: string, position = 0, active = true): Rate => ({ id: position + 1, label: "r", amount, hours_per_unit: null, position, active });
-    expect(hourly([rate("780.00")], { hours_per_day: 6 })).toBe("130.00");
-    // The studio's working day decides, not the hours a rate says it stands for.
-    expect(hourly([{ ...rate("780.00"), hours_per_unit: "8" }], { hours_per_day: 6 })).toBe("130.00");
-    expect(hourly([rate("100.00")], { hours_per_day: 3 })).toBe("33.33");
-    // The day rate is the first on the card still in use.
-    expect(hourly([rate("90.00", 0, false), rate("700.00", 1)], { hours_per_day: 7 })).toBe("100.00");
+    const rate = (amount: string, hours: string | null, position = 0, active = true): Rate => ({ id: position + 1, label: "r", amount, hours_per_unit: hours, position, active });
+    expect(hourly([rate("780.00", "6")], { hours_per_day: 6 })).toBe("130.00");
+    expect(hourly([rate("100.00", "3.00")], { hours_per_day: 3 })).toBe("33.33");
+    // The day rate is the rate that is one working day, wherever it sits on the card — not the first.
+    expect(hourly([rate("400.00", "3", 0), rate("750.00", "6", 1)], { hours_per_day: 6 })).toBe("125.00");
+    expect(hourly([rate("700.00", "7", 0, false), rate("90.00", null, 1), rate("721.00", "7", 2)], { hours_per_day: 7 })).toBe("103.00");
+    // No rate is a whole working day: no hourly rate, never one worked out from another.
+    expect(hourly([rate("780.00", "8"), rate("90.00", null, 1)], { hours_per_day: 6 })).toBeNull();
     expect(hourly([], { hours_per_day: 6 })).toBeNull();
-    expect(hourly([rate("750.00")], null)).toBeNull();
+    expect(hourly([rate("750.00", "6")], null)).toBeNull();
     expect(amountAt("0.25", "33.33")).toBe("8.33");
     expect(amountAt("1.50", "33.33")).toBe("50.00");
     expect(amountAt("0.03", "125.00")).toBe("3.75");

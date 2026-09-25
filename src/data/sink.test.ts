@@ -131,6 +131,18 @@ describe("the add-on's settings", () => {
   });
 });
 
+describe("what the person holds in Adminium", () => {
+  it("reads their system actions from Adminium's bootstrap (its `data`), with no write token", async () => {
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ data: { systemActions: ["settings.manage", 7, "audit.read"], nav: [] } }), { status: 200 }));
+    const sink = sessionSink(transport(vi.fn() as never), TABLE_OF_REF, { csrfToken: () => "tok", fetchImpl: fetchImpl as never });
+    expect(await sink.systemActions?.()).toEqual(["settings.manage", "audit.read"]);
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("/api/v1/bootstrap");
+    expect(init).toMatchObject({ method: "GET" });
+    expect(init.headers).not.toHaveProperty("x-adminium-csrf");
+  });
+});
+
 describe("action keys", () => {
   it("give every step its own 36-character key, the same on every retry", () => {
     const key = actionKey();

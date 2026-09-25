@@ -602,12 +602,20 @@ export function createEngine(opts: EngineOptions): Engine {
     return row;
   }
 
+  /** A write naming a column the table does not have is refused, as the data API refuses it (a sample brought in is not judged). */
+  function knownColumns(ref: TableRef, values: Record<string, unknown>): void {
+    const columns = (COLUMNS[ref] as Record<string, unknown> | undefined) ?? {};
+    const unknown = Object.keys(values).find((column) => column !== "id" && !(column in columns));
+    if (unknown !== undefined) refuse(422, "UNKNOWN_IDENTIFIER", `Unknown column ${JSON.stringify(unknown)} on ${ref}.`, { table: ref, column: unknown });
+  }
+
   function insert(ref: TableRef, given: Record<string, unknown>, writer: Writer): Row {
     const history = writer.origin === "history";
     const undo = snapshot();
     try {
       const values = { ...given };
       delete values["id"];
+      if (!history) knownColumns(ref, values);
       normalise(ref, values);
       const rule = STATES[ref];
       if (rule !== undefined && !history && !empty(values[rule.column]) && String(values[rule.column]) !== rule.initial) {
@@ -663,6 +671,7 @@ export function createEngine(opts: EngineOptions): Engine {
       const stored = { ...row } as Row;
       const values: Record<string, unknown> = { ...given };
       delete values["id"];
+      if (!history) knownColumns(ref, values);
       if (!history) for (const column of WORKED_OUT[ref] ?? []) delete values[column];
       normalise(ref, values);
       if (!history) opts.before?.(ref, stored, values, writer);

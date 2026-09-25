@@ -19,7 +19,8 @@
  *
  * After a reconnect the whole desk is read again (`resync`), with the document
  * that was open, because whatever was announced while the connection was down
- * is gone.
+ * is gone; a list screen on show (Expenses, Money, the Archive …) reads its
+ * own rows again, and until it has, keeps showing what it held.
  */
 import type { LiveFrame } from "../data/live.ts";
 import type { Id, TableRef } from "../data/types.ts";
@@ -115,7 +116,8 @@ export function applyFrame(frame: LiveFrame): void {
 /** Read the whole desk again, and the document that was open. */
 export async function resync(): Promise<void> {
   try {
-    applySnapshot(await deskReads().snapshot(today(), studioZone()));
+    // Tables the read set does not cover stay until the screen on show reads them again (it does: `reads` moved).
+    applySnapshot(await deskReads().snapshot(today(), studioZone()), true);
     await reloadOpen();
   } catch (error) {
     console.warn("[clients] the desk could not be read again after reconnecting:", error);

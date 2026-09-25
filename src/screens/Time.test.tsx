@@ -125,6 +125,36 @@ describe("the Time screen, drawn", () => {
     expect(html).toContain("Nothing to invoice");
   });
 
+  it("counts hours on a voided invoice as not invoiced, and says the invoice was voided — they can't move again", async () => {
+    const moved = ok(await moveNotInvoiced(held().filter((e) => e.id === 3), invoicedNow(), rate(), () => "Time"));
+    const invoiceId = moved.invoices[0]!.id;
+    await studio.world.writes.update("invoices", invoiceId, { status: "sent" });
+    await studio.world.writes.update("invoices", invoiceId, { status: "void", void_reason: "Raised in error" });
+    await loadTime("2000-01-01");
+    const { refreshRows } = await import("../state/desk.ts");
+    await refreshRows("invoices", [invoiceId]);
+    const html = draw();
+    expect(count(html, "Invoice voided")).toBe(1);
+    expect(html).toContain("Nothing was charged for these hours");
+    expect(count(html, '<span class="time-chip">Not invoiced</span>')).toBe(2);
+    // All 9.5 hours count as not invoiced: nothing bills the voided four.
+    expect(html).toMatch(/data-sum="open".*?9\.5 h.*?\$1,235\.00 at \$130\.00 an hour/);
+    // What Move would take is the 5.5 hours no line holds: the voided line still holds the other four.
+    expect(html).toMatch(/time-foot-figures">5\.5 h · \$715\.00/);
+    expect(toMove(held(), invoicedNow()).map((e) => e.id).sort()).toEqual([1, 2]);
+
+    // Once every hour on show is held by a voided invoice, the foot says so — not that everything is invoiced.
+    const rest = ok(await moveNotInvoiced(held().filter((e) => e.id !== 3), invoicedNow(), rate(), () => "Time"));
+    for (const invoice of rest.invoices) {
+      await studio.world.writes.update("invoices", invoice.id, { status: "sent" });
+      await studio.world.writes.update("invoices", invoice.id, { status: "void", void_reason: "Raised in error" });
+    }
+    await refreshRows("invoices", rest.invoices.map((i) => i.id));
+    const all = draw();
+    expect(all).toContain("Nothing here can go on an invoice: the rest is held by a voided one");
+    expect(all).not.toContain("Everything here is invoiced");
+  });
+
   it("draws an empty studio, a read in progress and a failed read", () => {
     const empty = draw(<Entries load="ready" rows={[]} invoicedBy={new Map()} onRetry={() => undefined} />);
     expect(empty).toContain("No time logged yet.");
@@ -184,6 +214,18 @@ describe("what the buttons write", () => {
     ok(await out.unfinished.resume());
     const carried = tableOf(studio, "invoice_lines").map((l) => l["time_entry_id"]).filter((id) => id !== null && id !== undefined);
     expect([...carried].sort()).toEqual([1, 2, 3]);
+  });
+
+  it("refuses a move when no rate on the card is a whole working day, and sends nothing", async () => {
+    useDesk.setState((s) => ({ rows: { ...s.rows, rates: Object.fromEntries(Object.values(s.rows.rates).map((r) => [r.id, { ...r, hours_per_unit: r.id === 1 ? "8" : r.hours_per_unit }])) } }));
+    const noRate = hourly(Object.values(useDesk.getState().rows.rates), Object.values(useDesk.getState().rows.settings)[0] ?? null);
+    expect(noRate).toBeNull();
+    const refused = await moveNotInvoiced(held(), invoicedNow(), noRate, () => "Time");
+    expect(!refused.ok && refused.code).toBe("NO_DAY_RATE");
+    if (!refused.ok) expect(refusalWords(refused).key).toBe("time.error.noDayRate");
+    expect(studio.writes).toEqual([]);
+    const sheet = draw(<MoveOntoInvoice entries={held()} invoiced={invoicedNow()} rate={noRate} companyOf={() => "Fold & Rule"} onClose={() => undefined} />);
+    expect(sheet).toContain("No rate on the rate card is one whole working day");
   });
 
   it("stops a clock with Adminium's hours from its own two stamps, whatever this computer's clock says", async () => {

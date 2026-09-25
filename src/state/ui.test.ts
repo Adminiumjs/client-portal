@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { open, openInvoices, openPrint, printTargetOf, setPrintTarget, useUi } from "./ui.ts";
 
 beforeEach(() => {
-  useUi.setState({ view: "home", print: null, invoiceFilter: null, selected: { proposal: null, invoice: null, project: null, client: null, deliverable: null, payment: null } });
+  useUi.setState({ view: "home", print: null, invoiceFilter: null, selected: { proposal: null, invoice: null, project: null, client: null, deliverable: null, payment: null, enquiry: null } });
 });
 
 const target = () => printTargetOf(useUi.getState());

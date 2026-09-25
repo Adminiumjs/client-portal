@@ -120,15 +120,18 @@ test("the scoping worksheet — every state, light, dark, Arabic, phone — at t
         await expect(main).toContainText("39 h · 6.5 days");
         await expect(sheet.locator(".scope-foot--sum")).toContainText(usd(5980));
         await expect(main).toContainText(`Passed on at cost: ${usd(480)} · ours to carry: ${usd(38)}.`);
-        await expect(sheet.locator("[data-figure=price]")).toHaveText(usd(6460));
-        await expect(main).toContainText(`Sales tax 8.5%, added on the invoice${usd(549.1)}`);
-        await expect(sheet.locator("[data-figure=total]")).toHaveText(usd(7009.1));
+        // The price is what the proposal will carry: the purchases go on the invoice at cost, apart.
+        await expect(sheet.locator("[data-figure=price]")).toHaveText(usd(5980));
+        await expect(main).toContainText(`Sales tax 8.5%, added on the invoice${usd(508.3)}`);
+        await expect(sheet.locator("[data-figure=total]")).toHaveText(usd(6488.3));
+        await expect(main).toContainText(`Purchases, passed on separately at cost${usd(480)}`);
         await expect(main).toContainText("39 h of work — 6.5 studio days, or 3.3 each if you both take it.");
         await expect(main).toContainText("2 of you at 4 days a week is 8 studio days a week, so this stage fills about 0.8 weeks of the calendar.");
         await expect(main).toContainText(`${usd(920)} a day`);
-        await expect(main).toContainText("2.3 months of fixed costs");
+        await expect(main).toContainText("2.1 months of fixed costs");
         await expect(main).toContainText(`Your running costs come to ${usd(2850)} a month before anyone is paid.`);
-        await expect(main).toContainText(`To start, before anything moves${usd(3504.55)}`);
+        // Half the subtotal and its tax: the stage invoice Adminium will draw.
+        await expect(main).toContainText(`To start, before anything moves${usd(3244.15)}`);
         await expect(main).toContainText("The sheet says 6.5 days. History says budget 6.6 and be pleasantly surprised.");
       }
       await shoot(page, "scoping-worked", variant);
@@ -140,7 +143,8 @@ test("the scoping worksheet — every state, light, dark, Arabic, phone — at t
       if (variant === "light") {
         // 6 × 0.02 days at $750, 0.02 half days at $400, 0.24 templates at $90.
         await expect(main).toContainText(`Contingency, 2% from your record${usd(119.6)}`);
-        await expect(sheet.locator("[data-figure=price]")).toHaveText(usd(6579.6));
+        await expect(sheet.locator("[data-figure=price]")).toHaveText(usd(6099.6));
+        await expect(sheet.locator("[data-figure=total]")).toHaveText(usd(6618.07));
       }
       await shoot(page, "scoping-reserve", variant);
     });
@@ -170,7 +174,7 @@ test("the scoping worksheet — every state, light, dark, Arabic, phone — at t
         expect(new Set(lines.map((l) => l["client_key"])).size).toBe(6);
         expect(lines.every((l) => typeof l["client_key"] === "string")).toBe(true);
         expect(lines.some((l) => String(l["description"]).includes("Type licence"))).toBe(false);
-        // The figures are Adminium's, and the composer shows them.
+        // The figures are Adminium's — the same the page showed before the press — and the composer shows them.
         expect([Number(draft["subtotal"]), Number(draft["tax"]), Number(draft["total"])]).toEqual([6099.6, 518.47, 6618.07]);
         await expect(screenOf(page, "composer")).toContainText(usd(6618.07));
         await shoot(page, "scoping-turned-composer", variant);

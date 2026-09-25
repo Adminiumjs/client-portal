@@ -39,6 +39,8 @@ export async function loadPurchases(since: Day | null = null): Promise<Expense[]
     ensureRows("projects", rows.map((r) => r.project_id)),
     ensureRows("clients", rows.map((r) => r.client_id)),
   ]);
+  // The invoices the lines are on: one that was voided passed nothing on.
+  await ensureRows("invoices", linesCarrying("expense_id", ids).map((l) => l.document_id));
   return rows;
 }
 
@@ -63,11 +65,16 @@ export function loadStudioDates(from: Day, to: Day): Promise<StudioEvent[]> {
   );
 }
 
-/** How a purchase stands: passed on (a line carries it), still to pass on, or the studio's own to carry. */
-export type PurchaseState = "passed-on" | "to-pass-on" | "ours";
+/**
+ * How a purchase stands: passed on (a line carries it), on a voided invoice
+ * (a line carries it, but that invoice was voided: nothing was charged), still
+ * to pass on, or the studio's own to carry.
+ */
+export type PurchaseState = "passed-on" | "voided" | "to-pass-on" | "ours";
 
 export function purchaseState(expense: Expense): PurchaseState {
-  if (linesCarrying("expense_id", [expense.id]).length > 0) return "passed-on";
+  const line = linesCarrying("expense_id", [expense.id])[0];
+  if (line !== undefined) return useDesk.getState().rows.invoices[line.document_id]?.status === "void" ? "voided" : "passed-on";
   return expense.rebill ? "to-pass-on" : "ours";
 }
 
@@ -203,7 +210,6 @@ export async function passOn(expenseIds: readonly Id[], input: { newTitle: (clie
   const expenses = expenseIds.map((id) => held[id]).filter((e): e is Expense => e !== undefined && e.rebill && e.client_id !== null);
   if (expenses.length === 0) return { ok: true, value: { invoices: [], lines: [], skipped: [] } };
   return ontoDrafts(
-    "purchases-passed-on",
     "expense_id",
     expenses.map((e) => ({ id: e.id, clientId: e.client_id as Id, projectId: e.project_id, description: e.what, qty: "1", rate: e.amount })),
     input.newTitle,

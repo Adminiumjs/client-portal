@@ -12,7 +12,8 @@ import { describe, expect, it } from "vitest";
 import { resolveSample, type SampleBundleRows } from "../../data/sampleRows.ts";
 import type { Enquiry, Id, Proposal, ProposalLine, Rate } from "../../data/types.ts";
 import { capacityWeeks } from "../../state/capacity.ts";
-import { dayRate, enquiriesAsking, fitOf, loadBefore, proposalDays, squaresOf, startFloor, weekRows, type OutProposal } from "./model.ts";
+import { dayRateOf } from "../../lib/rateCard.ts";
+import { enquiriesAsking, fitOf, loadBefore, proposalDays, squaresOf, startFloor, weekRows, type OutProposal } from "./model.ts";
 
 const bundle = JSON.parse(readFileSync(fileURLToPath(new URL("../../../seeds/clients.sample.json", import.meta.url)), "utf8")) as SampleBundleRows;
 const rows = resolveSample(bundle, { now: Date.parse("2026-07-28T14:00:00Z"), zone: "America/New_York", locale: "en-US", currency: "USD" });
@@ -75,8 +76,14 @@ describe("the sample's weeks, at 28 July", () => {
 
 describe("the proposal still out", () => {
   it("is QUO-S1142, 5 studio days: its lines name no rate, so its subtotal over the day rate", () => {
-    expect(dayRate(rates, 6)).toBe(750);
+    expect(Number(dayRateOf(rates, 6)?.amount)).toBe(750);
     expect(out).toEqual([{ id: quo1142.id, number: "QUO-S1142", days: 5 }]);
+  });
+
+  it("knows no days for a proposal when no rate on the card is a whole working day — none is guessed from a half day", () => {
+    const halfDayOnly = rates.map((r) => (Number(r.hours_per_unit) === 6 ? { ...r, active: false } : r));
+    expect(proposalDays({ subtotal: "3750", total: null }, [], halfDayOnly, 6)).toBeNull();
+    expect(proposalDays({ subtotal: "3750", total: null }, [], rates, 6)).toBe(5);
   });
 
   it("counts a proposal's hours when every line is named after a rate with hours", () => {

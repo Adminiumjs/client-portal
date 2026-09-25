@@ -55,6 +55,34 @@ describe("Expenses, drawn", () => {
     expect(words).toMatch(/Everything 3 .*To pass on 2 .*Passed on 0 .*Ours 1/);
   });
 
+  it("says a purchase on a voided invoice was never charged, counts it as waiting, and does not offer to pass it on", async () => {
+    const out = await passOn([1], TITLE);
+    if (!out.ok) throw new Error(out.code);
+    const invoiceId = out.value.invoices[0]!.id;
+    await studio.world.writes.update("invoices", invoiceId, { status: "sent" });
+    await studio.world.writes.update("invoices", invoiceId, { status: "void", void_reason: "Raised in error" });
+    const { refreshRows } = await import("../../state/desk.ts");
+    await refreshRows("invoices", [invoiceId]);
+    const html = draw(<Expenses />);
+    const words = text(html);
+    expect(html).toContain("ex-tag--voided");
+    expect(words).toContain("Invoice voided");
+    expect(words).toContain("To put on an invoice $110.40 2 purchases waiting");
+    expect(words).toMatch(/Everything 3 .*To pass on 2 .*Passed on 0 .*Ours 1/);
+    // "Pass on" takes only the one no line holds.
+    expect(html).toMatch(/ex-foot-amt money">\$24\.00</);
+    const sheet = text(draw(<PurchaseSheet expense={useDesk.getState().rows.expenses[1]!} onClose={() => undefined} />));
+    expect(sheet).toContain("which was voided: nothing was charged for it");
+    expect(sheet).not.toContain(t("expenses.sheet.takeOff"));
+    // The other one passed on and voided too: nothing Pass on can take, and the foot says why.
+    const other = await passOn([2], TITLE);
+    if (!other.ok) throw new Error(other.code);
+    await studio.world.writes.update("invoices", other.value.invoices[0]!.id, { status: "sent" });
+    await studio.world.writes.update("invoices", other.value.invoices[0]!.id, { status: "void", void_reason: "Raised in error" });
+    await refreshRows("invoices", [other.value.invoices[0]!.id]);
+    expect(text(draw(<Expenses />))).toContain("Nothing can be passed on: the rest is held by a voided invoice");
+  });
+
   it("lists the purchases newest first, whose each is, and a chip for how it stands", () => {
     const html = draw(<Expenses />);
     const words = text(html);
@@ -73,8 +101,13 @@ describe("Expenses, drawn", () => {
     expect(words).toContain("Already passed on $86.40 at cost, on their invoices");
     const sheet = text(draw(<PurchaseSheet expense={useDesk.getState().rows.expenses[1]!} onClose={() => undefined} />));
     expect(sheet).toContain("On Marigold Lane’s draft invoice at cost".replace("Marigold Lane", useDesk.getState().rows.clients[2]!.company));
-    expect(sheet).toContain("Take it off the draft");
+    expect(draw(<PurchaseSheet expense={useDesk.getState().rows.expenses[1]!} onClose={() => undefined} />)).toMatch(/<button[^>]*>(<svg.*?<\/svg>)?Take it off the draft<\/button>/);
     expect(sheet).not.toContain("Remove this purchase");
+    // The Studio role removes nothing: no button whose write Adminium would refuse, and who can.
+    useDesk.setState((s) => ({ me: { ...s.me, manager: false, access: { tables: { invoice_lines: ["read", "create", "update"], expenses: ["read", "create", "update"] }, roles: [{ slug: "studio", name: "Studio" }] } } }));
+    const studioSheet = draw(<PurchaseSheet expense={useDesk.getState().rows.expenses[1]!} onClose={() => undefined} />);
+    expect(studioSheet).not.toMatch(/<button[^>]*>(<svg.*?<\/svg>)?Take it off the draft<\/button>/);
+    expect(text(studioSheet)).toContain("A studio manager can take it off the draft.");
   });
 
   it("says nothing waits when every purchase is passed on or ours", async () => {

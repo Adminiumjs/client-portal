@@ -21,6 +21,8 @@ import type { ListCondition } from "../data/snapshotPort.ts";
 import { TABLE_REFS, type Id, type TableRef, type Tables } from "../data/types.ts";
 import { venueDay } from "../data/venueTime.ts";
 import { openWork } from "../data/adminiumSource.ts";
+import { MAX_IN_VALUES } from "../data/inChunks.ts";
+import { COLUMNS } from "../data/sampleRows.ts";
 import { clockJumped } from "../lib/clock.ts";
 import { createEngine, drawCode, Refusal, type Row, type Rows, type Writer } from "./engine.ts";
 import { createOutbox } from "./outbox.ts";
@@ -124,6 +126,26 @@ export function matches(row: Record<string, unknown>, where: ListCondition | und
       return value === null || value === undefined;
     case "not_null":
       return value !== null && value !== undefined;
+  }
+}
+
+/**
+ * A read's condition as the data API checks it before reading anything: every
+ * column one the table has (422 `UNKNOWN_IDENTIFIER`), every `in` list at most
+ * 200 values long (422 `VALIDATION_FAILED`).
+ */
+export function checkWhere(ref: TableRef, where: ListCondition | undefined): void {
+  if (where === undefined) return;
+  if ("and" in where || "or" in where) {
+    for (const child of "and" in where ? where.and : where.or) checkWhere(ref, child);
+    return;
+  }
+  const columns = (COLUMNS[ref] as Record<string, unknown> | undefined) ?? {};
+  if (where.column !== "id" && !(where.column in columns)) {
+    throw new PortError("UNKNOWN_IDENTIFIER", `Unknown column ${JSON.stringify(where.column)} on ${ref}.`, 422, { table: ref, column: where.column });
+  }
+  if (where.op === "in" && (!Array.isArray(where.value) || where.value.length > MAX_IN_VALUES)) {
+    throw new PortError("VALIDATION_FAILED", "`in` takes an array of at most 200 values.", 422, { column: where.column });
   }
 }
 
@@ -255,8 +277,12 @@ export function createWorld(source: Seed | SampleSource, base: () => number, zon
       return snap;
     },
     rows: async (ref, ids) => select(ref, { column: "id", op: "in", value: [...ids] }),
-    where: async (ref, where, order, limit = 2000) => select(ref, where, order).slice(0, limit),
+    where: async (ref, where, order, limit = 2000) => {
+      checkWhere(ref, where);
+      return select(ref, where, order).slice(0, limit);
+    },
     async page<R extends TableRef>(ref: R, query: { where?: ListCondition; order?: string; limit: number; offset: number; count?: boolean }): Promise<Page<Tables[R]>> {
+      checkWhere(ref, query.where);
       const all = select(ref, query.where, query.order);
       return { rows: all.slice(query.offset, query.offset + query.limit), total: query.count === true ? all.length : null };
     },
@@ -378,6 +404,7 @@ export function createWorld(source: Seed | SampleSource, base: () => number, zon
       },
       list: async (ref, where, order, limit = 200) => {
         guard();
+        checkWhere(ref, where);
         const open = ref === "settings" || ref === "people" || ref === "brief_questions" || ref === "terms_versions" || ref === "terms_clauses";
         return sortRows(engine.rows[ref].filter((r) => (open || own(ref)(r)) && matches(r, where)), order)
           .slice(0, limit)

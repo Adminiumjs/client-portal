@@ -33,6 +33,8 @@ export interface Selected {
   client: Id | null;
   deliverable: Id | null;
   payment: Id | null;
+  /** The enquiry the Enquiries screen opens on (Capacity's "Open the enquiry"); the newest when none. */
+  enquiry: Id | null;
 }
 
 /** A printed copy: the add-on's document for one row (a statement over a client, for a period). */
@@ -91,7 +93,7 @@ export interface UiState {
   invoiceFilter: InvoiceFilter | null;
 }
 
-const NOTHING: Selected = { proposal: null, invoice: null, project: null, client: null, deliverable: null, payment: null };
+const NOTHING: Selected = { proposal: null, invoice: null, project: null, client: null, deliverable: null, payment: null, enquiry: null };
 
 export const useUi = create<UiState>(() => ({
   persona: "studio",
@@ -180,6 +182,12 @@ export function usePrintTarget(): PrintTarget | null {
   const print = useUi((s) => s.print);
   const invoice = useUi((s) => s.selected.invoice);
   return printTargetOf({ print, selected: { ...NOTHING, invoice } });
+}
+
+/** Open the Enquiries screen on one enquiry. */
+export function openEnquiry(id: Id): void {
+  useUi.setState((s) => ({ view: "enquiries", selected: { ...s.selected, enquiry: id }, menu: false }));
+  scrollTop();
 }
 
 /** Open the Invoices list on one aging bucket (Home's aging chips). */

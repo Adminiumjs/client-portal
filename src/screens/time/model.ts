@@ -11,12 +11,14 @@
  *   filters      Everything, then one per project with time logged, named by
  *                its client (and the project, when a client has more than one)
  *   rows         newest first; a running clock is not a row (it has no hours)
- *   the rate     the rate card's day rate over the hours in a working day
+ *   the rate     the rate card's day rate (the rate that is one working day)
+ *                over the hours in a working day
  *   a move       what "Move onto an invoice" would put where: per client, the
  *                hours, the amount at the rate, and the draft it lands on
  */
 import type { Day, Decimal, Id, Invoice, Milestone, Person, Project, Rate, Settings, TimeEntry } from "../../data/types.ts";
 import { sumDecimals } from "../../lib/money.ts";
+import { dayRateOf } from "../../lib/rateCard.ts";
 import { hourlyRate } from "../../state/timeActions.ts";
 
 /** An entry with hours: a stopped clock, or time logged by hand. */
@@ -36,10 +38,20 @@ export interface TimeSums {
   month: Decimal;
   /** The projects those hours went on. */
   monthProjects: number;
-  /** Hours no line carries yet. */
+  /** Hours no invoice bills: no line carries them, or only a voided invoice's line does. */
   notInvoiced: Decimal;
   /** The project with the most hours, and its hours; null with no time at all. */
   heaviest: { projectId: Id; hours: Decimal } | null;
+}
+
+/**
+ * The entries an invoice bills: those a line carries, unless that line's
+ * invoice was voided — a voided invoice charges nothing, so its hours count as
+ * not invoiced (though the voided line still holds them: they cannot go on
+ * another invoice).
+ */
+export function billedEntries(invoicedBy: ReadonlyMap<Id, Id>, invoices: Readonly<Record<Id, Pick<Invoice, "status">>>): Set<Id> {
+  return new Set([...invoicedBy].filter(([, invoiceId]) => invoices[invoiceId]?.status !== "void").map(([entryId]) => entryId));
 }
 
 export function timeSums(entries: readonly TimeEntry[], invoiced: ReadonlySet<Id>, today: Day): TimeSums {
@@ -110,19 +122,16 @@ export function rowsFor(entries: readonly TimeEntry[], filter: TimeFilter): Time
   return entries.filter((e) => isLogged(e) && (projectId === null || e.project_id === projectId)).sort(newestFirst);
 }
 
-/** The day rate: the first rate on the card still in use. */
-export function dayRate(rates: readonly Rate[]): Rate | null {
-  return [...rates].filter((r) => r.active).sort((a, b) => a.position - b.position || a.id - b.id)[0] ?? null;
-}
-
 /**
- * The hourly rate lines carry: the day rate over the hours in a working day,
- * to the cent — exact, never a float. Null without a rate or hours.
+ * The hourly rate lines carry: the day rate (the rate on the card that is one
+ * working day, `dayRateOf`) over the hours in a working day, to the cent —
+ * exact, never a float. Null when the card has no day rate: hours are never
+ * billed at a rate worked out from some other one.
  */
 export function hourly(rates: readonly Rate[], settings: Pick<Settings, "hours_per_day"> | null): Decimal | null {
-  const rate = dayRate(rates);
   const hours = settings?.hours_per_day;
-  if (rate === null || hours === undefined || hours === null || hours <= 0) return null;
+  const rate = dayRateOf(rates, hours);
+  if (rate === null || hours === undefined) return null;
   return hourlyRate({ amount: rate.amount, hours_per_unit: String(hours) });
 }
 

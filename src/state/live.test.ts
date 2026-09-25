@@ -8,6 +8,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { fakeStudio, type FakeStudio } from "../testing/fakeStudio.ts";
 import { applyFrame, flush, resync } from "./live.ts";
+import { loadPurchases, loadStudioDates } from "./officeActions.ts";
+import { loadTime } from "./timeActions.ts";
 import { loadInvoice, rowsOf, useDesk } from "./desk.ts";
 import { open } from "./ui.ts";
 
@@ -57,5 +59,18 @@ describe("after a reconnect", () => {
     await resync();
     expect(useDesk.getState().rows.enquiries[2]).toBeUndefined();
     expect(rowsOf(useDesk.getState(), "payments").map((p) => p.document_id)).toEqual([2]);
+  });
+
+  it("keeps what the read set does not cover until the screen on show reads it again, and tells the screens to", async () => {
+    await loadPurchases(null);
+    await loadTime("2000-01-01");
+    await loadStudioDates("2026-07-01", "2026-08-31");
+    const before = useDesk.getState().reads;
+    const held = (s = useDesk.getState()) => [rowsOf(s, "expenses").length, rowsOf(s, "time_entries").length, rowsOf(s, "events").length, rowsOf(s, "suppliers").length];
+    expect(held()).toEqual([3, 3, 2, 2]);
+    await resync();
+    // Purchases, time, studio dates and suppliers are not in the read set: they stay, rather than empty the screens.
+    expect(held()).toEqual([3, 3, 2, 2]);
+    expect(useDesk.getState().reads).toBe(before + 1);
   });
 });

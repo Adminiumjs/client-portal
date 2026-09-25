@@ -1,7 +1,9 @@
 /**
  * The entries themselves: who (their initials), what the hours went on,
  * client · milestone · day, the hours, and whether a line of an invoice
- * carries them — "Invoiced" opens that invoice; "Not invoiced" is only a word.
+ * carries them — "Invoiced" opens that invoice; "Invoice voided" opens the
+ * voided one (nothing was charged, and its line still holds the hours);
+ * "Not invoiced" is only a word.
  * While the entries are read, a loading line; a failed read, the words and
  * "Try again"; no time at all, the empty card.
  */
@@ -60,6 +62,12 @@ export function Entries({ load, rows, invoicedBy, onRetry }: { load: "loading" |
                 <span className="time-row-hours">{hours(entry.hours)}</span>
                 {invoiceId === undefined ? (
                   <span className="time-chip">{t("time.row.notInvoiced")}</span>
+                ) : invoice?.status === "void" ? (
+                  // Its invoice was voided: nothing was charged, and the voided line still holds the hours.
+                  <button type="button" className="time-chip time-chip--void ol-chip" title={t("time.row.voidedHint")} onClick={() => open("invoice", invoiceId)}>
+                    {t("time.row.voided")}
+                    <span className="ol-sr-only">{` · ${invoice.number ?? ""} · ${t("time.row.voidedHint")}`}</span>
+                  </button>
                 ) : (
                   <button type="button" className="time-chip time-chip--on ol-chip" onClick={() => open("invoice", invoiceId)}>
                     {t("time.row.invoiced")}

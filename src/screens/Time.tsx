@@ -25,7 +25,7 @@ import { Alert, Button, Filters, ScreenHead } from "../components/ui.tsx";
 import type { Decimal, Id, Project, TimeEntry } from "../data/types.ts";
 import { useI18n } from "../i18n/index.tsx";
 import { today } from "../lib/clock.ts";
-import { ensureRows, refreshRows, useDesk, useRows, useSettings } from "../state/desk.ts";
+import { ensureRows, refreshRows, useDesk, useDeskReads, useRows, useSettings } from "../state/desk.ts";
 import { loadRunningClocks, loadTime } from "../state/timeActions.ts";
 import { toast } from "../state/ui.ts";
 import MoveOntoInvoice from "../sheets/time/MoveOntoInvoice.tsx";
@@ -34,7 +34,7 @@ import StopClock from "../sheets/time/StopClock.tsx";
 import { Clocks, type ClockView } from "./time/Clocks.tsx";
 import { Entries } from "./time/Entries.tsx";
 import { LogForm, type LogDraft } from "./time/LogForm.tsx";
-import { amountAt, filterChoices, filterProject, hourly, inOrder, isRunning, monthStart, openProjects, personOf, rowsFor, sumHours, timeSums, type TimeFilter } from "./time/model.ts";
+import { amountAt, billedEntries, filterChoices, filterProject, hourly, inOrder, isRunning, monthStart, openProjects, personOf, rowsFor, sumHours, timeSums, type TimeFilter } from "./time/model.ts";
 import { stopOrAsk } from "./time/act.ts";
 import { hoursLabel, type Words } from "./time/words.ts";
 
@@ -54,6 +54,7 @@ export default function Time() {
   const heldLines = useDesk((s) => s.rows.invoice_lines);
   const projects = useDesk((s) => s.rows.projects);
   const clients = useDesk((s) => s.rows.clients);
+  const invoices = useDesk((s) => s.rows.invoices);
   const me = useDesk((s) => s.me);
   const people = inOrder(useRows("people"));
   const rates = useRows("rates");
@@ -82,20 +83,11 @@ export default function Time() {
       setLoad("failed");
     }
   }, []);
+  // Read again whenever the desk is (a reconnect, the demo's reset): what moved meanwhile was never announced.
+  const reads = useDeskReads();
   useEffect(() => {
     void read();
-  }, [read]);
-
-  // A reconnect reads the desk's open work again from scratch, which holds no time: read it again too.
-  const heldCount = Object.keys(heldEntries).length;
-  const [hadEntries, setHadEntries] = useState(false);
-  useEffect(() => {
-    if (heldCount > 0) setHadEntries(true);
-    else if (hadEntries && load === "ready") {
-      setHadEntries(false);
-      void read();
-    }
-  }, [heldCount, hadEntries, load, read]);
+  }, [read, reads]);
 
   // A clock started or stopped on another computer shows when this one is looked at again.
   useEffect(() => {
@@ -114,17 +106,22 @@ export default function Time() {
     for (const line of Object.values(heldLines)) if (line.time_entry_id !== null) out.set(line.time_entry_id, line.document_id);
     return out;
   }, [heldLines]);
+  /** Carried by a line (a voided invoice's included): these cannot be moved onto another invoice. */
   const invoiced = useMemo(() => new Set(invoicedBy.keys()), [invoicedBy]);
+  /** Billed by an invoice that is not voided: what the sums count as invoiced. */
+  const billed = useMemo(() => billedEntries(invoicedBy, invoices), [invoicedBy, invoices]);
 
   const companyOfClient = (clientId: Id | null | undefined): string => (clientId === null || clientId === undefined ? "" : (clients[clientId]?.company ?? ""));
   const companyOf = (project: Project | undefined): string => companyOfClient(project?.client_id);
 
   const rate = hourly(rates, settings);
-  const sums = useMemo(() => timeSums(entries, invoiced, day), [entries, invoiced, day]);
+  const sums = useMemo(() => timeSums(entries, billed, day), [entries, billed, day]);
   const choices = useMemo(() => filterChoices(entries, projects, (id) => clients[id]?.company ?? null), [entries, projects, clients]);
   const current: TimeFilter = choices.some((c) => c.id === filter) ? filter : "all";
   const rows = useMemo(() => rowsFor(entries, current), [entries, current]);
   const notInvoiced = rows.filter((e) => !invoiced.has(e.id));
+  /** On show, not billed, and held by a voided invoice's line: nothing to move, and not "all invoiced" either. */
+  const onVoided = rows.some((e) => invoiced.has(e.id) && !billed.has(e.id));
   const footHours = sumHours(notInvoiced);
   const selectedProject = filterProject(current);
 
@@ -167,7 +164,7 @@ export default function Time() {
 
   const moveOrSay = () => {
     if (notInvoiced.length === 0) {
-      toast(t("time.foot.allInvoicedToast"), { icon: "check" });
+      toast(onVoided ? t("time.foot.voidedOnly") : t("time.foot.allInvoicedToast"), { icon: onVoided ? "info" : "check" });
       return;
     }
     setSheet({ kind: "move" });
@@ -242,7 +239,7 @@ export default function Time() {
         )}
 
         <div className="time-foot">
-          <span className="time-foot-label">{notInvoiced.length === 0 ? t("time.foot.none") : selectedProject === null ? t("time.foot.all") : t("time.foot.project", { project: projects[selectedProject]?.name ?? "" })}</span>
+          <span className="time-foot-label">{notInvoiced.length === 0 ? (onVoided ? t("time.foot.voidedOnly") : t("time.foot.none")) : selectedProject === null ? t("time.foot.all") : t("time.foot.project", { project: projects[selectedProject]?.name ?? "" })}</span>
           <span className="time-foot-figures">
             {hours(footHours)}
             {rate !== null && ` · ${money(amountAt(footHours, rate))}`}

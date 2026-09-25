@@ -21,6 +21,7 @@ import type { ListCondition } from "../data/snapshotPort.ts";
 import { TABLE_REFS, type Day, type Id, type TableRef, type Tables } from "../data/types.ts";
 import type { StaffAccess, TableAction } from "../staffConnection.ts";
 import { daysBetween } from "../data/venueTime.ts";
+import { readInChunks } from "../data/inChunks.ts";
 import { now, studioZone, today } from "../lib/clock.ts";
 
 export type ById<T> = Record<Id, T>;
@@ -51,20 +52,35 @@ export interface DeskState {
   rows: Held;
   /** The add-ons' settings the desk has read (the invoices add-on's defaults, letterhead, instructions …). */
   addOns: Record<string, AddOnSettings>;
+  /** The Adminium system actions the person holds (`settings.manage` …); null until read, or where nothing says. */
+  systemActions: string[] | null;
+  /**
+   * How many times the desk's boot read set has been read again (a reconnect,
+   * the demo's reset). A screen that reads more than the open work (time,
+   * purchases, the archive …) reads again when this moves: what was announced
+   * while the connection was down is gone.
+   */
+  reads: number;
 }
 
 const emptyHeld = (): Held => Object.fromEntries(TABLE_REFS.map((ref) => [ref, {}])) as Held;
 const EMPTY_ME: Me = { name: "", email: null, roleName: null, manager: false, access: null };
 
-export const useDesk = create<DeskState>(() => ({ load: "loading", loadError: null, me: EMPTY_ME, today: "", rows: emptyHeld(), addOns: {} }));
+export const useDesk = create<DeskState>(() => ({ load: "loading", loadError: null, me: EMPTY_ME, today: "", rows: emptyHeld(), addOns: {}, systemActions: null, reads: 0 }));
 
 // ── the doors, set once at boot ─────────────────────────────────────────────
 
 let reads: DeskReads | null = null;
 let writes: DeskWrites | null = null;
 
+/**
+ * Set the desk's reads. Every read by a condition goes through
+ * `readInChunks`: Adminium takes at most 200 values in one `in` list, and the
+ * desk asks by lists it cannot bound (the lines of every entry it read), so a
+ * longer list is asked in pieces and the answers merged.
+ */
 export function setDeskReads(next: DeskReads): void {
-  reads = next;
+  reads = { ...next, where: (ref, where, order, limit) => readInChunks((piece) => next.where(ref, piece ?? where, order, limit), where, order, limit) };
 }
 export function deskReads(): DeskReads {
   if (reads === null) throw new Error("the desk's reads are not set: boot sets them before any screen mounts");
@@ -80,7 +96,7 @@ export function deskWrites(): DeskWrites {
 
 /** Forget everything (a test, the demo's reset). */
 export function resetDesk(): void {
-  useDesk.setState({ load: "loading", loadError: null, today: "", rows: emptyHeld(), addOns: {} });
+  useDesk.setState({ load: "loading", loadError: null, today: "", rows: emptyHeld(), addOns: {}, systemActions: null });
 }
 
 // ── folding rows in ─────────────────────────────────────────────────────────
@@ -107,9 +123,14 @@ export function drop(ref: TableRef, id: Id): void {
   });
 }
 
-/** Replace everything the desk holds with a fresh boot read set (boot, and after a reconnect). */
-export function applySnapshot(snap: DeskSnapshot): void {
-  const rows = emptyHeld();
+/**
+ * Replace what the desk holds with a fresh boot read set (boot, the demo's
+ * reset, and after a reconnect). After a reconnect (`keep`), the tables the
+ * read set does not cover — time, purchases, lines, studio dates … — stay as
+ * they were until the screen on show reads them again, rather than empty.
+ */
+export function applySnapshot(snap: DeskSnapshot, keep = false): void {
+  const rows = keep ? { ...useDesk.getState().rows } : emptyHeld();
   const put = <R extends TableRef>(ref: R, list: readonly Tables[R][]) => {
     rows[ref] = Object.fromEntries(list.map((row) => [row.id, row])) as Held[R];
   };
@@ -126,7 +147,7 @@ export function applySnapshot(snap: DeskSnapshot): void {
   put("enquiries", snap.enquiries);
   put("messages", snap.messages);
   put("clients", snap.clients);
-  useDesk.setState({ load: "ready", loadError: null, today: snap.today, rows });
+  useDesk.setState((s) => ({ load: "ready", loadError: null, today: snap.today, rows, reads: s.reads + 1 }));
 }
 
 /** Read the desk's boot read set for today. */
@@ -326,6 +347,24 @@ export function addOnText(settings: Record<string, unknown> | null, name: string
 // ── who may do what ─────────────────────────────────────────────────────────
 
 /**
+ * Read which of Adminium's own actions the person holds (once a visit; the
+ * Emails screen asks). A refused read holds none; a door with no such read
+ * (the demo) leaves it unsaid.
+ */
+export async function loadSystemActions(): Promise<void> {
+  const read = writes?.systemActions;
+  if (typeof read !== "function" || useDesk.getState().systemActions !== null) return;
+  try {
+    useDesk.setState({ systemActions: await read.call(writes) });
+  } catch {
+    useDesk.setState({ systemActions: [] });
+  }
+}
+
+/** Whether the person holds one of Adminium's system actions; null when that is not known (not read yet, or nothing says). */
+export const useHoldsSystemAction = (key: string): boolean | null => useDesk((s) => (s.systemActions === null ? null : s.systemActions.includes(key)));
+
+/**
  * Whether the signed-in person may do this to a table, as the server would
  * judge it. When the server did not say, every button shows and the server
  * refuses what it refuses.
@@ -340,6 +379,9 @@ export function can(table: TableRef, action: TableAction): boolean {
 export function useCan(table: TableRef, action: TableAction): boolean {
   return useDesk((s) => (s.me.access === null ? true : (s.me.access.tables[table] ?? []).includes(action)));
 }
+
+/** How many times the desk has been read again: a screen's reads depend on it, so they run again after a reconnect. */
+export const useDeskReads = (): number => useDesk((s) => s.reads);
 
 /** A studio manager (voids, discarding a draft, reopening, settings, terms). */
 export const useManager = (): boolean => useDesk((s) => s.me.manager);

@@ -25,7 +25,7 @@ import { venueDay } from "./data/venueTime.ts";
 import { DEMO_LINK_TOKEN, demoWorld, type DemoWorld } from "./demo/world.ts";
 import { demoText } from "./demo/strings.ts";
 import { setHostLocale } from "./i18n/index.tsx";
-import { locale as currentLocale } from "./i18n/ambient.ts";
+import { locale as currentLocale, onLocaleApplied } from "./i18n/ambient.ts";
 import { formatMoney } from "./lib/money.ts";
 import { DEMO_ZONE } from "./lib/clock.ts";
 import type { Persona, View } from "./app/routes.ts";
@@ -356,7 +356,8 @@ export function startDemoBridge(): () => void {
     setTimeout(report, 50);
   };
   window.addEventListener("message", onMessage);
-  const unsubscribe = [useUi.subscribe(report), useSheets.subscribe(report), demoWorld()?.onReload(report) ?? (() => {})];
+  // The language is on screen only after the render that applies it: report again then, so the card shows it.
+  const unsubscribe = [useUi.subscribe(report), useSheets.subscribe(report), demoWorld()?.onReload(report) ?? (() => {}), onLocaleApplied(report)];
   post({ type: "adminium:demo:hello", dv: DEMO_PROTOCOL_VERSION, appKey: DEMO_APP_KEY });
   return () => {
     window.removeEventListener("message", onMessage);

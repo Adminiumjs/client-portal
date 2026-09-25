@@ -252,6 +252,11 @@ export function sessionSink(transport: SessionTransport, tableOf: Readonly<Recor
         throw error;
       }
     },
+    async systemActions() {
+      const reply = await raw<{ data?: { systemActions?: unknown } }>("/api/v1/bootstrap", "GET");
+      const held = reply.data?.systemActions;
+      return Array.isArray(held) ? held.filter((a): a is string => typeof a === "string") : [];
+    },
     async testEmail(templateId, to, document) {
       const reply = await raw<{ queued?: number }>(`/api/v1/email-templates/${encodeURIComponent(templateId)}/test-send`, "POST", JSON.stringify({ to, document }), "application/json");
       return { queued: reply.queued ?? 0 };
@@ -266,19 +271,6 @@ export function actionKey(): string {
   return typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
     ? crypto.randomUUID()
     : "xxxxxxxx-xxxx-4xxx-8xxx-xxxxxxxxxxxx".replace(/x/g, () => Math.floor(Math.random() * 16).toString(16));
-}
-
-/**
- * An action key made from what the action is ABOUT, not drawn at random: the
- * same parts give the same 36 characters on every computer. An action that
- * must happen once per thing — moving these hours onto an invoice, passing
- * these purchases on — runs under it, so a second press (or a second tab)
- * finds every row the first one saved by its key and adds nothing.
- */
-export function keyFor(...parts: readonly string[]): string {
-  const text = parts.join("\u0000");
-  const hex = ["a", "b", "c", "d"].map((salt) => hash8(`${salt}\u0000${text}`)).join("");
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
 }
 
 /** FNV-1a, 32 bits, as 8 hex characters. */

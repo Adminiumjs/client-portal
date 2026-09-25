@@ -335,6 +335,11 @@
   background: var(--pos-soft);
   color: var(--pos);
 }
+/* On a voided invoice: nothing was charged; the chip opens that invoice. */
+.time-chip--void {
+  cursor: pointer;
+  border-style: dashed;
+}
 .time-more {
   display: flex;
   justify-content: center;

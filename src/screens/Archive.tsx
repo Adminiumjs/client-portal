@@ -19,14 +19,15 @@ import { useI18n } from "../i18n/index.tsx";
 import { tenantCurrency } from "../i18n/ambient.ts";
 import { dayLabel } from "../lib/dates.ts";
 import type { Day } from "../data/types.ts";
-import { useDesk } from "../state/desk.ts";
+import { useDesk, useDeskReads } from "../state/desk.ts";
 import { open } from "../state/ui.ts";
 import { loadArchive } from "./archive/load.ts";
 import { byYear, finished, search, worth } from "./archive/model.ts";
 
-/** The finished projects, their sent invoices and their clients, read when the desk knows its day. */
+/** The finished projects, their sent invoices and their clients, read when the desk knows its day (and again after a reconnect). */
 function useFinished(today: string): boolean {
   const [loaded, setLoaded] = useState(false);
+  const reads = useDeskReads();
   useEffect(() => {
     if (today === "") return;
     let live = true;
@@ -38,7 +39,7 @@ function useFinished(today: string): boolean {
     return () => {
       live = false;
     };
-  }, [today]);
+  }, [today, reads]);
   return loaded;
 }
 

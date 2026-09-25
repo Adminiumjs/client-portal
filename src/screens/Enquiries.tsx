@@ -24,7 +24,7 @@ import { loadPage, useDesk, useRows } from "../state/desk.ts";
 import { refusalKey } from "../state/outcome.ts";
 import { useDemoSignal } from "../state/demoSignal.ts";
 import { openSheet } from "../state/sheets.ts";
-import { open, openComposer, toast } from "../state/ui.ts";
+import { open, openComposer, toast, useUi } from "../state/ui.ts";
 import { byReceived, callDraft, ENQUIRY_FILTERS, ENQUIRY_WORD, firstName, inEnquiryFilter, nextUnanswered, replyFor, summary, type EnquiryFilter } from "./enquiries/model.ts";
 
 /** How long ago something came in, in the page's language ("4 hours ago", "yesterday", "12 Jul"). */
@@ -51,6 +51,7 @@ export default function Enquiries() {
   const held = useRows("enquiries");
   const [filter, setFilter] = useState<EnquiryFilter>("all");
   const [openId, setOpenId] = useState<Id | null>(null);
+  const asked = useUi((s) => s.selected.enquiry);
   const [replies, setReplies] = useState<Record<number, string>>({});
   const [busy, setBusy] = useState<"reply" | "park" | "decline" | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -87,7 +88,8 @@ export default function Enquiries() {
   const unanswered = countOf("new");
   const thisMonth = counts?.month ?? list.filter((e) => e.received_at !== null && venueDay(Date.parse(e.received_at), zone).startsWith(monthPrefix)).length;
 
-  const current: Enquiry | undefined = list.find((e) => e.id === openId) ?? shown[0];
+  // The one picked here, else the one another screen opened this on (Capacity's "Open the enquiry"), else the newest shown.
+  const current: Enquiry | undefined = list.find((e) => e.id === (openId ?? asked)) ?? shown[0];
   const next = nextUnanswered(list, current?.id ?? null);
 
   const items: FilterItem<EnquiryFilter>[] = ENQUIRY_FILTERS.map((f) => ({ id: f, label: t(`enquiries.filter.${f}` as MessageKey), count: countOf(f) }));

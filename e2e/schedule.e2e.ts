@@ -151,6 +151,21 @@ test("every state of both screens — light, dark, Arabic, phone", async ({ brow
   }
 });
 
+test("Open the enquiry opens the enquiry Capacity is answering, not the newest", async ({ browser }) => {
+  const page = await open(browser, "light", "capacity");
+  const chips = page.locator(".cap-chip");
+  await expect(chips.nth(1)).toBeVisible();
+  await chips.nth(1).click();
+  await expect(chips.nth(1)).toHaveAttribute("aria-pressed", "true");
+  const asked = (await stack.rows("enquiries")).filter((e) => e["fit"] !== "no" && ["new", "replied", "parked"].includes(String(e["status"])));
+  asked.sort((a, b) => String(b["received_at"] ?? "").localeCompare(String(a["received_at"] ?? "")) || Number(b.id) - Number(a.id));
+  const second = asked[1]!;
+  await page.locator(".cap-actions button").nth(1).click();
+  await expect(screenOf(page, "enquiries")).toBeVisible();
+  await expect(page.locator(".enq-business")).toHaveText(String(second["business"] ?? second["name"]));
+  await page.context().close();
+});
+
 test("Add a date writes one studio date, and the month shows it", async ({ browser }) => {
   const page = await open(browser, "light", "schedule");
   await page.locator(".sch-add").click();

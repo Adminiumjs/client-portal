@@ -7,7 +7,8 @@
  *   out          each sent proposal still in date, as days: the hours of its
  *                lines (a line named after a rate that has hours per unit)
  *                over the studio's hours a day; when a line names no such
- *                rate, the proposal's subtotal over the day rate. Placed from
+ *                rate, the proposal's subtotal over the card's day rate (none
+ *                on the card: the proposal's days are not known). Placed from
  *                the fourth week on, at most four days a week, into what room
  *                is left — pessimistic, and usually right
  *   fit          the first week with enough open days to start (two for a
@@ -18,6 +19,7 @@
  */
 import type { Day, Decimal, Enquiry, Id, Proposal, ProposalLine, Rate } from "../../data/types.ts";
 import { addDays } from "../../data/venueTime.ts";
+import { dayRateOf } from "../../lib/rateCard.ts";
 import type { CapacityView } from "../../state/capacity.ts";
 
 export type SizeKey = "small" | "medium" | "large";
@@ -40,14 +42,6 @@ const num = (value: Decimal | number | null | undefined): number => {
   return Number.isFinite(n) ? n : NaN;
 };
 
-/** The rate a day is charged at: the one whose hours per unit are a whole day, else the first with hours, per day. */
-export function dayRate(rates: readonly Rate[], hoursPerDay: number): number | null {
-  const live = [...rates].filter((r) => r.active).sort((a, b) => a.position - b.position || a.id - b.id);
-  const whole = live.find((r) => num(r.hours_per_unit) === hoursPerDay && num(r.amount) > 0);
-  if (whole !== undefined) return num(whole.amount);
-  const any = live.find((r) => num(r.hours_per_unit) > 0 && num(r.amount) > 0);
-  return any === undefined ? null : (num(any.amount) / num(any.hours_per_unit)) * hoursPerDay;
-}
 
 /** A proposal's studio days, whole days and at least one; null when nothing says. */
 export function proposalDays(proposal: Pick<Proposal, "subtotal" | "total">, lines: readonly Pick<ProposalLine, "description" | "qty">[], rates: readonly Rate[], hoursPerDay: number): number | null {
@@ -65,7 +59,9 @@ export function proposalDays(proposal: Pick<Proposal, "subtotal" | "total">, lin
     hours += qty * perUnit;
   }
   if (named) return Math.max(1, Math.round(hours / hoursPerDay));
-  const rate = dayRate(rates, hoursPerDay);
+  // The card's day rate; none on the card, and a proposal's days are not guessed from another rate.
+  const day = dayRateOf(rates, hoursPerDay);
+  const rate = day === null ? null : num(day.amount);
   const value = num(proposal.subtotal ?? proposal.total);
   if (rate === null || rate <= 0 || !Number.isFinite(value)) return null;
   return Math.max(1, Math.round(value / rate));

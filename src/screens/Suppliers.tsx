@@ -23,7 +23,7 @@ import type { Id, SupplierKind } from "../data/types.ts";
 import { useI18n } from "../i18n/index.tsx";
 import { today } from "../lib/clock.ts";
 import { dayLabel } from "../lib/dates.ts";
-import { ensureRows, useDesk, useRows } from "../state/desk.ts";
+import { ensureRows, useDesk, useDeskReads, useRows } from "../state/desk.ts";
 import { linesCarrying } from "../state/invoiceDrafts.ts";
 import { editSupplier, loadPurchases, loadSuppliers } from "../state/officeActions.ts";
 import { refusalKey } from "../state/outcome.ts";
@@ -54,6 +54,8 @@ export default function Suppliers() {
   const [form, setForm] = useState<"add" | "edit" | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // The address book and every purchase (again after a reconnect).
+  const reads = useDeskReads();
   useEffect(() => {
     let live = true;
     void (async () => {
@@ -70,7 +72,7 @@ export default function Suppliers() {
     return () => {
       live = false;
     };
-  }, []);
+  }, [reads]);
 
   // The book in the order the names were added.
   const book = useMemo(() => [...suppliers].sort((a, b) => a.id - b.id), [suppliers]);

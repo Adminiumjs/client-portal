@@ -23,7 +23,7 @@ import { useI18n, type MessageKey } from "../i18n/index.tsx";
 import { tenantCurrency } from "../i18n/ambient.ts";
 import { dayLabel } from "../lib/dates.ts";
 import type { Id, Payment, RunningCost } from "../data/types.ts";
-import { useCan, useDesk } from "../state/desk.ts";
+import { useCan, useDesk, useDeskReads } from "../state/desk.ts";
 import { go, open, openInvoices } from "../state/ui.ts";
 import RunningCostSheet from "../sheets/money/RunningCost.tsx";
 import { loadMoney } from "./money/load.ts";
@@ -44,9 +44,10 @@ function monthLabel(month: string, locale: string, style: "short" | "long" | "ye
   return new Intl.DateTimeFormat(locale, opts).format(new Date(Date.UTC(y, m - 1, 15)));
 }
 
-/** The six months' invoices and payments and the running costs, read when the desk knows its day. */
+/** The six months' invoices and payments and the running costs, read when the desk knows its day (and again after a reconnect). */
 function useSixMonths(today: string): boolean {
   const [loaded, setLoaded] = useState(false);
+  const reads = useDeskReads();
   useEffect(() => {
     if (today === "") return;
     let live = true;
@@ -58,7 +59,7 @@ function useSixMonths(today: string): boolean {
     return () => {
       live = false;
     };
-  }, [today]);
+  }, [today, reads]);
   return loaded;
 }
 

@@ -306,6 +306,10 @@ test("every email we send — light, dark, Arabic, phone — and a test that onl
     });
 
     if (variant === "light") {
+      await test.step("Email templates, for someone who manages Adminium's settings", async () => {
+        await expect(main.locator(".em-templates-link")).toHaveAttribute("href", "/email-templates");
+        await expect(main.locator(".em-templates-link")).toHaveText("Change the words in Email templates");
+      });
       await test.step("a test goes to the studio's own address only, with no live link", async () => {
         await tabs.nth(3).click();
         const before = await stack.mail();

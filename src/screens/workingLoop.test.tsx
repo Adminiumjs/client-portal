@@ -15,7 +15,7 @@ import { I18nProvider } from "../i18n/index.tsx";
 import { loadInvoice, loadProposal, upsert, useDesk } from "../state/desk.ts";
 import { usePortal } from "../state/portal.ts";
 import { useSheets } from "../state/sheets.ts";
-import { useUi } from "../state/ui.ts";
+import { openEnquiry, useUi } from "../state/ui.ts";
 import { fakeStudio } from "../testing/fakeStudio.ts";
 import Home from "./Home.tsx";
 import Enquiries from "./Enquiries.tsx";
@@ -91,6 +91,15 @@ describe("Enquiries", () => {
     expect(words).toContain("Hello Promo, thank you for writing. This isn't work we take on");
     expect(buttons(html)).toEqual(expect.arrayContaining(["Start a proposal", "Send reply", "Park it"]));
     expect(words).toContain("A polite no is a real answer and costs nothing.");
+  });
+
+  it("opens on the enquiry another screen asked for (Capacity's \"Open the enquiry\")", () => {
+    openEnquiry(2);
+    expect(useUi.getState()).toMatchObject({ view: "enquiries", selected: { enquiry: 2 } });
+    const words = text(draw(<Enquiries />));
+    // Lantern Books' reply is drafted, not the newest (Bright Offers).
+    expect(words).toContain("Hello Ines");
+    expect(words).not.toContain("Hello Promo");
   });
 });
 

@@ -145,22 +145,3 @@ export function capacityWeeks(inputs: CapacityInputs): CapacityView {
   }
   return { weeks, unplaced };
 }
-
-/**
- * The first week a job of `days` could start and be done in view: a week
- * with free days (at least `min(days, 2)` of them) from which the free days
- * add up to the job before the last week shown. Null when it does not fit.
- */
-export function firstFit(view: CapacityView, days: number): { start: number; end: number } | null {
-  const weeks = view.weeks;
-  for (let s = 0; s < weeks.length; s += 1) {
-    if (weeks[s]!.free < Math.min(days, 2)) continue;
-    let sum = 0;
-    for (let e = s; e < weeks.length; e += 1) {
-      sum += weeks[e]!.free;
-      if (sum >= days - 1e-9) return { start: s, end: e };
-    }
-    return null;
-  }
-  return null;
-}

@@ -25,7 +25,7 @@ import { useI18n, type MessageKey } from "../i18n/index.tsx";
 import { today as clockToday } from "../lib/clock.ts";
 import { dayLabel } from "../lib/dates.ts";
 import AddDate, { type DatePrefill } from "../sheets/schedule/AddDate.tsx";
-import { useAddOnSettings, useCan, useDesk, useRows } from "../state/desk.ts";
+import { useAddOnSettings, useCan, useDesk, useDeskReads, useRows } from "../state/desk.ts";
 import { loadStudioDates } from "../state/officeActions.ts";
 import { open, toast } from "../state/ui.ts";
 import { daysIn, daysUntil, monthLabel, monthName, firstNameOf, holidaysOf, isWeekend, itemsByDay, monthGrid, monthOf, monthStats, nextInOrder, shiftMonth, type DayItem, type ItemKind } from "./schedule/model.ts";
@@ -72,9 +72,10 @@ export default function Schedule() {
   // The studio's dates around the month shown, and from today on for the list below.
   const first = `${month}-01`;
   const last = `${month}-${String(daysIn(month)).padStart(2, "0")}`;
+  const reads = useDeskReads();
   useEffect(() => {
     void loadStudioDates(first < day ? first : day, addDays(last > day ? last : day, 120)).catch(() => undefined);
-  }, [first, last, day]);
+  }, [first, last, day, reads]);
 
   const bag = useMemo(() => itemsByDay({ projects, milestones, invoices, events, holidays }), [projects, milestones, invoices, events, holidays.map((h) => h.date + h.name).join()]); // eslint-disable-line react-hooks/exhaustive-deps
   const cells = monthGrid(month);

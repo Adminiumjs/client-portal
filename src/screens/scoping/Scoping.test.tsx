@@ -101,18 +101,21 @@ describe("a worked sheet", () => {
     expect(words).toContain("$90.00 each · no hours on the card $360.00");
     expect(words).toContain("Fees $1,920.00");
     expect(words).toContain("Passed on at cost: $60.00 · ours to carry: $38.00.");
-    // Fees and the purchase at cost; tax at the studio's rate (the client has none of its own).
-    expect(words).toContain("Price for this stage $1,980.00");
-    expect(words).toContain("Tax 8.5%, added on the invoice $168.30");
-    expect(words).toContain("What the invoice will read $2,148.30");
+    // The fees the proposal carries; tax at the studio's rate (the client has none of its own). The purchase is not in it:
+    // it goes on the invoice at cost, with its receipt.
+    expect(words).toContain("Price for this stage $1,920.00");
+    expect(words).toContain("Tax 8.5%, added on the invoice $163.20");
+    expect(words).toContain("What the invoice will read $2,083.20 Purchases, passed on separately at cost $60.00");
     expect(words).toContain("12 h of work — 2 studio days, or 1 each if you both take it.");
     expect(words).toContain("2 of you at 4 days a week is 8 studio days a week, so this stage fills about 0.3 weeks of the calendar.");
     expect(words).toContain("$960.00 a day");
     expect(words).toContain("At or above the $780.00 day rate on the card.");
-    // $1,980 over $2,060 a month: a month, to one place.
-    expect(words).toContain("1 month of fixed costs");
+    // $1,920 over $2,060 a month: 0.9 of a month, to one place.
+    expect(words).toContain("0.9 months of fixed costs");
     expect(words).toContain("Your running costs come to $2,060.00 a month before anyone is paid.");
-    expect(words).toContain("To start, before anything moves $1,074.15");
+    // Each stage invoice: half the subtotal, and its tax — as Adminium will work it out.
+    expect(words).toContain("To start, before anything moves $1,041.60");
+    expect(words).toContain("On delivery of the stage $1,041.60");
     expect(studio.writes).toEqual([]);
   });
 
@@ -162,7 +165,7 @@ describe("how the last stages actually went", () => {
     // 2 × 0.13 design days and 4 × 0.13 handlings, at the card's own rates.
     expect(words).toContain("Contingency, 13% from your record $249.60");
     expect(words).toContain("Contingency is on: $249.60 and 1.6 h added on top");
-    expect(words).toContain("Price for this stage $2,229.60");
+    expect(words).toContain("Price for this stage $2,169.60");
     expect(html).toMatch(/aria-pressed="true"[^>]*>.*Contingency on · 13%/);
   });
 

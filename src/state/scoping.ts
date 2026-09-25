@@ -74,14 +74,17 @@ export interface WorksheetFigures {
   /** Hours the rows stand for (rows whose rate has none are left out). */
   hours: number;
   days: number;
+  /** Purchases to pass on at cost: they go on the client's invoice with their receipts, never on the proposal. */
   expensesAtCost: number;
   expensesCarried: number;
   past: PastStage[];
   /** How far past stages ran over, on average (0.15 = 15 % over); null with no history. */
   drift: number | null;
   contingency: number;
+  /** The proposal's subtotal: the rows and the reserve (what Adminium will store). */
   price: number;
   tax: number;
+  /** The proposal's total. */
   priceWithTax: number;
   /** Studio days a week: each person's, else the studio's. */
   studioDaysAWeek: number;
@@ -90,7 +93,7 @@ export interface WorksheetFigures {
   dayRate: number | null;
   /** Months of running costs the price covers. */
   monthsCovered: number | null;
-  /** Each payment of the split, of the price with tax. */
+  /** Each payment of the split, as its stage invoice will read: the share of the price, with its tax. */
   stages: number[];
 }
 
@@ -106,6 +109,12 @@ const num = (text: string | null | undefined): number => {
   return Number.isFinite(n) ? n : 0;
 };
 const cents = (n: number): number => Math.round(n * 100) / 100;
+
+/** The tax on an amount as a document works it out: the amount times the rate, to the cent (in whole cents, so no float moves it). */
+function taxOn(amount: number, rate: string | null): number {
+  const perMille = Math.round(num(rate) * 1000);
+  return Math.round((Math.round(amount * 100) * perMille) / 100_000) / 100;
+}
 
 /**
  * How many of a rate the reserve holds back for one row: its quantity times
@@ -157,13 +166,18 @@ export function workSheet(sheet: Worksheet, inputs: WorksheetInputs): WorksheetF
           return rate === undefined ? sum : sum + cents(num(reserveQty(row.qty, drift)) * num(rate.amount));
         }, 0))
       : 0;
-  const price = cents(fees + contingency + expensesAtCost);
-  const tax = cents((price * num(inputs.taxRate)) / 100);
+  // What the proposal will carry — its lines, the reserve among them — and so what Adminium will store as its
+  // subtotal, tax and total. The expenses passed on are not in it: they reach the invoice at cost, with their receipts.
+  const price = cents(fees + contingency);
+  const tax = taxOn(price, inputs.taxRate);
   const priceWithTax = cents(price + tax);
   const studioDaysAWeek = inputs.people.reduce((sum, p) => sum + (p.days_per_week ?? inputs.settings?.days_per_week ?? 5), 0);
   const costs = inputs.runningCosts.reduce((sum, c) => sum + num(c.monthly_amount), 0);
-  const shares = SPLIT_SHARES[sheet.split];
-  const stages = shares.map((share, i) => (i === shares.length - 1 ? cents(priceWithTax - shares.slice(0, -1).reduce((s, x) => s + cents(priceWithTax * x), 0)) : cents(priceWithTax * share)));
+  // Each payment as its stage invoice will read: its share of the proposal's subtotal, and the tax on that share.
+  const stages = SPLIT_SHARES[sheet.split].map((share) => {
+    const part = Math.round((Math.round(price * 100) * Math.round(share * 100)) / 100) / 100;
+    return cents(part + taxOn(part, inputs.taxRate));
+  });
   return {
     rows,
     fees,
