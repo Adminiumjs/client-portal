@@ -482,7 +482,7 @@ export const TABLES: Table[] = [
       text("start_when", 60, "When they want to start", opt),
       text("source", 60, "How they found us", opt),
       choice("fit", "Fit", { good: "Good fit", maybe: "Maybe", no: "Not for us" }, { ...opt, tones: { good: "pos", maybe: "warn", no: "neutral" } }),
-      text("body", null, "What they wrote", opt),
+      text("body", null, "What they wrote", { ...opt, rules: { validation: { maxLength: 4000 } } }),
       choice(
         "status",
         "Status",

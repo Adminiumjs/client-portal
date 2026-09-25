@@ -16,7 +16,7 @@ import { useI18n, type MessageKey } from "../../i18n/index.tsx";
 import { requestSignInLink, signInWithCode } from "../../state/clientActions.ts";
 import { useDemoSignal } from "../../state/demoSignal.ts";
 import { usePortal } from "../../state/portal.ts";
-import { toast } from "../../state/ui.ts";
+import { go, toast } from "../../state/ui.ts";
 import { CODE_LENGTH, RESEND_AFTER, codeProblem, emailProblem, emptyCode, maskEmail, placeDigits, sendProblem, type CodeProblem } from "./signin/model.ts";
 import { goAfterSignIn } from "./signin/landing.ts";
 import { slot } from "./shared/slot.tsx";
@@ -256,6 +256,12 @@ export default function Find() {
           </div>
         )}
       </div>
+      <p className="enquire-already">
+        <span className="cl-subtle">{t("client.find.newHere")}</span>
+        <button type="button" className="cl-link-btn ol-gi" onClick={() => go("enquire")}>
+          {t("client.find.enquire")}
+        </button>
+      </p>
     </section>
   );
 }

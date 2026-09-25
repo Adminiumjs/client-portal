@@ -65,6 +65,7 @@ export const CUSTOMER_ROUTES = {
   statement: "/statement",
   brief: "/brief",
   handover: "/h",
+  enquire: "/enquire",
 };
 
 /** `laterPages`: also the pages declared for later — only the test that proves they install asks. */

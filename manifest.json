@@ -94,7 +94,8 @@
         "invoices": "/invoices",
         "statement": "/statement",
         "brief": "/brief",
-        "handover": "/h"
+        "handover": "/h",
+        "enquire": "/enquire"
       }
     }
   ],
@@ -2137,7 +2138,12 @@
               "zh-CN": "他们的留言",
               "zh-TW": "他們的留言"
             },
-            "nullable": true
+            "nullable": true,
+            "rules": {
+              "validation": {
+                "maxLength": 4000
+              }
+            }
           },
           {
             "ref": "status",

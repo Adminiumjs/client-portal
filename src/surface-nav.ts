@@ -58,6 +58,7 @@ export const SURFACE_NAV = [
   { id: "statement", path: "statement", view: "statement", side: "customer", labelKey: "nav.statement" },
   { id: "brief", path: "brief", view: "brief", side: "customer", labelKey: "nav.brief" },
   { id: "handover", path: "h", view: "handover", side: "customer", labelKey: "nav.handover" },
+  { id: "enquire", path: "enquire", view: "enquire", side: "customer", labelKey: "screen.enquire" },
 ] as const satisfies readonly Entry[];
 
 /**
@@ -67,7 +68,7 @@ export const SURFACE_NAV = [
  */
 export const SURFACE_EXTRAS = {
   staff: ["proposal", "composer", "project", "review", "handover", "client", "invoice", "print", "notfound", "scoping", "emails"],
-  customer: ["review", "expired", "notavailable", "notfound", "enquire"],
+  customer: ["review", "expired", "notavailable", "notfound"],
 } as const satisfies Record<"staff" | "customer", readonly View[]>;
 
 export type StaffView =

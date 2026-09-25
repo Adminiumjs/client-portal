@@ -1,1 +1,165 @@
 /* The enquiry form's own layout (the clients' side). Shared pieces are in primitives.css; tokens in tokens.css. */
+
+.enquire {
+  gap: 18px;
+}
+.enquire-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+.enquire-title {
+  text-wrap: balance;
+}
+.enquire-lead {
+  margin-block-start: 3px;
+  max-width: 50ch;
+}
+
+/* ── the form ─────────────────────────────────────────────────────────────── */
+.enquire-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: clamp(18px, 3vw, 24px);
+}
+.enquire-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 15px 14px;
+}
+.enquire-field {
+  min-width: 0;
+}
+.enquire-field--wide {
+  grid-column: 1 / -1;
+}
+.enquire-label {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+}
+.enquire-optional {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--fg-subtle);
+}
+.enquire-select {
+  width: 100%;
+  cursor: pointer;
+}
+.enquire-body {
+  width: 100%;
+  min-height: 150px;
+  padding: 11px 13px;
+  border-radius: 12px;
+  font-size: var(--text-body);
+  line-height: 1.55;
+  resize: vertical;
+}
+
+/* The human check's small area: what happens when Send is pressed, then that it is happening. */
+.enquire-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 11px 13px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  color: var(--fg-muted);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+.enquire-check svg {
+  flex: 0 0 auto;
+  margin-block-start: 1px;
+  color: var(--accent);
+}
+.enquire-refused {
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  line-height: 1.5;
+}
+.enquire-refused > svg {
+  flex: 0 0 auto;
+  margin-block-start: 2px;
+}
+.enquire-refused > span {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+/* The address kept whole where it fits (never broken at its hyphen), broken anywhere only where it cannot. */
+.enquire-mail {
+  display: inline-block;
+  max-width: 100%;
+  color: inherit;
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  overflow-wrap: anywhere;
+}
+.enquire-send {
+  width: 100%;
+}
+.enquire-fine {
+  text-align: center;
+}
+
+/* ── already a client ─────────────────────────────────────────────────────── */
+.enquire-already {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 2px 4px;
+  margin: 0;
+}
+.enquire-already .cl-link-btn {
+  align-self: center;
+}
+
+/* ── sent ─────────────────────────────────────────────────────────────────── */
+.enquire-sent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: clamp(24px, 5vw, 44px) 18px;
+  text-align: center;
+}
+.enquire-sent-title {
+  text-wrap: balance;
+}
+.enquire-sent-title:focus {
+  outline: none;
+}
+.enquire-sent-body {
+  max-width: 46ch;
+}
+.enquire-sent-at {
+  margin: 0;
+}
+.enquire-sent-actions {
+  justify-content: center;
+}
+.enquire-sent-actions a.btn {
+  text-decoration: none;
+}
+
+@media (max-width: 560px) {
+  .enquire-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
