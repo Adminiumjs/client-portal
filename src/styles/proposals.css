@@ -1,1 +1,281 @@
-/* The proposals area's own layout. Shared pieces are in primitives.css; tokens in tokens.css. */
+/* The proposals area's own layout (the list, one proposal, its sheets). Shared pieces are in primitives.css. */
+
+.prop-untitled {
+  color: var(--fg-muted);
+}
+
+/* one proposal */
+.prop-page {
+  max-width: 880px;
+}
+.prop-back {
+  align-self: flex-start;
+  height: 31px;
+  gap: 7px;
+  color: var(--fg-muted);
+  border-color: var(--border);
+}
+.prop-doc {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 17px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.prop-head {
+  padding: clamp(18px, 2.6vw, 26px);
+  border-block-end: 1px solid var(--border);
+}
+.prop-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.prop-number {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg-muted);
+}
+.prop-dates {
+  margin-inline-start: auto;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--fg-subtle);
+}
+.prop-title {
+  margin: 12px 0 0;
+  font-size: clamp(21px, 2.7vw, 28px);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 1.2;
+  text-wrap: pretty;
+}
+.prop-facts {
+  margin: 18px 0 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+.prop-facts > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.prop-facts dt {
+  font-size: var(--text-kicker);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+}
+.prop-facts dd {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.prop-facts .prop-mono {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+}
+.prop-body {
+  padding: clamp(18px, 2.6vw, 26px);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.prop-h2 {
+  margin: 0 0 10px;
+}
+.prop-scope {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+.prop-scope p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.65;
+  font-weight: 500;
+  color: var(--fg-muted);
+  text-wrap: pretty;
+}
+.prop-muted {
+  color: var(--fg-subtle) !important;
+}
+.prop-lines {
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  overflow: hidden;
+}
+.prop-lines .totals {
+  background: var(--surface-2);
+}
+
+/* the state's own line: a decline or withdrawal, the signature, out of date */
+.prop-band {
+  display: flex;
+  gap: 11px;
+  align-items: flex-start;
+  padding: 13px 15px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+.prop-band > svg {
+  flex: 0 0 auto;
+  margin-block-start: 2px;
+}
+.prop-band--danger {
+  background: var(--danger-soft);
+}
+.prop-band--danger > svg {
+  color: var(--danger);
+}
+.prop-band--pos {
+  background: var(--pos-soft);
+}
+.prop-band--pos > svg {
+  color: var(--pos);
+}
+.prop-band--warn {
+  background: var(--warn-soft);
+}
+.prop-band--warn > svg {
+  color: var(--warn);
+}
+.prop-band--info {
+  background: var(--info-soft);
+}
+.prop-band--info > svg {
+  color: var(--info);
+}
+.prop-band--action {
+  align-items: center;
+  flex-wrap: wrap;
+}
+.prop-band-text {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.prop-band-title {
+  font-size: var(--text-sm);
+  font-weight: 800;
+  color: var(--danger);
+}
+.prop-band-body {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.55;
+  color: var(--fg-muted);
+  text-wrap: pretty;
+}
+.prop-band-line {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.55;
+  color: var(--fg);
+  text-wrap: pretty;
+}
+.prop-fingerprint {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+.prop-actions {
+  display: flex;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+
+/* the proposal's sheets */
+.prop-sheet-lead {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  line-height: 1.55;
+  color: var(--fg-muted);
+  text-wrap: pretty;
+}
+.prop-date {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 500;
+}
+.prop-danger-btn {
+  background: var(--danger);
+  color: #ffffff;
+}
+.prop-ms {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.prop-ms-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 148px 34px;
+  gap: 6px;
+  align-items: center;
+}
+.prop-ms-title,
+.prop-ms-date {
+  height: 38px;
+  border-radius: 10px;
+  font-size: 13px;
+}
+.prop-ms-date {
+  padding-inline: 8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+}
+.prop-ms-remove {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  color: var(--fg-subtle);
+}
+.prop-ms-add {
+  align-self: flex-start;
+}
+.prop-stage {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 14px;
+  border-radius: 13px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.prop-stage-split {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.prop-stage-name {
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.prop-stage-agreed,
+.prop-stage-note {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-subtle);
+}
+.prop-stage-line {
+  font-family: var(--font-mono);
+  font-size: var(--text-md);
+  font-weight: 600;
+}

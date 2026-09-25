@@ -1,1 +1,249 @@
 /* The home area's own layout. Shared pieces are in primitives.css; tokens in tokens.css. */
+
+.home {
+  gap: 20px;
+  container: home / inline-size;
+}
+.home-date {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--fg-subtle);
+}
+.home-lead {
+  margin: 7px 0 0;
+  font-size: var(--text-hero);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 1.18;
+  text-wrap: pretty;
+}
+
+/* the three figures */
+.home-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(215px, 1fr));
+  gap: 13px;
+}
+.home-danger {
+  color: var(--danger);
+}
+
+/* aging */
+.home-aging {
+  padding: 14px 16px;
+}
+.home-aging-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.home-aging-note {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--fg-subtle);
+}
+.home-aging-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 9px;
+  margin-block-start: 12px;
+}
+.home-bucket {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 11px 13px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--fg);
+  cursor: pointer;
+  text-align: start;
+  font: inherit;
+}
+.home-bucket--empty {
+  opacity: 0.5;
+}
+.home-bucket-label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+}
+.home-bucket-amount {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+.home-bucket--d30 .home-bucket-amount {
+  color: var(--warn);
+}
+.home-bucket--d60 .home-bucket-amount,
+.home-bucket--d61 .home-bucket-amount {
+  color: var(--danger);
+}
+.home-bucket--empty .home-bucket-amount {
+  color: var(--fg-subtle);
+}
+.home-bucket-count {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--fg-subtle);
+}
+
+/* the two columns: activity | waiting and this week */
+.home-cols {
+  display: grid;
+  gap: 14px;
+  align-items: start;
+  grid-template-columns: minmax(0, 1fr);
+}
+@container home (min-width: 760px) {
+  .home-cols {
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  }
+}
+.home-side {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.home-panel {
+  overflow: hidden;
+}
+.home-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 14px 16px;
+  border-block-end: 1px solid var(--border);
+  color: var(--fg-subtle);
+}
+.home-panel-head h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--fg);
+}
+.home-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.home-feed,
+.home-week {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  width: 100%;
+  padding: 12px 16px;
+  border: none;
+  border-block-end: 1px solid var(--border);
+  background: transparent;
+  color: var(--fg);
+  cursor: pointer;
+  text-align: start;
+  font: inherit;
+}
+.home-week {
+  align-items: center;
+}
+.home-feed-icon {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.home-tone--pos {
+  background: var(--pos-soft);
+  color: var(--pos);
+}
+.home-tone--info {
+  background: var(--info-soft);
+  color: var(--info);
+}
+.home-tone--warn {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+.home-feed-text,
+.home-wait-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+.home-feed-title {
+  font-size: 13px;
+  font-weight: 700;
+}
+.home-feed-body {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--fg-muted);
+  text-wrap: pretty;
+}
+.home-feed-when {
+  flex: 0 0 auto;
+  padding-block-start: 2px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--fg-subtle);
+}
+.home-wait {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 12px 16px;
+  border-block-end: 1px solid var(--border);
+}
+.home-wait-client {
+  font-size: 13px;
+  font-weight: 700;
+}
+.home-wait-what {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-muted);
+}
+.home-open {
+  height: 29px;
+  padding: 0 11px;
+  border-radius: 9px;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+.home-day {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--fg-muted);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  padding: 5px 9px;
+  border-radius: 8px;
+}
+.home-none {
+  padding: 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg-subtle);
+}
