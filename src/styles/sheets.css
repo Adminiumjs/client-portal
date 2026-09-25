@@ -1,1 +1,95 @@
 /* The sheets area's own layout. Shared pieces are in primitives.css; tokens in tokens.css. */
+
+/* ── the "add" sheet ───────────────────────────────────────────────────── */
+.add-body {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+/* The design's add sheet names its sub-line in plain text, not in the mono of a document number. */
+.sheet:has(.add-body) .sheet-sub {
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+.add-body .field {
+  gap: 6px;
+}
+.add-body .field-label {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+}
+.add-body .field-hint {
+  font-size: 11.5px;
+  text-wrap: pretty;
+}
+.add-body .input {
+  font-size: 13.5px;
+}
+.add-body .input.add-mono {
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+.add-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 0.6fr) minmax(0, 1fr);
+  gap: 10px;
+}
+.add-hint {
+  margin: -6px 0 0;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--fg-subtle);
+  text-wrap: pretty;
+}
+.add-switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 11px;
+}
+.add-switch-label {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+}
+.add-submit.btn {
+  height: 46px;
+  border-radius: 13px;
+  font-size: 14.5px;
+  justify-content: center;
+}
+.add-remove.btn {
+  align-self: flex-start;
+}
+.add-foot {
+  margin: 0;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.55;
+  color: var(--fg-subtle);
+  text-wrap: pretty;
+}
+.add-link {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 26px;
+  padding: 0 2px;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+}
+.add-link:hover {
+  text-decoration: underline;
+}
+[dir="rtl"] .add-link svg {
+  transform: scaleX(-1);
+}
