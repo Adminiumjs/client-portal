@@ -1,1 +1,381 @@
-/* The handover area's own layout. Shared pieces are in primitives.css; tokens in tokens.css. */
+/*
+ * The studio's handover page (and its sheets): the banner with "Preview what
+ * they see" and the project picker, the hero on the client's tint with its
+ * three figures, the link you send, the files, the notes and the fonts.
+ * Logical properties only; the link and every figure in the mono face.
+ */
+
+.ho-page {
+  container: hopage / inline-size;
+}
+.ho-banner {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  flex-wrap: wrap;
+  padding: 11px 14px;
+  border-radius: 12px;
+  border: 1px dashed var(--border-strong);
+  background: var(--surface-2);
+  color: var(--fg-subtle);
+}
+.ho-banner > svg {
+  flex: 0 0 auto;
+}
+.ho-preview {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 2px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--accent);
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.ho-picker {
+  display: flex;
+  gap: 8px;
+  margin-inline-start: auto;
+  flex-wrap: wrap;
+}
+
+/* the hero */
+.ho-hero-card {
+  border-radius: 17px;
+  overflow: hidden;
+}
+.ho-hero {
+  padding: clamp(22px, 4vw, 40px) clamp(18px, 3vw, 34px);
+  border-block-end: 1px solid var(--border);
+}
+.ho-kicker {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+.ho-title {
+  margin: 12px 0 0;
+  font-size: clamp(24px, 3.6vw, 38px);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1.12;
+  text-wrap: pretty;
+}
+.ho-intro {
+  margin: 12px 0 0;
+  max-width: 52ch;
+  font-size: 15px;
+  line-height: 1.65;
+  font-weight: 500;
+  color: var(--fg-muted);
+  text-wrap: pretty;
+}
+.ho-stats {
+  margin: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+@container hopage (min-width: 760px) {
+  .ho-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .ho-stat + .ho-stat {
+    border-block-start: none;
+    border-inline-start: 1px solid var(--border);
+  }
+}
+.ho-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 14px clamp(16px, 2.4vw, 20px);
+}
+.ho-stat + .ho-stat {
+  border-block-start: 1px solid var(--border);
+}
+.ho-stat dt {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+}
+.ho-stat dd {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--fg);
+}
+.ho-stat dd .money {
+  font-size: inherit;
+}
+
+/* the link */
+.ho-link {
+  overflow: visible;
+}
+.ho-state {
+  margin-inline-start: auto;
+  font-size: 10.5px;
+}
+.ho-link-body {
+  padding: 15px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+.ho-link-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 11px 13px;
+  border-radius: 11px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
+}
+.ho-link-box .btn--small {
+  height: 31px;
+  font-size: 12px;
+  border-color: var(--border);
+}
+.ho-address {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--fg);
+  overflow-wrap: anywhere;
+  direction: ltr;
+  text-align: start;
+}
+.ho-address--stopped {
+  color: var(--fg-subtle);
+  text-decoration: line-through;
+}
+.ho-stopped-on {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--fg-subtle);
+}
+.ho-expiry {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ho-chips {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+.ho-chips .rv-chip[aria-pressed="true"] {
+  border: 1px solid var(--border);
+}
+.ho-expiry-note {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.6;
+  color: var(--fg-subtle);
+  text-wrap: pretty;
+}
+.ho-send {
+  width: 100%;
+}
+.ho-send--sent {
+  background: var(--pos);
+  color: var(--bg);
+}
+
+/* files, notes, fonts */
+.ho-cols {
+  display: grid;
+  gap: 14px;
+  align-items: start;
+  grid-template-columns: minmax(0, 1fr);
+}
+@container hopage (min-width: 900px) {
+  .ho-cols {
+    grid-template-columns: minmax(0, 1.1fr) minmax(300px, 0.9fr);
+  }
+}
+.ho-files,
+.ho-panel {
+  overflow: hidden;
+  min-width: 0;
+}
+.ho-side {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.ho-head-actions {
+  margin-inline-start: auto;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.ho-head-actions .btn--small {
+  height: 29px;
+  padding: 0 10px;
+  font-size: 12px;
+  background: var(--surface-2);
+}
+.ho-file-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.ho-file {
+  display: flex;
+  align-items: center;
+  border-block-end: 1px solid var(--border);
+}
+.ho-file:last-child {
+  border-block-end: none;
+}
+.ho-file-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+  padding: 12px 16px;
+  color: inherit;
+  text-decoration: none;
+}
+.ho-file-row--static {
+  opacity: 0.8;
+}
+.ho-file-icon,
+.ho-file-go {
+  flex: 0 0 auto;
+  color: var(--fg-subtle);
+}
+.ho-file-main {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+.ho-file-name {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--fg);
+  overflow-wrap: anywhere;
+}
+.ho-file-kind {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--fg-subtle);
+}
+.ho-file-size {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--fg-subtle);
+}
+.ho-file-remove {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  margin-inline-end: 10px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--fg-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.ho-notes {
+  padding: 15px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+.ho-notes p {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.7;
+  font-weight: 500;
+  color: var(--fg-muted);
+  text-wrap: pretty;
+}
+.ho-edit {
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ho-edit-end {
+  display: flex;
+  gap: 8px;
+  margin-inline-start: auto;
+}
+.ho-fonts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.ho-font {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-block-end: 1px solid var(--border);
+}
+.ho-font:last-child {
+  border-block-end: none;
+}
+.ho-font-main {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+}
+.ho-font-name {
+  font-size: 13.5px;
+  font-weight: 700;
+}
+.ho-font-licence {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--fg-subtle);
+  text-wrap: pretty;
+}
+.ho-font .pill {
+  font-size: 10.5px;
+}
+.ho-font-edit {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr) 34px;
+  gap: 6px;
+  align-items: center;
+}
+.ho-font-edit .input {
+  height: 36px;
+  font-size: 13px;
+  border-radius: 9px;
+}
+.ho-font-edit .ho-file-remove {
+  margin: 0;
+  width: 34px;
+  height: 34px;
+}
