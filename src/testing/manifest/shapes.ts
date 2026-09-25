@@ -84,8 +84,14 @@ export function shapeKey(addOn: string, shape: { name: string; version: number }
   return `${addOn}/${shape.name}@${String(shape.version)}`;
 }
 
-/** Rules an app may add to a part's column: they label or narrow, never decide. */
+/**
+ * Rules an app may add to a part's column: they label or narrow, never decide.
+ * `secret` only as `true`: an app may hide a part's column, never show one the
+ * shape keeps back (`SECRET_ONLY_HIDES`).
+ */
 const ADDABLE_RULES: ReadonlySet<string> = new Set(['enumLabels', 'personal', 'secret', 'validation', 'required', 'requiredWhen', 'options', 'notAfter', 'notBefore']);
+/** An addable rule that is added only one way: `secret: true` hides; `false` would show a part's column to every reader. */
+const SECRET_ONLY_HIDES = (name: string, value: unknown) => name === 'secret' && value !== true;
 
 /** JSON with sorted keys, so two spellings of one value compare equal. */
 function canonical(value: unknown): string {
@@ -178,6 +184,8 @@ export function shapeConformanceIssues(
         const copyBeforeFill = name === 'copy' && wantRules['default'] !== undefined && wantRules['copy'] === undefined;
         if (wantRules[name] === undefined && !ADDABLE_RULES.has(name) && !copyBeforeFill) {
           mismatch(`${here}.rules.${name}`, `"${table.ref}.${want.ref}" adds a ${name} rule the shape does not keep`);
+        } else if (wantRules[name] === undefined && SECRET_ONLY_HIDES(name, haveRules[name])) {
+          mismatch(`${here}.rules.${name}`, `"${table.ref}.${want.ref}" may be made a secret, never shown: only "secret": true is added to a shape's column`);
         }
       }
     }

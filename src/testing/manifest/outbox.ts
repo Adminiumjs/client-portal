@@ -40,6 +40,7 @@
 import { z } from 'zod';
 
 import type { AddOnNeeds } from './add-ons.ts';
+import { formulaColumns, type FormulaExpr } from './formula.ts';
 import {
   bcp47TagSchema,
   refSchema,
@@ -344,6 +345,43 @@ export type EmailTemplate = z.infer<typeof emailTemplateSchema>;
 
 /** The column rules that decide a value on the server (see `columnRulesSchema`). */
 const DECIDING_RULES = ['copy', 'default', 'sequence', 'format', 'code', 'rollup', 'formula', 'stamp'] as const;
+/** The column rules that refuse a value: Adminium's own writes to the column would be refused by them. */
+const REFUSING_RULES = ['options', 'validation', 'required', 'requiredWhen', 'notAfter', 'notBefore'] as const;
+/** What the outbox writes, and which rules each refuses: everything, but a check of the address a person types. */
+export const OUTBOX_WRITTEN = {
+  status: [...DECIDING_RULES, ...REFUSING_RULES],
+  sentAt: [...DECIDING_RULES, ...REFUSING_RULES],
+  error: [...DECIDING_RULES, ...REFUSING_RULES],
+  skipReason: [...DECIDING_RULES, ...REFUSING_RULES],
+  approvedBy: [...DECIDING_RULES, ...REFUSING_RULES],
+  effectAt: [...DECIDING_RULES, ...REFUSING_RULES],
+  effectError: [...DECIDING_RULES, ...REFUSING_RULES],
+  // Left empty by a desk that asks Adminium to look the address up, and written when it sends.
+  to: [...DECIDING_RULES, 'options', 'required', 'requiredWhen'],
+  language: [...DECIDING_RULES, 'options', 'required', 'requiredWhen'],
+} as const satisfies Record<string, readonly string[]>;
+
+/**
+ * The columns of its own row one column's rules read where the read can
+ * refuse a write of that row: a `requiredWhen`'s watched column, a
+ * `notBefore`'s bound (or its link), a `copy`'s link, a formula's inputs (a
+ * result the column cannot hold is refused). The manifest's rule shape, which
+ * is also the value of the override each is kept as (`column.requiredWhen`,
+ * `column.bounds`, `column.copy`, `column.formula`).
+ */
+export function rulesReading(rules: unknown): { rule: 'requiredWhen' | 'notBefore' | 'copy' | 'formula'; reads: string }[] {
+  if (typeof rules !== 'object' || rules === null) return [];
+  const r = rules as { requiredWhen?: { column?: unknown }; notBefore?: { column?: unknown; via?: unknown }; copy?: { via?: unknown }; formula?: unknown };
+  const out: ReturnType<typeof rulesReading> = [];
+  if (typeof r.requiredWhen?.column === 'string') out.push({ rule: 'requiredWhen', reads: r.requiredWhen.column });
+  const bound = r.notBefore?.via ?? r.notBefore?.column;
+  if (typeof bound === 'string') out.push({ rule: 'notBefore', reads: bound });
+  if (typeof r.copy?.via === 'string') out.push({ rule: 'copy', reads: r.copy.via });
+  if (typeof r.formula === 'object' && r.formula !== null) {
+    for (const reads of formulaColumns(r.formula as FormulaExpr)) out.push({ rule: 'formula', reads });
+  }
+  return out;
+}
 
 /** Everything in `outbox` and `emailTemplates` that names something undeclared, or does not fit. */
 export function outboxIssues(
@@ -429,19 +467,43 @@ export function outboxIssues(
   if (box.columns.effectAt !== undefined) col(box.table, box.columns.effectAt, ['timestamptz'], at('columns', 'effectAt'), 'a timestamptz');
   /*
    * The columns Adminium writes as it sends and as a person approves or skips
-   * a message. A rule of the app's own that decides one of them (a stamp of
-   * who approved) races Adminium for it, and the desk's every message is then
-   * refused for writing a column only Adminium writes.
+   * a message — and the address and language it writes when it looks them up.
+   * A rule of the app's own that decides one of them (a stamp of who
+   * approved) races Adminium for it, and the desk's every message is then
+   * refused for writing a column only Adminium writes; one that refuses a
+   * value (allowed values, a length, required) refuses Adminium's own write,
+   * and the message is stuck. A check of the address a person types
+   * (`validation`) stays: Adminium only ever writes an address.
    */
-  for (const name of ['status', 'sentAt', 'error', 'skipReason', 'approvedBy', 'effectAt', 'effectError'] as const) {
+  for (const [name, refused] of Object.entries(OUTBOX_WRITTEN) as [keyof typeof OUTBOX_WRITTEN, readonly string[]][]) {
     const ref = box.columns[name];
     if (ref === undefined) continue;
-    const rules = (index.column(box.table, ref) as { rules?: Partial<Record<(typeof DECIDING_RULES)[number], unknown>> } | undefined)?.rules;
-    const deciding = DECIDING_RULES.filter((rule) => rules?.[rule] !== undefined);
-    if (deciding.length > 0) {
+    const rules = (index.column(box.table, ref) as { rules?: Record<string, unknown> } | undefined)?.rules;
+    const found = refused.filter((rule) => rules?.[rule] !== undefined);
+    if (found.length > 0) {
       out.push({
         path: at('columns', name),
-        message: `"${box.table}.${ref}" is the outbox's ${name}, which Adminium writes, so it takes no ${deciding.join(' or ')} rule`,
+        message: `"${box.table}.${ref}" is the outbox's ${name}, which Adminium writes, so it takes no ${found.join(' or ')} rule`,
+      });
+    }
+  }
+  /*
+   * Nor may a rule of ANOTHER column read one of them where the read can
+   * refuse a write: a `skip_note` required while the status is `sent` refuses
+   * the very write that marks a message sent, and the message is stuck.
+   */
+  const written = new Map<string, string>();
+  for (const name of Object.keys(OUTBOX_WRITTEN) as (keyof typeof OUTBOX_WRITTEN)[]) {
+    const ref = box.columns[name];
+    if (ref !== undefined) written.set(ref, name);
+  }
+  for (const column of index.table(box.table)?.columns ?? []) {
+    for (const { rule, reads } of rulesReading((column as { rules?: unknown }).rules)) {
+      const name = written.get(reads);
+      if (name === undefined || reads === column.ref) continue;
+      out.push({
+        path: at('columns', name),
+        message: `"${box.table}.${column.ref}" has a ${rule} rule that reads "${reads}", the outbox's ${name}, which Adminium writes as it sends, so its own writes would be refused`,
       });
     }
   }

@@ -30,10 +30,10 @@ import { z } from 'zod';
 import { addOnNeedsIssues, addOnsSchema, requiresAddOn, type AddOnNeeds } from './add-ons.ts';
 import { bookingIssues, bookingSchema } from './booking.ts';
 import { appDocumentIssues, appDocumentSchema, mappingIssues, type AppDocument } from './documents.ts';
-import { formulaExprSchema, tableFormulaIssues } from './formula.ts';
+import { formulaColumns, formulaExprSchema, tableFormulaIssues } from './formula.ts';
 import { pageCalendarIssues } from './page-calendar.ts';
 import { emailTemplateSchema, outboxIssues, outboxProducerSchema, outboxSchema } from './outbox.ts';
-import { publicAccessIssues, publicAccessSchema, publicKeysSchema, type PublicAccess } from './public-access.ts';
+import { publicAccessIssues, publicAccessSchema, publicKeysSchema, shareCodeColumns, type PublicAccess } from './public-access.ts';
 import { roleLimitIssues, roleLimitsSchema, type RoleShape } from './roles.ts';
 import { statesIssues, statesSchema, type States } from './states.ts';
 import {
@@ -1163,6 +1163,22 @@ export function appReferenceIssues(
       out.push({ path, message: `"${source.table}" has no column "${source.column}"` });
     }
   };
+  /**
+   * Why a column is kept from readers — a secret, personal data, the code a
+   * shared link opens its row with — or null when it is not, or when the
+   * column a rule lands it in is kept the same way (a secret in a secret;
+   * personal data in personal data or a secret). A copy of one, or a formula
+   * over one, would show it where it is not kept, past the audit's and the
+   * outbox's redaction and the public refusals. A shared link's code is never
+   * landed anywhere.
+   */
+  const keptFromReaders = (tableRef: string, columnRef: string, into: ColumnRules | undefined): string | null => {
+    if (shareCodeColumns(m.publicAccess ?? [], tableRef).includes(columnRef)) return 'the code a shared link opens its row with';
+    const source = tables.get(tableRef)?.columns.find((x) => x.ref === columnRef)?.rules;
+    if (source?.secret === true && into?.secret !== true) return 'a secret';
+    if (source?.personal === true && into?.personal !== true && into?.secret !== true) return 'personal data';
+    return null;
+  };
   /** The tables the app's signed-in people are rows of (its claim identities). */
   const identityTables = new Set((m.publicAccess ?? []).filter((e) => e.claim !== undefined).map((e) => e.table));
   /** Per table, the columns Adminium decides and no writer may set. */
@@ -1291,6 +1307,21 @@ export function appReferenceIssues(
           out.push({ path: here('copy', 'via'), message: `"${rules.copy.via}" is not a foreign key of "${table.ref}"` });
         } else if (!has(via.references, rules.copy.from)) {
           out.push({ path: here('copy', 'from'), message: `"${via.references}" has no column "${rules.copy.from}"` });
+        } else {
+          const kept = keptFromReaders(via.references, rules.copy.from, column.rules);
+          if (kept !== null) out.push({ path: here('copy', 'from'), message: `"${via.references}.${rules.copy.from}" is ${kept}, so no column copies it` });
+        }
+      }
+      // The same of a stamp that copies a column of its row, and of a formula's inputs.
+      const stamped = rules.stamp?.set;
+      if (typeof stamped === 'object' && 'copy' in stamped) {
+        const kept = keptFromReaders(table.ref, stamped.copy, column.rules);
+        if (kept !== null) out.push({ path: here('stamp', 'set', 'copy'), message: `"${table.ref}.${stamped.copy}" is ${kept}, so no column copies it` });
+      }
+      if (rules.formula !== undefined) {
+        for (const input of formulaColumns(rules.formula)) {
+          const kept = keptFromReaders(table.ref, input, column.rules);
+          if (kept !== null) out.push({ path: here('formula'), message: `"${table.ref}.${input}" is ${kept}, so no formula reads it` });
         }
       }
       if (rules.rollup !== undefined) {

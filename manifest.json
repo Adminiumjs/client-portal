@@ -19,7 +19,7 @@
     "crm"
   ],
   "compatibility": {
-    "minAdminiumVersion": "0.3.2",
+    "minAdminiumVersion": "0.3.3",
     "engines": [
       "sqlite",
       "postgres",
@@ -95,7 +95,7 @@
     "requires": [
       {
         "key": "invoices",
-        "range": ">=1.0.3",
+        "range": ">=1.0.5",
         "reason": {
           "en-US": "Proposals, invoices, receipts and payment reminders are made by this add-on.",
           "de-DE": "Angebote, Rechnungen, Quittungen und Zahlungserinnerungen macht dieses Add-on.",

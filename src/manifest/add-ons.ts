@@ -7,13 +7,15 @@
  * installing the app installs (or connects) the add-on first, and the add-on
  * cannot be removed while the app is installed.
  *
- * The range names the add-ons' release that first defines the shapes; it is
- * written from the version that release actually carries.
+ * The range names the add-ons' release this app was checked against. The
+ * shapes arrived in 1.0.3, but 1.0.4 and 1.0.5 changed what a client prints
+ * (a receipt says what the money was for; an Arabic copy keeps each amount in
+ * order), so an older add-on would print copies this app never showed anyone.
  */
 import { l } from "./labels.ts";
 
-/** The first Invoices & Receipts release with the `invoice@1` and `quote@1` shapes. */
-export const INVOICES_RANGE = ">=1.0.3";
+/** The Invoices & Receipts release the contract, the demo's copies and the shapes are held to. */
+export const INVOICES_RANGE = ">=1.0.5";
 
 export const ADD_ONS = {
   requires: [

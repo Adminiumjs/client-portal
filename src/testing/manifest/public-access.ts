@@ -113,6 +113,21 @@ export function claimKind(claim: Claim): 'lookup' | 'link' | 'token' {
 }
 
 /**
+ * The columns of one table its shared links open a row by (`claim: { by:
+ * 'token' }`): codes that leave only as the link — never shown, never
+ * listed, never a value the app's own package gives (its sample rows).
+ */
+export function shareCodeColumns(entries: readonly PublicAccess[], table: string): string[] {
+  const out: string[] = [];
+  for (const entry of entries) {
+    const claim = entry.claim;
+    if (entry.table !== table || claim === undefined || !('by' in claim) || claimKind(claim) !== 'token') continue;
+    if (!out.includes(claim.column)) out.push(claim.column);
+  }
+  return out;
+}
+
+/**
  * A time no more than `within` minutes ahead — a past time always passes. A
  * kiosk takes an arrival from an hour before the visit, and a late one too.
  * Up to a day: a longer window is no window.
@@ -324,6 +339,33 @@ export function publicAccessIssues(entries: readonly PublicAccess[], ctx: Public
       out.push({ path: ['publicAccess', i, 'claim'], message: `the "${key}" key already claims through entry ${String(identities.get(key)!.index)}; a key has one identity` });
     } else {
       identities.set(key, { entry, index: i });
+    }
+  });
+
+  /*
+   * A shared link's code opens its row, and leaves only as that link: no
+   * entry on its table — the link's own, another key's, one anyone may call —
+   * shows it, filters by it or orders by it. One that did would hand out
+   * every link its table has, or read one back a character at a time.
+   */
+  const shareCodes = new Map<string, Set<string>>();
+  for (const entry of entries) {
+    if (entry.claim === undefined || claimKind(entry.claim) !== 'token' || !('by' in entry.claim)) continue;
+    shareCodes.set(entry.table, (shareCodes.get(entry.table) ?? new Set()).add(entry.claim.column));
+  }
+  entries.forEach((entry, i) => {
+    const codes = shareCodes.get(entry.table);
+    if (codes === undefined) return;
+    const own = entry.claim !== undefined && 'by' in entry.claim ? entry.claim.column : undefined;
+    const named: [string, string][] = [
+      ...(entry.select ?? []).map((ref) => ['select', ref] as [string, string]),
+      ...(entry.filters ?? []).map((filter) => ['filters', filter.column] as [string, string]),
+      ...(entry.rank === undefined ? [] : [['rank', entry.rank.orderBy] as [string, string], ...(entry.rank.where === undefined ? [] : [['rank', entry.rank.where.column] as [string, string]])]),
+    ];
+    for (const [list, ref] of named) {
+      // The link's own entry naming it in `select` is said below, in the words it has always had.
+      if (!codes.has(ref) || (list === 'select' && ref === own)) continue;
+      out.push({ path: ['publicAccess', i, list], message: `"${entry.table}.${ref}" is the code a shared link opens its row with: no entry shows, filters or orders by it` });
     }
   });
 
