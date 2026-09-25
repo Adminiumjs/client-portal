@@ -28,6 +28,7 @@
  * normalized here, in the one synced place, so no splice re-derives it.
  */
 
+import { setAppName } from "./i18n/ambient.ts";
 import { HOSTED, SURFACE_SIDE } from "./surface.ts";
 // The mount-path math lives with the staff resolver because that is the one
 // module every app in the fleet has; it is not staff-specific.
@@ -104,6 +105,9 @@ export async function resolveSurfaceConfig(
     if (doc === null || typeof doc !== "object") return null;
     const key = (doc as { publishableKey?: unknown }).publishableKey;
     if (typeof key !== "string" || key === "") return null;
+    // Carried on the customer document too: a mapped storefront domain renders
+    // the operator's name, not the sample's.
+    setAppName((doc as { appName?: unknown }).appName as string | null | undefined);
     const served = (doc as { baseUrl?: unknown }).baseUrl;
     const baseUrl =
       typeof served === "string" && served !== ""
