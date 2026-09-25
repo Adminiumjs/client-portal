@@ -1,222 +1,289 @@
 # Client Portal
 
-A complete, production-shaped client portal and invoicing app — built with
-Vite + React + TypeScript, no CSS framework, no backend required. It's an
-example app that ships with [Adminium](https://adminium.dev): write a
-proposal, watch a client accept it and a project appear, approve a
-deliverable, and take a partial payment that moves the studio's outstanding
-total the moment it lands.
+A studio's desk and a portal for its clients, installed by
+[Adminium](https://adminium.dev) onto your own database. The studio writes a
+proposal; the client reads it, accepts it and signs it; a project starts; the
+client reviews the work and approves it; the invoices go out, the reminders
+wait for a nod, and the client sees their statement and receipts. Every row
+lives in your database, and every figure on every screen is one Adminium
+stored.
 
-The demo is dressed as **Outline**, a fictional two-person brand-design
-studio, so the proposals, projects and invoices read like a quarter already in
-motion rather than lorem ipsum.
+The app is built on the **Invoices & Receipts** add-on. Its proposals and
+invoices are the add-on's quote and invoice shapes, and the proposals,
+invoices, receipts and statements a client prints are the add-on's own
+documents. So the app **requires** that add-on: installing the app installs
+(or connects) it first, and it cannot be removed while the app is installed.
+
+The sample studio is **Outline**, a fictional two-person brand-design studio,
+so the proposals, projects and invoices read like a quarter already in motion
+rather than lorem ipsum.
 
 **Live demo → [adminium.dev/demo/client-portal](https://adminium.dev/demo/client-portal)**
 
+## What it needs
+
+- **Adminium 0.3.2 or later.**
+- **Invoices & Receipts 1.0.3 or later**, which installs with the app.
+- A database on **SQLite, Postgres or MySQL**. The app creates its own tables
+  there, under names Adminium gives them.
+- **Email delivery** and **file storage** set up in Adminium. The app sends its
+  emails through the first and keeps deliverables and handover files in the
+  second.
+
 ## What it does
 
-- **Two genuinely different shells.** The demo dock switches between the
-  Studio — internal chrome, sidebar, document search — and the Client, who
-  gets a minimal centered portal with no sidebar and no view of the studio's
-  other work. The loop closes across the switch: accept a proposal as the
-  client and the project is on the studio's board.
+- **Two sides, two bundles.** The studio's **desk** and the **clients' side**
+  are built separately, and the clients' bundle, which anyone on the internet
+  can load, carries no desk screen at all. A test builds both and checks.
+  The desk opens on its own address by default; an operator can move it inside
+  Adminium's dashboard instead, where its own sidebar and header give way to
+  the dashboard's.
 
-- **An invoicing engine in integer cents.**
-  [`src/lib/invoice.ts`](src/lib/invoice.ts) does every calculation in whole
-  cents and divides exactly once, at display. Line totals round at the line;
-  tax rounds once on the subtotal. That ordering is why the studio's total and
-  the client's total can never disagree by a rounding penny. 43 assertions in
-  [`invoice.test.ts`](src/lib/invoice.test.ts) — and not one of them needs a
-  floating-point tolerance.
+- **The studio's desk.**
+  - **Home**: the day in one sentence, what is owed, what is late and the
+    work running, the open balances by how late they are, what happened
+    lately, what is waiting on a client, and what falls due this week.
+  - **Enquiries**: the inbox of people who asked about work. Start a
+    proposal, send a reply drafted from the enquiry, park it for a month, or
+    say a polite no. "Log a call" adds one by hand.
+  - **Proposals** and the **Composer**: a proposal or an invoice written in
+    one place, with its scope, its lines and a rail showing the figures while
+    you type.
+  - **Projects**: a board of running, paused and finished work. Each project
+    has its milestones, its deliverables and the client's brief. The
+    **deliverable review** shows the file with pins dropped on it, versions
+    one at a time or two side by side, and the notes both sides wrote. The
+    **handover** is one share link for a finished project, with every file
+    (downloadable as one zip), the fonts licensed in the client's name, and
+    notes for the next print run.
+  - **Clients**: every client as a card, and each client's record: what is
+    open and overdue, what they have paid, how fast they pay, private notes,
+    every document, and their side of the portal to preview read-only.
+  - **Invoices**: six filters (All, Open, Overdue, Draft, Paid, Void). Record
+    a payment, including a part payment. A studio manager may void an unpaid
+    invoice or a recorded payment.
+  - **Chasing**, with held reminders. Every sent invoice gets three
+    reminders, each due on its day of the invoice's ladder, and **none goes
+    out until someone approves it**. Each one can be edited while it waits,
+    sent early or skipped. A later reminder replaces an earlier one still
+    waiting, and paying or voiding the invoice drops them. Sending the third
+    pauses the project, as the terms the client agreed to say.
+  - **Printed copy**: an invoice, proposal, receipt or statement as the
+    client receives it, drawn by the add-on, on Letter or A4.
+  - **Terms & signature**: accepted is not the same as signed. Who agreed,
+    when, against which terms version, and the fingerprint Adminium stored.
+    Terms are versioned, and a version is locked once a proposal naming it is
+    sent.
+  - **Settings** (studio manager only): the studio, the people clients deal
+    with, the email sign-off, which notices the studio gets, the add-on's own
+    invoice settings, and the rate card.
 
-- **Overdue is derived, never stored.** A record carries only
-  `draft | sent | paid`. Whether it is late is answered from the pinned clock
-  every time it is asked, so moving the clock changes the answer without
-  touching the record — and a draft is never overdue however old it gets.
+- **The clients' side.**
+  - **Sign in by an emailed link or code.** The client types the address the
+    studio writes to, and the page gives the same answer whatever they typed,
+    so it never tells anyone whether an address belongs to a client. The
+    email carries a link and a six-digit code for opening it on another
+    device. The link only signs someone in when they press Continue, so a
+    mail scanner that follows it spends nothing.
+  - **Their proposals**: accept and sign by typing their name against the
+    terms version the proposal names, decline with a note, or ask for a new
+    price on one that is out of date.
+  - **Their projects and the review**: milestones, and the work shared with
+    them. They can open a file, write back, approve it, or ask for changes.
+  - **Their invoices**: the lines, the payments so far, the balance, how to
+    pay, and "I've sent a payment" to tell the studio.
+  - **Statement & receipts**: everything invoiced and paid over a period,
+    with a receipt for each payment.
+  - **The brief**: the studio's questions, answered on the client's own
+    time, saved as they type.
+  - **A shared handover link**: one finished project's files, fonts and notes
+    on one page, with no sign-in and nothing else of the client's, until the
+    studio stops the link or it runs out.
 
-- **A payments ledger with a running balance.** An opening invoice-total row,
-  then each payment with date, method and amount, carrying the balance down
-  the end column. Partial payments are welcome; overpayment is *refused* with
-  the maximum attached rather than silently clamped.
+  Everything a client reads is their own. Another client's document answers
+  exactly like one that does not exist.
 
-- **A portal gate that tells the truth.** An unknown number, a number that
-  belongs to a different email, and a draft the studio has not sent yet each
-  get their own honest error — not one generic "not found".
+- **Every figure is Adminium's.** Line amounts, totals, tax, paid, balance,
+  document numbers, states, who signed and when, and the fingerprint of what
+  they agreed to are all worked out and stored by Adminium. After a write the
+  screen reads the document back rather than trusting its own arithmetic. The
+  composer's rail does show figures while you type, worked out the same way
+  (exact fractions, rounded once), but it never sends them.
 
-- **Eight languages, including a right-to-left one.** English, German, French,
-  Czech, Danish, Simplified and Traditional Chinese, and Egyptian Arabic. The
-  seeded fiction — scope paragraphs, line descriptions, milestone names — is
-  translated too. Plurals go through `Intl.PluralRules` in each locale's own
+- **A write that stops half-way can be finished.** Starting a project writes
+  the project, its milestones, the first stage's invoice and its line. If
+  that fails part-way, "Finish it" runs the rest, and a retry never writes a
+  row twice: every row carries its step's own key.
+
+- **Two roles.** *Studio* runs the desk. *Studio manager* can also change
+  the set-up, void, discard a draft and reopen a finished project. The desk
+  hides a button by role, but it is Adminium's grant that refuses the write.
+
+- **Nineteen emails, all in the outbox.** The `messages` table is the outbox,
+  so every email can be seen, approved, edited, sent early or skipped. The
+  notices to the studio each have their own switch in Settings.
+
+- **Live.** A change made on another computer, or by a client on the portal,
+  reaches the desk as it happens.
+
+- **An Overview page of widgets** inside Adminium's dashboard: 23 cards drawn
+  by Adminium's own widgets from the app's tables, showing the money and the
+  work, how old the money owed is, what needs someone's attention, six months
+  invoiced and collected, and this week's milestones. Every card that leads somewhere
+  opens its list already filtered to exactly what the card counts. Beside it
+  are record pages for clients, enquiries, proposals, projects,
+  deliverables, invoices, payments, emails and the studio's set-up.
+
+- **Sample data, at 28 July.** Outline's six clients and about six months of
+  history, added from Adminium (at install, or later from the app's page) and
+  removed again. Removing it keeps any sample row your own records depend on.
+  Dates are relative to the day the sample is added, so its history keeps its
+  shape. The figures are written for, and tested at, Tuesday 28 July 2026,
+  which is the demo's day. Sample numbers carry an `S` (`INV-S2039`), so a
+  real studio's first invoice is never one of them.
+
+- **Eight languages, including one right-to-left.** English, German, French,
+  Czech, Danish, Simplified and Traditional Chinese, and Egyptian Arabic,
+  covering the screens, the emails, the dashboard pages' labels and the
+  sample itself. Plurals go through `Intl.PluralRules` in each locale's own
   CLDR order.
 
-- **RTL by construction.** Every positional rule is a CSS logical property, and
-  money columns use `text-align: end` rather than `right`, so an invoice table
-  aligns to the correct edge in Arabic while the digits inside each cell stay
+- **RTL by construction.** Every positional rule is a CSS logical property,
+  so in Arabic the layout mirrors while the digits inside a money cell stay
   left-to-right.
 
-- **Light / dark themes**, following the OS on first load with a toggle in
-  both shells.
+- **Light and dark themes**, following the OS at first, with a switch on
+  both sides. Inside the dashboard, the dashboard's theme and language win.
 
-- **A pinned clock.** Nothing reads `Date.now()`. "Now" is Tuesday 28 July
-  2026, so every machine sees the same two overdue invoices in the same two
-  aging buckets.
+- **Self-hosted fonts.** Manrope and JetBrains Mono ship as woff2 in
+  `public/fonts/`.
 
-- **No bitmaps, no external requests.** Deliverable thumbnails are layered
-  gradients with a mono filename chip. Fonts are self-hosted woff2.
+## Installing it
+
+Install Client Portal from Adminium's app catalog and pick the database it
+should use. Adminium installs Invoices & Receipts first if it is not there
+yet, then creates the app's tables, the Overview and record pages, the two
+roles, the clients' browser key and the emails. Tick sample data at the
+install step to start with Outline's studio, or add it later.
+
+Once installed, the desk is served at `/apps/clients/staff/` and the clients'
+side at `/apps/clients/customer/`. A studio can also give the clients' side a
+domain of its own.
+
+**Coming from 0.1.x?** 0.2.0 is a different app on new tables, and it cannot
+update a 0.1.x install in place. Uninstall 0.1.x first (its tables stay
+unless you choose to drop them), then install 0.2.0. Nothing is carried over
+from the old tables.
+
+## The demo
+
+The [website demo](https://adminium.dev/demo/client-portal) runs with no
+server. It loads the app's real sample in memory at 10:00 on Tuesday 28 July
+2026, and a stand-in plays Adminium's part: the same rules for every write,
+the same outbox, the same fingerprints. The demo's card offers:
+
+| Control | What it does |
+| --- | --- |
+| **Studio / Client** | Switches between the desk and the client's side. The loop closes across it. |
+| **Screens** | Jumps to any screen of the side on show. Some carry shortcuts: *The client accepts and signs*, *Part payment*, *Let the link expire* … |
+| **Clock** | Moves the day on a week at a time, then puts it back with the sample as it was. |
+| **Language** | Eight locales, including Arabic, which flips the layout to RTL. |
+| **Theme** | Light or dark. |
+
+The demo's printed copies are the ones the add-on drew at build time, and
+nothing it "sends" reaches anyone.
 
 ## Local development
 
 ```bash
 npm install
-```
-
-```bash
 npm run dev
 ```
 
-Then open the URL Vite prints (default http://localhost:5173).
+With no Adminium settings, `npm run dev` runs the demo at the URL Vite
+prints (default http://localhost:5173). The address can open one screen
+directly: `?persona=client&view=home&theme=dark&lang=ar-EG`.
 
-### Driving the demo
-
-| Control | What it does |
-| --- | --- |
-| **Studio / Client** | Switches shell *and* persona. The loop closes across it. |
-| **Language** | Eight locales, including Arabic, which flips the layout to RTL. |
-| **Theme** | Latches light or dark over the OS preference. |
-| **Reset** | Puts the seeded documents back the way they started. |
-
-A sixty-second tour: Home → note the two populated aging buckets → switch to
-**Client** → tap the `PRO-1145` hint chip → Open it → Accept proposal →
-switch to **Studio** → Projects → the project is there. Then Invoices →
-`INV-2039` → record a partial payment → the outstanding KPI on Home has moved.
-
-## Deploy
-
-- **Vercel** — import the repo. Build command `npm run build`, output `dist`.
-- **DigitalOcean App Platform** — import the repo; same build command.
-- **Host anywhere** — `npm run build` produces a static `dist/`. Or:
-
-  ```bash
-  docker build -t client-portal .
-  ```
-
-### Build scripts
+`npm run dev:hosted` serves the desk with hot reload against a local
+Adminium, proxying `/api` to `ADMINIUM_DEV_API` (default
+`http://127.0.0.1:4600`). Sign in once on Adminium's own address; the
+session cookie then works for the dev server too.
 
 | Script | What it does |
 | --- | --- |
-| `npm run dev` | Start the Vite dev server. |
-| `npm run build` | Type-check + build to `dist/` at base `/`. |
-| `npm run build:demo` | Build at base `/demo/client-portal/` (Adminium demo). |
-| `npm run preview` | Preview a production build locally. |
-| `npm test` | Run the invoicing engine suite. |
+| `npm run dev` | The demo, with hot reload. |
+| `npm run dev:hosted` | The desk against a local Adminium, with hot reload. |
+| `npm run build` | Type-check, then build the demo at base `/`. |
+| `npm run build:demo` | Type-check, then build the website demo at `/demo/client-portal/app/`, with the card's `demo.json`. |
+| `npm run build:surface` | Build both sides as Adminium serves them, into `dist-surface/clients/staff` and `dist-surface/clients/customer` (also `build:surface:staff` and `build:surface:customer`). |
+| `npm run preview` | Preview a build locally. |
+| `npm test` | The whole suite (Vitest). |
+| `npm run manifest` | Rewrite `manifest.json` from `src/manifest/`. |
+| `npm run sample` | Rewrite the part of `src/data/sampleRows.ts` that comes from the manifest (each column's default and the rules rows are settled by). |
+| `npm run row-types` | Rewrite `src/data/types.ts` from the manifest. |
+| `npm run lexicon` / `lexicon:check` | Copy, or check, the release word list the manifest's words are held to (from the add-ons checkout). |
 
-## Full implementation (self-host)
+`manifest.json`, `src/data/types.ts` and the manifest-derived part of
+`src/data/sampleRows.ts` are written from source, and tests fail when the
+checked-in copies drift from it.
 
-There are two ways to run this studio.
+### The three-engine contract
 
-**One click — the frontend on its own.** The Vercel / DigitalOcean routes above
-deploy the portal by itself, running on the bundled demo studio. No database,
-no dashboard — a fully static preview.
+`src/contract/contract.test.ts` installs this repo's own manifest and sample
+on a **built** Adminium with the Invoices & Receipts add-on, then walks
+through the whole contract: install, the sample at 28 July, every invoice's
+totals, two payments racing for the same balance, a void and its reminders,
+a client signing in by link and accepting a proposal, and the sample
+removed. The demo plays the same scenario and is held to the same figures,
+so the demo cannot drift from what Adminium does.
 
-**One command — the whole stack.**
-[`docker-compose.yml`](docker-compose.yml) stands up Postgres (seeded by
-default with the *same* clients, proposals, projects and invoices), an
-auto-generated Adminium dashboard that runs that real database, and the portal:
+It needs two checkouts and skips (saying why) without them:
+
+| Variable | What it points at |
+| --- | --- |
+| `ADMINIUM_REPO` | An Adminium checkout with its server, dashboard and e2e script built (`pnpm turbo run build --filter="@adminium/e2e..."`). |
+| `ADD_ONS_REPO` | An add-ons checkout with Invoices & Receipts built. Defaults to `../add-ons`. |
+| `TEST_POSTGRES_URL` | Adds the Postgres run. SQLite always runs. |
+| `TEST_MYSQL_URL` | Adds the MySQL run. |
 
 ```bash
-cp .env.example .env      # then set ADMINIUM_SECRET — e.g. openssl rand -hex 32
-docker compose up
+ADMINIUM_REPO=../adminium ADD_ONS_REPO=../add-ons \
+TEST_POSTGRES_URL=postgres://postgres:postgres@127.0.0.1:5432/postgres \
+TEST_MYSQL_URL=mysql://root@127.0.0.1:3306 \
+npx vitest run src/contract
 ```
 
-- **Client portal** → http://localhost:8080
-- **Adminium dashboard** → http://localhost:4600
-
-On first boot, `clients-db` applies [`db/schema.sql`](db/schema.sql), installs
-the demo bookkeeping in [`db/demo-toolkit.sql`](db/demo-toolkit.sql), and then
-loads [`db/seed.sql`](db/seed.sql) unless you set `DEMO_DATA=0`. Adminium
-imports the studio database as its first source connection, introspects the
-schema, and generates the back office. Finish the ~1-minute first-run wizard
-at `:4600` — it's pre-pointed at the studio database. The install spec
-Adminium reads to configure itself is [`manifest.json`](manifest.json).
-
-The seed is the app's own fiction, not a second one: Drift & Fern is still
-waiting on round 3 of the logo, `INV-2037` is still 47 days late, and Low
-Orbit's $1,200.00 part payment is a row in `payments`. A reader who has used
-the portal recognises every record.
-
-The manifest scaffolds 9 tables, 5 dashboard pages, 1 access preset
-(`studio-owner`) and 6 settings into your connected database.
-
-### Demo data
-
-The studio arrives seeded: Outline's clients, proposals, projects, invoices and
-payments are in the database the first time you open `:8080`. To start empty
-instead — the same full schema, no rows — set `DEMO_DATA=0` in `.env` before
-the first `docker compose up`. Neither choice is permanent; the demo rows go in
-and out again from four scripts:
-
-| Script | What it does |
-| --- | --- |
-| `npm run demo:status` | What is loaded right now, table by table. |
-| `npm run demo:import` | Load [`db/seed.sql`](db/seed.sql). |
-| `npm run demo:wipe` | Remove the demo rows — the schema and your own rows stay. |
-| `npm run demo:reset` | Wipe, then import a fresh copy. |
-
-A wipe deletes only the rows the seed added. A demo row your own data depends
-on is kept rather than force-deleted, and reported under `kept`; but
-`ON DELETE CASCADE` still applies, so a demo project takes its milestones with
-it and a demo invoice takes its payments — including rows you added yourself,
-which are counted separately as `cascaded`. `wipe` and `reset` ask before they
-do anything; pass `--yes` (`npm run demo:wipe -- --yes`) to skip the question,
-which is what a script needs — with no terminal to ask, the command stops. Set
-`DATABASE_URL` to run any of them against a Postgres elsewhere.
-[`db/README.md`](db/README.md) has the rest: how the wipe knows which rows are
-the demo's, and what it keeps.
-
-## The split: the portal and the back office
-
-| In this app | In the generated dashboard |
-| --- | --- |
-| Writing and sending a proposal | Every table as records, with full CRUD |
-| The client's review, approval and payment | Bookkeeping and reconciliation |
-| Project progress and deliverable sign-off | Reporting across the whole history |
-
-## Connecting to Adminium
-
-All data access goes through a thin `DataSource` interface
-([`src/data/source.ts`](src/data/source.ts)) with a single `demoSource`
-implementation. **Today the deployed demo is demo data only — nothing is
-persisted, no card is charged and no email reaches a person.** Once Adminium's
-browser-safe publishable key (`adm_pub_…`) ships, a second implementation reads
-and writes live data without touching any screen or the store.
-
-### What is deliberately out of scope
-
-- **Real payments.** The card sheet is a visual fiction and says so, verbatim,
-  every time it opens.
-- **Sending email.** Sending a proposal flips its status and raises a toast
-  that admits no message was sent.
-- **PDF generation.** Documents render as HTML; export belongs to a later
-  phase.
-- **Recurring invoices.** They need a job runner this version does not have.
+`ADMINIUM_REQUIRE_CONTRACT=1` turns a skip into a failure. CI's `contract`
+workflow sets it and runs all three engines, alongside the drift checks for
+the copies this repo keeps of other repos' files (the add-on's shapes, the
+manifest validator, the word list and the demo's printed copies) and both
+surface builds plus the demo. The `ci` workflow builds and runs the suite.
 
 ## Project structure
 
 ```
 src/
-  app/         App shell + the exhaustive 12-view switch
-  state/       Zustand store (persona, documents, portal gate, toasts)
-  data/        demo.ts (the seeded studio), types.ts, source.ts (DataSource seam)
-  i18n/        8-locale runtime, locale registry, ambient bridge, strings/
-  lib/         invoice.ts (the engine) + tests, format.ts (locale-aware output)
-  screens/     Studio.tsx (7 studio views + shared tables), Portal.tsx (4 + 404)
-  components/  the two shells, demo dock, overlays, primitives
-  styles/      tokens.css (canonical tokens + bronze accent), base.css,
-               components.css, screens.css
+  app/         App shell, the route table for both sides, deep links
+  screens/     the desk's screens (one file per view) and client/ (the clients' side)
+  sheets/      the desk's dialogs: record a payment, start a project, send …
+  state/       the desk and portal stores; actions.ts (the desk's writes),
+               clientActions.ts (the client's)
+  data/        ports.ts (the doors every read and write goes through), sink.ts
+               (where the desk's writes go), the Adminium and public-API sources,
+               row types written from the manifest, the sample resolver
+  manifest/    the typed modules manifest.json is written from
+  demo/        the demo's stand-in world, rules, outbox and printed copies
+  i18n/        8-locale runtime and strings per area
+  components/  the two frames, sheets, toasts, shared pieces
+  lib/         the studio's clock, money and dates for display
+  styles/      tokens and one stylesheet per area
+  contract/    the three-engine contract and its harness
+  testing/     shared test helpers and the vendored manifest validator
+seeds/         clients.sample.json, the sample Adminium adds
+scripts/       manifest, sample and row-type writers, sync checks, release
 public/fonts/  self-hosted Manrope + JetBrains Mono (woff2)
-db/            schema.sql, seed.sql and the demo-data toolkit (db/README.md)
 ```
 
 ## License
 
-[AGPL-3.0](LICENSE) © 2026 Client Portal. A demo shipped with Adminium.
+[AGPL-3.0](LICENSE) © 2026 Client Portal. An example app for Adminium.

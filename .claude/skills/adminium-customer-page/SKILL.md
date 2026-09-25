@@ -67,13 +67,23 @@ Ask these before writing anything. Each one changes the code.
 
 Follow the repo's own conventions; read two neighbouring screens before writing a third.
 
-- **One screen module** in `src/screens/`, matching the naming of what is there.
-- **The `View` union in `src/data/types.ts`** and the `SCREENS` record in `src/app/App.tsx`.
-  These are mapped one-to-one on purpose — adding a view is a compile error until a screen
-  exists for it, which is what keeps every link landing somewhere real.
-- **Store actions** in `src/state/store.ts` for anything the page writes.
-- **Reads through `src/data/source.ts`**, never by importing `src/data/demo.ts`. The seam is
-  bypassed in twelve of the fifteen repos already; do not add to that.
+- **One screen module** in `src/screens/` for a staff page, or `src/screens/client/` for a
+  customer page, matching the naming of what is there.
+- **The view in `src/app/routes.ts`** (`DESK_VIEWS`/`DESK_ROUTES` or
+  `CLIENT_VIEWS`/`CLIENT_ROUTES`), its entry in `src/surface-nav.ts` (`SURFACE_NAV` for a page
+  with its own path, `SURFACE_EXTRAS` for one reached from another), and the
+  `DESK_SCREENS` or `CLIENT_SCREENS` record in `src/app/App.tsx`. These are mapped one-to-one
+  on purpose — adding a view is a compile error until a screen exists for it, and
+  `src/app/routes.test.ts` holds the three together, which is what keeps every link landing
+  somewhere real.
+- **Actions** for anything the page writes: a staff page's in `src/state/actions.ts`, which
+  writes through the desk's `DeskWrites` port (`src/data/ports.ts`, implemented by
+  `src/data/sink.ts`); a customer page's in `src/state/clientActions.ts`, which writes through
+  the `PortalPort` (`src/data/ports.ts`, implemented by `src/data/publicSource.ts`). Screens
+  never write a row themselves.
+- **Reads through the ports in `src/data/ports.ts`**, by way of the stores: `src/state/desk.ts`
+  for a staff page, `src/state/portal.ts` for a customer page. Never import `src/data/demo.ts`
+  or anything under `src/demo/` from a screen; those are the demo build's only.
 - **i18n keys in English only.** Every user-visible string goes through the repo's `t()`.
   Author the English text; do not invent translations. Read `references/repo-shapes.md`
   before touching the locale files — the two i18n layouts differ, and ICU plurals need the
