@@ -28,7 +28,14 @@
           },
           "hours_per_day": 6,
           "days_per_week": 4,
-          "notify_enquiry": false
+          "notify_enquiry": false,
+          "notify_accepted": true,
+          "notify_declined": true,
+          "notify_files": true,
+          "notify_paid": true,
+          "notify_brief": true,
+          "notify_new_price": true,
+          "notify_notes": true
         }
       ]
     },
