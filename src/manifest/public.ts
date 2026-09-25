@@ -109,8 +109,10 @@ export const PUBLIC_ACCESS = [
   {
     table: "clients",
     methods: ["GET"],
-    select: ["company", "contact_name"],
+    // Their own id too: a statement is drawn over the client's own row.
+    select: ["id", "company", "contact_name"],
     claim: { verify: "email-link", email: "email" },
+    documents: ["statement"],
     humanCheck: true,
   },
 
@@ -235,7 +237,7 @@ export const PUBLIC_ACCESS = [
       { column: "status", op: "in", value: ["sent", "void"] },
       { column: "issued_on", op: "gte", value: "1970-01-01" },
     ],
-    documents: ["invoice", "statement"],
+    documents: ["invoice"],
     ...mine,
   },
   {
@@ -273,7 +275,7 @@ export const PUBLIC_ACCESS = [
   {
     table: "handover_files",
     methods: ["GET"],
-    select: ["id", "project_id", "file", "note", "position"],
+    select: ["id", "project_id", "file", "link", "note", "position"],
     files: ["file"],
     visibleWith: { table: "projects", via: "project_id" },
     key: "handover",

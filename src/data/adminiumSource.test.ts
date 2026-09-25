@@ -110,3 +110,23 @@ describe("the desk's other reads", () => {
     expect(await reads.search("  ", 7)).toEqual([]);
   });
 });
+
+describe("the add-on's documents for the desk", () => {
+  it("asks Adminium to draw one for a row, by the app's own table name and the row's key", async () => {
+    const calls: { url: string; init: RequestInit }[] = [];
+    const fetchImpl = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      calls.push({ url: String(input), init: init ?? {} });
+      return new Response(JSON.stringify({ id: "d1", contentUrl: "/api/v1/documents/d1/content", printUrl: "/api/v1/documents/d1/print", reused: false, document: {} }), { status: 201 });
+    };
+    const transport = createSessionTransport({ tableOfRef: realTables({}), connectionId: "conn-1", staff: { csrfToken: "tok", timezone: "UTC", currency: "USD" }, fetchImpl: fetchImpl as never });
+    const reads = sessionDeskReads(transport);
+    await transport.port.config();
+    expect(await reads.documentUrl?.("statement", "clients", 3, "de-DE", "year")).toEqual({ contentUrl: "/api/v1/documents/d1/content", printUrl: "/api/v1/documents/d1/print" });
+    const last = calls.at(-1)!;
+    expect(last.url).toBe("/api/v1/apps/clients/documents/render");
+    expect(last.init.method).toBe("POST");
+    expect(JSON.parse(String(last.init.body))).toEqual({ kind: "statement", ref: "clients", pk: { id: 3 }, locale: "de-DE", period: "year" });
+    await reads.documentUrl?.("invoice", "invoices", 12, "en-US");
+    expect(JSON.parse(String(calls.at(-1)!.init.body))).toEqual({ kind: "invoice", ref: "invoices", pk: { id: 12 }, locale: "en-US" });
+  });
+});

@@ -98,6 +98,8 @@ describe("one project", () => {
   it("shows the brief's answers when it is in, and the ways on — a void invoice says void, never paid", () => {
     const s = useDesk.getState();
     upsert("invoices", { ...s.rows.invoices[2]!, status: "void", balance: "0.00" });
+    // The client sends their brief back.
+    upsert("briefs", { ...s.rows.briefs[1]!, status: "sent", sent_at: "2026-06-12T10:00:00.000Z" });
     const words = text(draw(<Project />));
     expect(words).toContain("Their brief In WHO IS THIS FOR? People who still write by hand.".replace("WHO IS THIS FOR?", "Who is this for?"));
     expect(words).toContain("Preview as the client");

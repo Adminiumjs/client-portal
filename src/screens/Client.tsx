@@ -21,11 +21,10 @@ import { isInDate, loadClient, loadWhere, useDesk, useRow, useRows } from "../st
 import { refusalKey } from "../state/outcome.ts";
 import { previewClient } from "../state/preview.ts";
 import { openSheet } from "../state/sheets.ts";
-import { go, open, openComposer, toast, useUi } from "../state/ui.ts";
+import { go, open, openComposer, openPrint, toast, useUi } from "../state/ui.ts";
 import { clientFigures, progressOf } from "./clients/figures.ts";
 import { CLIENT_STATE_TONE } from "./clients/state.ts";
 import { invoiceWord, isDiscarded, isOpen, sumsLabel } from "./invoices/figures.ts";
-import { openPrint } from "./print/target.ts";
 
 export default function ClientRecord() {
   const { t, money, number } = useI18n();

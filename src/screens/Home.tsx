@@ -39,7 +39,7 @@ import { studioZone } from "../lib/clock.ts";
 import { dayLabel, instantLabel } from "../lib/dates.ts";
 import { addDays, venueMidnight } from "../data/venueTime.ts";
 import { ensureRows, loadPage, loadWhere, useDesk } from "../state/desk.ts";
-import { go, open } from "../state/ui.ts";
+import { go, open, openInvoices } from "../state/ui.ts";
 import { aging, feed, kpis, overdueInvoices, proposalsOut, waiting, week, type FeedKind, type Target } from "./home/model.ts";
 
 const FEED_LOOK: Readonly<Record<FeedKind, { icon: LucideIcon; tone: "pos" | "info" | "warn" }>> = {
@@ -158,7 +158,7 @@ export default function Home() {
         </div>
         <div className="home-aging-grid">
           {buckets.map((b) => (
-            <button key={b.key} type="button" className={`home-bucket ol-chip home-bucket--${b.key}${b.count === 0 ? " home-bucket--empty" : ""}`} onClick={() => go("invoices")}>
+            <button key={b.key} type="button" className={`home-bucket ol-chip home-bucket--${b.key}${b.count === 0 ? " home-bucket--empty" : ""}`} onClick={() => openInvoices(b.key)}>
               <span className="home-bucket-label">{t(`home.aging.${b.key}` as MessageKey)}</span>
               <span className="home-bucket-amount">{money(b.amount, figures.currency)}</span>
               <span className="home-bucket-count">{t("home.agingCount", {}, b.count)}</span>

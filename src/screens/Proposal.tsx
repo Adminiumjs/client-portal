@@ -41,7 +41,7 @@ import { loadProposal, loadWhere, useDesk, useRow, useRows } from "../state/desk
 import { refusalKey } from "../state/outcome.ts";
 import { previewClient } from "../state/preview.ts";
 import { openSheet } from "../state/sheets.ts";
-import { go, open, openComposer, toast, useUi } from "../state/ui.ts";
+import { go, open, openComposer, openPrint, toast, useUi } from "../state/ui.ts";
 import { proposalState, proposalWord, shortFingerprint, termsVersionLabel } from "./proposals/model.ts";
 import { scopeParagraphs } from "./composer/draft.ts";
 import { dayWithYear } from "./proposals/format.ts";
@@ -51,11 +51,6 @@ const first = (name: string | undefined) => (name ?? "").trim().split(/\s+/)[0] 
 /** The latest reminder about a proposal: gone out, or still going. */
 function lastReminder(messages: readonly Message[], proposalId: Id): Message | null {
   return messages.filter((m) => m.proposal_id === proposalId && m.kind === "proposal-reminder" && m.status !== "skipped" && m.status !== "failed").sort((a, b) => b.id - a.id)[0] ?? null;
-}
-
-/** Open the printed copy of a proposal. */
-function openPrint(proposalId: Id): void {
-  useUi.setState((s) => ({ view: "print", menu: false, selected: { ...s.selected, proposal: proposalId, invoice: null } }));
 }
 
 export default function Proposal() {
@@ -295,7 +290,7 @@ export default function Proposal() {
             )}
             {state.canPreview && (
               <>
-                <Button icon={Printer} onClick={() => openPrint(p.id)}>
+                <Button icon={Printer} onClick={() => openPrint({ kind: "quote", id: p.id })}>
                   {t("proposals.print")}
                 </Button>
                 <Button icon={Eye} onClick={() => void previewClient(p.client_id, "proposal", "proposal")}>

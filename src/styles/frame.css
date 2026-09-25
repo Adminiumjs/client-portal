@@ -514,10 +514,17 @@
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
-  max-width: 45vw;
+  /* A long company name gives way before the studio's name does. */
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 42vw;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.portal-bar .brand-text {
+  flex: 0 1 auto;
+  min-width: 0;
 }
 .portal-bar .icon-btn {
   width: 34px;

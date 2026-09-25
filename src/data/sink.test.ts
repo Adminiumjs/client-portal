@@ -115,6 +115,22 @@ describe("the session sink", () => {
   });
 });
 
+describe("the add-on's settings", () => {
+  it("reads an add-on's stored values and declared keys from the add-ons' list, with no write token", async () => {
+    const fetchImpl = vi.fn(async () =>
+      new Response(JSON.stringify({ addOns: [{ key: "other" }, { key: "invoices", settings: [{ key: "tax_name" }, { key: "default_terms" }], settingValues: { tax_name: "VAT", default_terms: "net14" } }] }), { status: 200 }),
+    );
+    const sink = sessionSink(transport(vi.fn() as never), TABLE_OF_REF, { csrfToken: () => "tok", fetchImpl: fetchImpl as never });
+    expect(await sink.addOnSettings?.("invoices")).toEqual({ values: { tax_name: "VAT", default_terms: "net14" }, declared: ["tax_name", "default_terms"] });
+    expect(await sink.addOnSettings?.("absent")).toBeNull();
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("/api/v1/add-ons");
+    expect(init).toMatchObject({ method: "GET", credentials: "same-origin" });
+    expect(init.headers).not.toHaveProperty("x-adminium-csrf");
+    expect(init).not.toHaveProperty("body");
+  });
+});
+
 describe("action keys", () => {
   it("give every step its own 36-character key, the same on every retry", () => {
     const key = actionKey();

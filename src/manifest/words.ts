@@ -242,6 +242,7 @@ export const WORDS: Record<string, Translation> = {
   "Standard": { "de-DE": "Normal", "fr-FR": "Standard", "da-DK": "Standard", "cs-CZ": "Standardní", "ar-EG": "عادي", "zh-CN": "标准", "zh-TW": "標準" },
   "Started": { "de-DE": "Begonnen", "fr-FR": "Commencé", "da-DK": "Startet", "cs-CZ": "Zahájeno", "ar-EG": "بدأ", "zh-CN": "开始日期", "zh-TW": "開始日期" },
   "State": { "de-DE": "Stand", "fr-FR": "État", "da-DK": "Tilstand", "cs-CZ": "Stav", "ar-EG": "الحالة", "zh-CN": "状态", "zh-TW": "狀態" },
+  "Statement": { "de-DE": "Kontoauszug", "fr-FR": "Relevé", "da-DK": "Kontoudtog", "cs-CZ": "Výpis", "ar-EG": "كشف الحساب", "zh-CN": "对账明细", "zh-TW": "對帳明細" },
   "Status": { "de-DE": "Status", "fr-FR": "Statut", "da-DK": "Status", "cs-CZ": "Stav", "ar-EG": "الحالة", "zh-CN": "状态", "zh-TW": "狀態" },
   "Still owed": { "de-DE": "Noch offen", "fr-FR": "Reste dû", "da-DK": "Stadig skyldig", "cs-CZ": "Zbývá uhradit", "ar-EG": "المتبقي", "zh-CN": "尚欠", "zh-TW": "尚欠" },
   "Studio mark": { "de-DE": "Studio-Zeichen", "fr-FR": "Logo du studio", "da-DK": "Studiets logo", "cs-CZ": "Logo studia", "ar-EG": "شعار الاستوديو", "zh-CN": "工作室标志", "zh-TW": "工作室標誌" },

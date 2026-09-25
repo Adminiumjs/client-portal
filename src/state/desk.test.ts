@@ -7,7 +7,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { fakeStudio, type FakeStudio } from "../testing/fakeStudio.ts";
 import { DEMO_START } from "../lib/clock.ts";
-import { loadClient, loadInvoice, loadProposal, meOf, navCounts, rowsOf, upsert, useDesk } from "./desk.ts";
+import { addOnSettings, addOnText, deskWrites, loadAddOnSettings, loadClient, loadInvoice, loadProposal, meOf, navCounts, rowsOf, setDeskWrites, upsert, useDesk } from "./desk.ts";
+import { saveInvoiceSettings } from "./actions.ts";
 
 let studio: FakeStudio;
 beforeEach(async () => {
@@ -70,5 +71,25 @@ describe("who is signed in", () => {
     expect(meOf({ name: "Nadia Cole", email: "n@x.example" }, { tables: {}, roles: [{ slug: "studio", name: "Studio" }, { slug: "studio-manager", name: "Studio manager" }] })).toMatchObject({ roleName: "Studio manager", manager: true });
     // A server that says nothing hides nothing: Adminium refuses what it refuses.
     expect(meOf(null, null)).toMatchObject({ manager: true, roleName: null });
+  });
+});
+
+describe("the invoices add-on's settings on the desk", () => {
+  it("are read once through the sink's read, and follow a save", async () => {
+    const base = deskWrites();
+    setDeskWrites({ ...base, addOnSettings: async (key: string) => (key === "invoices" ? { values: { tax_name: "VAT", payment_instructions: "  " }, declared: ["tax_name", "payment_instructions"] } : null) });
+    await loadAddOnSettings("invoices");
+    expect(addOnSettings("invoices")).toEqual({ tax_name: "VAT", payment_instructions: "  " });
+    expect(addOnText(addOnSettings("invoices"), "tax_name")).toBe("VAT");
+    expect(addOnText(addOnSettings("invoices"), "payment_instructions")).toBeNull();
+    await saveInvoiceSettings({ tax_name: "Sales tax" });
+    expect(addOnSettings("invoices")).toEqual({ tax_name: "Sales tax" });
+  });
+
+  it("stay unknown where the sink cannot read them (the demo), and the desk still starts", async () => {
+    const { addOnSettings: _none, ...rest } = deskWrites();
+    setDeskWrites(rest);
+    await loadAddOnSettings("invoices");
+    expect(addOnSettings("invoices")).toBeNull();
   });
 });

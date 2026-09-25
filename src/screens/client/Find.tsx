@@ -14,6 +14,7 @@ import { CircleAlert, LogIn, Mail, MailCheck, RotateCw } from "lucide-react";
 import { Alert, Button } from "../../components/ui.tsx";
 import { useI18n, type MessageKey } from "../../i18n/index.tsx";
 import { requestSignInLink, signInWithCode } from "../../state/clientActions.ts";
+import { useDemoSignal } from "../../state/demoSignal.ts";
 import { usePortal } from "../../state/portal.ts";
 import { toast } from "../../state/ui.ts";
 import { CODE_LENGTH, RESEND_AFTER, codeProblem, emailProblem, emptyCode, maskEmail, placeDigits, sendProblem, type CodeProblem } from "./signin/model.ts";
@@ -43,14 +44,14 @@ export default function Find() {
 
   const focusBox = (i: number) => setTimeout(() => boxes.current[i]?.focus(), 0);
 
-  const send = async () => {
-    const problem = emailProblem(email);
+  const send = async (address: string = email) => {
+    const problem = emailProblem(address);
     if (problem !== null) {
       setEmailError(problem === "empty" ? "client.find.emailEmpty" : "client.find.emailShape");
       return;
     }
     setBusy(true);
-    const out = await requestSignInLink(email.trim(), locale);
+    const out = await requestSignInLink(address.trim(), locale);
     setBusy(false);
     const refused = sendProblem(out);
     if (refused !== null) {
@@ -65,6 +66,15 @@ export default function Find() {
     setClock(Date.now());
     setStep("check");
   };
+
+  // The website demo's sign-in shortcuts: the address typed in (and, for "send", sent) as a person would.
+  useDemoSignal("signin.fill", (fill) => {
+    const address = fill["email"] ?? "";
+    setStep("email");
+    setEmail(address);
+    setEmailError(null);
+    if (fill["send"] === "yes") void send(address);
+  });
 
   const resend = async () => {
     if (wait > 0 || busy) return;

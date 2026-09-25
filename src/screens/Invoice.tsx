@@ -33,9 +33,8 @@ import { loadInvoice, useDesk, useManager, useRow, useRows } from "../state/desk
 import { refusalKey } from "../state/outcome.ts";
 import { previewClient } from "../state/preview.ts";
 import { openSheet } from "../state/sheets.ts";
-import { go, open, openComposer, toast, useUi } from "../state/ui.ts";
+import { go, open, openComposer, openPrint, toast, useUi } from "../state/ui.ts";
 import { daysOverdue, invoiceWord, isDiscarded, isOpen, ledger, type LedgerRow } from "./invoices/figures.ts";
-import { openPrint } from "./print/target.ts";
 import { firstName, LADDERS } from "./invoices/words.ts";
 
 export default function Invoice() {

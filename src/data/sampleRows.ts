@@ -157,7 +157,7 @@ export const COLUMNS: Record<string, Record<string, Fill>> = {
   proposal_lines: { document_id: REQUIRED, position: 0, description: null, qty: 1, rate: null, discount_kind: "amount", discount: null, currency: null, amount: null, client_id: null, client_key: null },
   projects: { number_seq: null, number: null, client_id: REQUIRED, proposal_id: null, name: REQUIRED, status: "active", pause_note: null, started_on: null, done_on: null, share_token: null, share_expires_on: null, share_stopped: false, share_stopped_at: null, handover_notes: null, handover_sent: false, handover_sent_at: null, client_key: null },
   project_fonts: { project_id: REQUIRED, client_id: null, name: REQUIRED, licence: null, position: 0, client_key: null },
-  handover_files: { project_id: REQUIRED, client_id: null, file: null, note: null, position: 0, client_key: null },
+  handover_files: { project_id: REQUIRED, client_id: null, file: null, link: null, note: null, position: 0, client_key: null },
   milestones: { project_id: REQUIRED, client_id: null, title: REQUIRED, due_on: null, state: "next", done_at: null, estimated_days: null, position: 0, client_key: null },
   deliverables: { project_id: REQUIRED, client_id: null, milestone_id: null, title: REQUIRED, icon: null, status: "unshared", shared_at: null, reviewed_at: null, review_note: null, approved_how: null, approved_on: null, approved_by: null, position: 0, client_key: null },
   deliverable_versions: { deliverable_id: REQUIRED, client_id: null, v: null, file: null, link: null, note: null, posted_by: null, posted_at: null, client_key: null },

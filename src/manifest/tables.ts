@@ -592,7 +592,17 @@ export const TABLES: Table[] = [
     ref: "handover_files",
     label: l("Handover file"),
     labelPlural: l("Handover files"),
-    columns: [id, fk("project_id", "projects", "Project"), clientOf("project_id"), text("file", 255, "File", opt), text("note", 300, "Note", opt), int("position", "Position", { default: 0 }), clientKey],
+    columns: [
+      id,
+      fk("project_id", "projects", "Project"),
+      clientOf("project_id"),
+      text("file", 255, "File", opt),
+      // A handover item may be a link instead of a file (a shared folder, a font's page).
+      text("link", 500, "Link", { ...opt, rules: { validation: { format: "url" } } }),
+      text("note", 300, "Note", opt),
+      int("position", "Position", { default: 0 }),
+      clientKey,
+    ],
   },
   {
     ref: "milestones",
@@ -634,7 +644,8 @@ export const TABLES: Table[] = [
       at("reviewed_at", "Reviewed", { ...opt, rules: stamp("now", when("status", "approved", "changes")) }),
       text("review_note", 1000, "What they said", opt),
       choice("approved_how", "Approved by", { portal: "The portal", email: "Email", call: "A call", meeting: "A meeting" }, { ...opt, rules: stamp({ byOrigin: { public: "portal" } }, when("status", "approved")) }),
-      date("approved_on", "Approved on", { ...opt, rules: stamp("today", when("status", "approved")) }),
+      // Stamped for the clients' side only: a studio's "approved by email on 24 Jul" keeps its own day.
+      date("approved_on", "Approved on", { ...opt, rules: stamp({ byOrigin: { public: "today" } }, when("status", "approved")) }),
       text("approved_by", 120, "Marked approved by", { ...opt, rules: stamp({ claim: "contact_name", staff: "user-name" }, when("status", "approved")) }),
       int("position", "Position", { default: 0 }),
       clientKey,

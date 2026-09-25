@@ -10,6 +10,7 @@
  * (`npm run manifest` re-writes it).
  */
 import { ADD_ONS } from "./add-ons.ts";
+import { DOCUMENTS } from "./documents.ts";
 import { emailTemplates } from "./emails.ts";
 import { untranslated } from "./labels.ts";
 import { KINDS, OUTBOX } from "./outbox.ts";
@@ -88,6 +89,7 @@ export function buildManifest(): Record<string, unknown> {
       { side: "customer", kind: "spa", entry: "index.html", env: ENV, routes: CUSTOMER_ROUTES },
     ],
     addOns: ADD_ONS,
+    documents: DOCUMENTS,
     navGroups: NAV_GROUPS,
     requiredSchema: { prefixed: true, tables: TABLES },
     pages: pages(),

@@ -128,15 +128,30 @@ describe("each client write sends only what its endpoint may write", () => {
 });
 
 describe("signing in by link", () => {
-  it("asks for a link, spends it, and reads a used one as expired", async () => {
-    const requestLink = vi.fn(async () => undefined);
-    const verifyLink = vi.fn(async (input: { token: string } | { email: string; code: string }) => ({ ok: "token" in input && input.token === "good" }));
-    const { client } = fakeClient({ requestLink, verifyLink });
+  it("asks for a link, greets by the link's first name, spends it, and reads a used one as expired", async () => {
+    const requestLink = vi.fn(async () => ({ sentTo: "a•••@h•••.example" }));
+    const peekLink = vi.fn(async (token: string) => (token === "good" ? "Amara" : null));
+    const openLink = vi.fn(async (token: string) => token === "good");
+    const { client } = fakeClient({ requestLink, peekLink, openLink });
     const port = await publicPortalPort(client);
     await port.requestLink(" amara@hearth.example ", "de-DE");
     expect(requestLink).toHaveBeenCalledWith({ email: "amara@hearth.example", lang: "de-DE" });
+    expect(await port.peekLink("good")).toEqual({ firstName: "Amara" });
+    expect(await port.peekLink("used")).toBeNull();
     await port.verifyLink("good");
     await expect(port.verifyLink("used")).rejects.toMatchObject({ code: "LINK_EXPIRED", status: 410 });
+  });
+
+  it("signs in by the code on another device, and resends to the link's own address", async () => {
+    const verifyLinkCode = vi.fn(async (input: { email: string; code: string }) => (input.code === "123456" ? ({ ok: true } as const) : ({ ok: false, triesLeft: 3 } as const)));
+    const resendLink = vi.fn(async () => undefined);
+    const { client } = fakeClient({ verifyLinkCode, resendLink });
+    const port = await publicPortalPort(client);
+    expect(await port.verifyCode(" amara@hearth.example", " 123456 ")).toEqual({ ok: true });
+    expect(verifyLinkCode).toHaveBeenCalledWith({ email: "amara@hearth.example", code: "123456" });
+    expect(await port.verifyCode("amara@hearth.example", "000000")).toEqual({ ok: false, triesLeft: 3 });
+    await port.resendFromLink("old-token", "en-US");
+    expect(resendLink).toHaveBeenCalledWith("old-token");
   });
 
   it("refuses to pretend with a public client that cannot sign in by link", async () => {
@@ -144,11 +159,74 @@ describe("signing in by link", () => {
     const port = await publicPortalPort(client);
     await expect(port.requestLink("a@b.example", "en-US")).rejects.toBeInstanceOf(PortError);
     await expect(port.requestLink("a@b.example", "en-US")).rejects.toMatchObject({ code: "PUBLIC_CLIENT_TOO_OLD" });
+    await expect(port.verifyLink("t")).rejects.toMatchObject({ code: "PUBLIC_CLIENT_TOO_OLD" });
   });
 
   it("carries the server's refusal code through", async () => {
     const { client } = fakeClient({ update: vi.fn(async () => { throw Object.assign(new Error("x"), { code: "PUBLIC_WRITE_REFUSED", status: 403 }); }) as never });
     const port = await publicPortalPort(client);
     await expect(port.accept(1, "A")).rejects.toMatchObject({ code: "PUBLIC_WRITE_REFUSED", status: 403 });
+  });
+});
+
+describe("the payment instructions", () => {
+  it("are the add-on's setting, read for the verified session", async () => {
+    const addOnSettings = vi.fn(async () => ({ payment_instructions: "Bank transfer to Outline Studio", business_name: "Outline" }));
+    const port = await publicPortalPort(fakeClient({ addOnSettings }).client);
+    expect(await port.paymentInstructions?.()).toBe("Bank transfer to Outline Studio");
+    expect(addOnSettings).toHaveBeenCalledWith("invoices");
+  });
+
+  it("read as none — never an error — from a client without the read, a refusal, or an empty setting", async () => {
+    expect(await (await publicPortalPort(fakeClient().client)).paymentInstructions?.()).toBeNull();
+    const refused = vi.fn(async () => {
+      throw Object.assign(new Error("x"), { code: "PUBLIC_REF_NOT_FOUND", status: 404 });
+    });
+    expect(await (await publicPortalPort(fakeClient({ addOnSettings: refused }).client)).paymentInstructions?.()).toBeNull();
+    expect(await (await publicPortalPort(fakeClient({ addOnSettings: async () => ({ payment_instructions: "  " }) }).client)).paymentInstructions?.()).toBeNull();
+  });
+});
+
+describe("documents and files", () => {
+  it("draws a statement over the client's own row, for its period", async () => {
+    const render = vi.fn(async () => ({ id: "doc-1" }));
+    const { client, list } = fakeClient({ documents: { render, contentUrl: (id: string) => `/c/${id}` } });
+    list.mockImplementation(async () => ({ data: [{ id: 9, company: "Hearth & Co", contact_name: "Amara" }] }));
+    const port = await publicPortalPort(client);
+    expect(await port.documentUrl("statement", "invoices", 42, "en-US", "year")).toBe("/c/doc-1");
+    expect(render).toHaveBeenCalledWith({ kind: "statement", ref: "clients_clients", id: 9, locale: "en-US", period: "year" });
+    await port.documentUrl("invoice", "invoices", 42, "en-US");
+    expect(render).toHaveBeenLastCalledWith({ kind: "invoice", ref: "clients_invoices", id: 42, locale: "en-US" });
+  });
+
+  it("fetches a private file with the session", async () => {
+    const file = vi.fn(async () => ({ blob: new Blob(["x"]), filename: "box.pdf", inline: true }));
+    const port = await publicPortalPort(fakeClient({ file }).client);
+    expect(await port.file?.("deliverable_versions", 3, "file")).toMatchObject({ filename: "box.pdf", inline: true });
+    expect(file).toHaveBeenCalledWith("clients_deliverable_versions", 3, "file");
+  });
+});
+
+describe("the shared handover", () => {
+  const handoverScope: PublicConfigLike = { timezone: "America/New_York", currency: "USD", refs: { clients_settings: r(["read"], ["name"]), clients_projects: r(["read"], ["id", "name"]) } };
+
+  it("opens by the link's code, then reads that project's handover", async () => {
+    const openShared = vi.fn(async () => "opened" as const);
+    const hlist = vi.fn(async (ref: string) => ({ data: ref === "clients_projects" ? [{ id: 4, name: "Studio identity" }] : [] }));
+    const handover = { ...fakeClient().client, config: async () => handoverScope, openShared, list: hlist as never };
+    const port = await publicPortalPort(fakeClient().client, { handover });
+    expect((await port.openHandover("CODE")).project).toMatchObject({ id: 4, name: "Studio identity" });
+    expect(openShared).toHaveBeenCalledWith("CODE");
+  });
+
+  it("tells a stopped link from one that opens nothing", async () => {
+    for (const [answer, code] of [
+      ["closed", "LINK_STOPPED"],
+      ["unknown", "LINK_UNKNOWN"],
+    ] as const) {
+      const handover = { ...fakeClient().client, config: async () => handoverScope, openShared: async () => answer };
+      const port = await publicPortalPort(fakeClient().client, { handover });
+      await expect(port.openHandover("CODE")).rejects.toMatchObject({ code });
+    }
   });
 });

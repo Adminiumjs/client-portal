@@ -59,6 +59,8 @@ export async function fakeStudio(opts: { at?: number } = {}): Promise<FakeStudio
     upload: (ref, column, file, filename) => around({ op: "upload", table: ref, values: { column, filename } }, () => world.writes.upload(ref, column, file, filename)),
     regenerateCode: (ref, id, column) => around({ op: "regenerate", table: ref, id, values: { column } }, () => world.writes.regenerateCode(ref, id, column)),
     saveAddOnSettings: (key, values) => around({ op: "settings", table: "add-on", values: { key, ...values } }, () => world.writes.saveAddOnSettings(key, values)),
+    // A read, recorded as nothing; only where the world keeps the add-on's settings.
+    ...(world.writes.addOnSettings === undefined ? {} : { addOnSettings: (key: string) => world.writes.addOnSettings!(key) }),
   };
   resetDesk();
   resetPortal();

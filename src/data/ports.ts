@@ -102,6 +102,28 @@ export interface SearchHit {
   client: string | null;
 }
 
+/** A document the Invoices & Receipts add-on draws for one of the app's rows. */
+export type DocumentKind = "quote" | "invoice" | "receipt" | "statement";
+
+/** A statement's period: everything, this year, or the last twelve months. */
+export type StatementPeriod = "all" | "year" | "12m";
+
+/**
+ * Where one of the add-on's documents is: the HTML copy made for printing,
+ * and the PDF where one was drawn (null where none was: the demo's copies are
+ * HTML only).
+ */
+export interface DocumentLink {
+  printUrl: string;
+  contentUrl: string | null;
+}
+
+/** An add-on's stored settings, and the keys it declares (a secret one never comes back). */
+export interface AddOnSettings {
+  values: Record<string, unknown>;
+  declared: string[];
+}
+
 export interface DeskReads {
   /** The boot read set, bounded (see `DeskSnapshot`). */
   snapshot(today: Day, zone: string): Promise<DeskSnapshot>;
@@ -117,6 +139,15 @@ export interface DeskReads {
   page<R extends TableRef>(ref: R, query: PageQuery): Promise<Page<Tables[R]>>;
   /** The header's search: proposals, invoices and projects by number or title, clients by name. */
   search(text: string, limit: number): Promise<SearchHit[]>;
+  /**
+   * One of the add-on's documents for a row the desk can read: a quote
+   * (`proposals`), an invoice (`invoices`), a receipt (`payments`) or a
+   * statement (`clients`, over a period). Adminium draws it; the demo opens
+   * the copy the add-on drew at build time. Null — or no method at all —
+   * when nothing was drawn for the row: the printed copy then draws the
+   * document itself from the stored rows.
+   */
+  documentUrl?(kind: DocumentKind, ref: TableRef, id: Id, locale: string, period?: StatementPeriod): Promise<DocumentLink | null>;
 }
 
 export type RowValues = Record<string, unknown>;
@@ -134,6 +165,14 @@ export interface DeskWrites {
   regenerateCode<R extends TableRef>(ref: R, id: Id, column: string): Promise<Tables[R]>;
   /** The Invoices & Receipts add-on's settings (a studio manager's). */
   saveAddOnSettings(addOnKey: string, values: Record<string, unknown>): Promise<Record<string, unknown>>;
+  /**
+   * An add-on's stored settings and the keys it declares; null when it is not
+   * installed. Any signed-in staff member may read them (no secret is in
+   * them): the desk's composer, chasing and printed copy read the defaults,
+   * the Settings card edits them. Absent where nothing keeps them (the demo,
+   * until its world does).
+   */
+  addOnSettings?(addOnKey: string): Promise<AddOnSettings | null>;
 }
 
 // ── the clients' side ───────────────────────────────────────────────────────
@@ -163,6 +202,14 @@ export interface PublicStudio {
   briefQuestions: Pick<BriefQuestion, "key" | "question" | "hint" | "kind" | "position">[];
 }
 
+/** A private file, as the clients' side receives it: its bytes, its name, and whether a page may draw it. */
+export interface PrivateFile {
+  blob: Blob;
+  filename: string | null;
+  /** An image or a PDF the page may draw; anything else is a download. */
+  inline: boolean;
+}
+
 /** Who is signed in on the clients' side. */
 export interface Me {
   company: string;
@@ -188,8 +235,6 @@ export interface ClientNote {
   pin_y: string | null;
 }
 
-/** A document the add-on renders for one of the client's rows. */
-export type DocumentKind = "quote" | "invoice" | "statement" | "receipt";
 
 /** The shared handover page, read through its share link. */
 export interface HandoverView {
@@ -218,7 +263,7 @@ export interface PortalPort {
   verifyLink(token: string): Promise<void>;
   /** The six-digit code from the same email, on another device. */
   verifyCode(email: string, code: string): Promise<CodeResult>;
-  /** "Email me a new link" from a used or expired link: to that link's own address. */
+  /** "Email me a new link" from a used or expired link: to that link's own address (and in its language). */
   resendFromLink(token: string, language: string): Promise<void>;
   signOut(): Promise<void>;
 
@@ -227,10 +272,24 @@ export interface PortalPort {
   me(): Promise<Me>;
   /** The signed-in client's own rows of a table, as the manifest scopes them. */
   list<R extends TableRef>(ref: R, where?: ListCondition, order?: string, limit?: number): Promise<Tables[R][]>;
-  /** A link to one of the add-on's documents for a row the client may see. */
-  documentUrl(kind: DocumentKind, ref: TableRef, id: Id, locale: string): Promise<string>;
-  /** A short-lived link to a file column's file (a deliverable version, a handover file). */
+  /**
+   * A link to one of the add-on's documents for a row the client may see. A
+   * statement is over the client themselves, for a period (all by default).
+   */
+  documentUrl(kind: DocumentKind, ref: TableRef, id: Id, locale: string, period?: StatementPeriod): Promise<string>;
+  /**
+   * The studio's payment instructions, served to a signed-in (verified)
+   * client only; null when there are none or this server cannot say.
+   */
+  paymentInstructions?(): Promise<string | null>;
+  /**
+   * A short-lived link to a file column's file (a deliverable version, a
+   * handover file). The live client fetches files WITH the session instead
+   * (`file`); this answers only where a plain link exists (the demo).
+   */
   fileUrl(ref: TableRef, id: Id, column: string): string;
+  /** A private file a row of this session names, fetched with the session. */
+  file?(ref: TableRef, id: Id, column: string): Promise<PrivateFile>;
 
   // writes — each through its own narrow door
   accept(proposalId: Id, signedName: string): Promise<Tables["proposals"]>;

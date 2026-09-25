@@ -13,9 +13,10 @@
  * rows come back in the app's spelling (`rows.ts`).
  */
 import type { SessionTransport } from "./sessionSource.ts";
+import { APP_KEY } from "../surface-nav.ts";
 import type { ListCondition } from "./snapshotPort.ts";
 import { normaliseAll } from "./rows.ts";
-import type { DeskReads, DeskSnapshot, Page, PageQuery, SearchHit } from "./ports.ts";
+import type { DeskReads, DeskSnapshot, DocumentLink, Page, PageQuery, SearchHit } from "./ports.ts";
 import type { Id, TableRef, Tables } from "./types.ts";
 import { addDays, venueMidnight } from "./venueTime.ts";
 
@@ -187,6 +188,25 @@ export function sessionDeskReads(
         ...clients.map((c) => ({ table: "clients" as const, id: c.id, label: c.company, title: c.contact_name, client: null })),
       ];
       return hits.slice(0, limit);
+    },
+
+    /*
+     * The add-on's document for one row, drawn by Adminium: the app names the
+     * table by its own short name and the row by its key; Adminium finds the
+     * real table, checks this person may read everything the document shows,
+     * and answers where the PDF and the printable HTML are (reusing a copy
+     * already drawn while the row is unchanged).
+     */
+    async documentUrl(kind, ref, id, locale, period): Promise<DocumentLink> {
+      const reply = await transport.mutate<{ contentUrl?: string; printUrl?: string }>(`/api/v1/apps/${APP_KEY}/documents/render`, "POST", {
+        kind,
+        ref,
+        pk: { id },
+        locale,
+        ...(period === undefined ? {} : { period }),
+      });
+      if (typeof reply.contentUrl !== "string" || typeof reply.printUrl !== "string") throw Object.assign(new Error("the document route answered no address"), { status: 502, code: "DOCUMENTS_UNAVAILABLE" });
+      return { printUrl: reply.printUrl, contentUrl: reply.contentUrl };
     },
   };
 }

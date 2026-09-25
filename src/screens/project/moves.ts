@@ -1,22 +1,17 @@
 /**
  * "Mark done…": every open milestone closes, then the project moves to done.
  *
- * Each write is one of the desk's own actions (`state/actions.ts`); nothing
- * here writes a row. The milestones go first and the project's move LAST, so
- * the project never shows as done with work still open; pressing the button
- * again after a failure closes only what is still open, so nothing is written
- * twice.
+ * The desk's own action does it (`state/actions.ts` `markProjectDone`, a step
+ * list: the milestones first and the project's move LAST, so the project never
+ * shows as done with work still open; finishing after a failure closes only
+ * what is still open). The milestones on screen are no longer needed: the
+ * action reads the project's milestones itself.
  */
 import type { Id, Milestone, Project } from "../../data/types.ts";
-import { moveProject, setMilestoneState, type Outcome } from "../../state/actions.ts";
+import { markProjectDone as markDone, type Outcome } from "../../state/actions.ts";
 
-export async function markProjectDone(projectId: Id, milestones: readonly Milestone[]): Promise<Outcome<Project>> {
-  for (const m of milestones) {
-    if (m.project_id !== projectId || m.state === "done") continue;
-    const closed = await setMilestoneState(m.id, "done");
-    if (!closed.ok) return { ...closed, unfinished: null };
-  }
-  return moveProject(projectId, "done");
+export function markProjectDone(projectId: Id, _milestones?: readonly Milestone[]): Promise<Outcome<Project>> {
+  return markDone(projectId);
 }
 
 /**

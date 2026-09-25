@@ -342,8 +342,8 @@ export function saveProposal(draft: ProposalDraft): Promise<Outcome<Proposal>> {
 }
 
 /**
- * Send: save the draft, then the move to sent (Adminium refuses an empty one,
- * `DOCUMENT_EMPTY`). A revision's send then withdraws the proposal it revises.
+ * Send: save the draft, then the move to sent (Adminium refuses an empty one:
+ * the move names the lines it requires). A revision's send then withdraws the proposal it revises.
  */
 export function sendProposal(draft: ProposalDraft, opts: { replacedReason: string }): Promise<Outcome<Proposal>> {
   const run = newRun();
@@ -454,6 +454,8 @@ function stageSteps(proposal: Proposal, projectId: (ctx: StepContext) => Id, sta
           proposal_id: proposal.id,
           from_quote_id: proposal.id,
           share_pct: stage.share_pct.trim(),
+          // A stage is billed before tax, and taxed once, here, at the proposal's rate.
+          tax_rate: proposal.tax_rate,
           stage: stage.stage.trim(),
           title: stage.title.trim(),
           client_key: ctx.key,
@@ -461,7 +463,8 @@ function stageSteps(proposal: Proposal, projectId: (ctx: StepContext) => Id, sta
     },
     {
       name: "line",
-      // Adminium copies the rate from the proposal's stored total and works the amount out from the share.
+      // Adminium copies the rate from the proposal's stored SUBTOTAL (tax is added once, on the invoice)
+      // and works the amount out from the share.
       run: (ctx) => insert("invoice_lines", { document_id: ctx.result<Invoice>("invoice").id, quote_id: proposal.id, position: 0, description: stage.description.trim(), client_key: ctx.key }),
     },
   ];
@@ -681,17 +684,21 @@ export function sendRungEarly(messageId: Id, at: number = now()): Promise<Outcom
 
 /** Skip a rung, by hand. */
 export function skipRung(messageId: Id): Promise<Outcome<Message>> {
-  return attempt(() => update("messages", messageId, { status: "skipped", skip_reason: "by-hand" }));
+  // Adminium writes why ("by-hand"): a reason a person sends is refused.
+  return attempt(() => update("messages", messageId, { status: "skipped" }));
 }
 
-/** The rungs "Send all" would approve: held, due, one per invoice (its earliest). */
+/**
+ * The rungs "Send all" would approve: held, due, one per invoice — its LATEST
+ * due one, since a later rung overtakes an earlier one still waiting.
+ */
 export function readyRungs(at: number = now()): Message[] {
   const byInvoice = new Map<Id, Message>();
   for (const message of rowsOf(useDesk.getState(), "messages")) {
     if (message.status !== "held" || !/^invoice-rung-\d$/.test(message.kind) || message.invoice_id === null) continue;
     if (message.due !== null && Date.parse(message.due) > at) continue;
     const earlier = byInvoice.get(message.invoice_id);
-    if (earlier === undefined || (message.due ?? "") < (earlier.due ?? "")) byInvoice.set(message.invoice_id, message);
+    if (earlier === undefined || (message.due ?? "") > (earlier.due ?? "")) byInvoice.set(message.invoice_id, message);
   }
   return [...byInvoice.values()];
 }
@@ -730,8 +737,31 @@ export type ProjectMove = "pause" | "resume" | "done" | "reopen";
 /** Pause (with a note) / Resume / Mark done / Reopen (a studio manager's; Adminium checks the role). */
 export function moveProject(projectId: Id, move: ProjectMove, note?: string | null): Promise<Outcome<Project>> {
   const patch: RowValues =
-    move === "pause" ? { status: "paused", pause_note: blank(note ?? null) } : move === "resume" ? { status: "active", pause_note: null } : move === "done" ? { status: "done" } : { status: "active" };
+    move === "pause" ? { status: "paused", pause_note: blank(note ?? null) } : move === "resume" ? { status: "active", pause_note: null } : move === "done" ? { status: "done" } : { status: "active", done_on: null };
   return attempt(() => update("projects", projectId, patch));
+}
+
+/**
+ * Mark done: every open milestone closes, then the project moves to done —
+ * LAST, so a project never reads done with work still open. Finishing after a
+ * failure closes only what is still open.
+ */
+export function markProjectDone(projectId: Id): Promise<Outcome<Project>> {
+  const run = newRun();
+  return after(
+    () => Promise.all([ensureRows("projects", [projectId]), loadWhere("milestones", { column: "project_id", op: "eq", value: projectId }, "position.asc")]),
+    () =>
+      attemptSteps(
+        run,
+        () => [
+          ...rowsOf(useDesk.getState(), "milestones")
+            .filter((m) => m.project_id === projectId && m.state !== "done")
+            .map((m): Step => ({ name: `milestone:${String(m.id)}`, run: () => update("milestones", m.id, { state: "done" }) })),
+          { name: "done", run: () => update("projects", projectId, { status: "done" }) },
+        ],
+        (done) => done["done"] as Project,
+      ),
+  );
 }
 
 export function addMilestone(projectId: Id, input: MilestoneInput & { position: number }): Promise<Outcome<Milestone>> {
@@ -962,9 +992,23 @@ export function putTermsInForce(versionId: Id): Promise<Outcome<TermsVersion>> {
       ...rowsOf(useDesk.getState(), "terms_versions")
         .filter((v) => v.status === "in_force" && v.id !== versionId)
         .map((v) => ({ name: `retire:${String(v.id)}`, run: () => update("terms_versions", v.id, { status: "retired" }) })),
-      { name: "in-force", run: () => update("terms_versions", versionId, { status: "in_force" }) },
+      {
+        name: "in-force",
+        // A version put in force with no start day starts today, on the studio's calendar.
+        run: () => update("terms_versions", versionId, { status: "in_force", ...(held("terms_versions", versionId)?.in_force_from == null ? { in_force_from: today() } : {}) }),
+      },
     ],
     (done) => done["in-force"] as TermsVersion,
+  );
+}
+
+/** A version's note and the day it is in force from, after it was made (a locked version is Adminium's to refuse). */
+export function editTermsVersion(versionId: Id, patch: { note?: string | null; in_force_from?: Day | null }): Promise<Outcome<TermsVersion>> {
+  return attempt(() =>
+    update("terms_versions", versionId, {
+      ...(patch.note === undefined ? {} : { note: blank(patch.note) }),
+      ...(patch.in_force_from === undefined ? {} : { in_force_from: patch.in_force_from }),
+    }),
   );
 }
 
@@ -995,9 +1039,33 @@ export function saveStudioSettings(patch: Partial<Omit<Settings, "id" | "singlet
   return attempt(() => update("settings", settings.id, patch));
 }
 
+/** The studio's mark: the file uploaded for the settings row's `mark` column, then the row points at it. */
+export function saveStudioMark(file: Blob, filename: string): Promise<Outcome<Settings>> {
+  const run = newRun();
+  return attemptSteps(
+    run,
+    () => [
+      { name: "upload", run: () => deskWrites().upload("settings", "mark", file, filename) },
+      {
+        name: "mark",
+        run: (ctx: StepContext) => {
+          const settings = Object.values(useDesk.getState().rows.settings)[0];
+          return settings === undefined ? insert("settings", { mark: ctx.result<string>("upload") }) : update("settings", settings.id, { mark: ctx.result<string>("upload") });
+        },
+      },
+    ],
+    (done) => done["mark"] as Settings,
+  );
+}
+
 /** The Invoices & Receipts card (a studio manager holds the add-on's settings grant). */
 export function saveInvoiceSettings(values: Record<string, unknown>): Promise<Outcome<Record<string, unknown>>> {
-  return attempt(() => deskWrites().saveAddOnSettings("invoices", values));
+  return attempt(async () => {
+    const saved = await deskWrites().saveAddOnSettings("invoices", values);
+    // What the desk holds of the add-on's settings follows the save.
+    useDesk.setState((s) => ({ addOns: { ...s.addOns, invoices: { values: saved, declared: s.addOns["invoices"]?.declared ?? Object.keys(saved) } } }));
+    return saved;
+  });
 }
 
 export function savePerson(personId: Id | null, input: Partial<Omit<Person, "id">>): Promise<Outcome<Person>> {
