@@ -43,12 +43,20 @@ rather than lorem ipsum.
   - **Home**: the day in one sentence, what is owed, what is late and the
     work running, the open balances by how late they are, what happened
     lately, what is waiting on a client, and what falls due this week.
+  - **Schedule** and **Capacity**: the month's calls, press checks and days
+    away (and a holiday calendar's days, when the Holiday calendars add-on is
+    attached), and "Can we take this?": the open days in the weeks ahead
+    against the work running and the proposals out, and when an enquiry of
+    each size could start.
   - **Enquiries**: the inbox of people who asked about work. Start a
     proposal, send a reply drafted from the enquiry, park it for a month, or
     say a polite no. "Log a call" adds one by hand.
   - **Proposals** and the **Composer**: a proposal or an invoice written in
     one place, with its scope, its lines and a rail showing the figures while
     you type.
+  - **Scoping worksheet**: a stage priced from the rate card, with a reserve
+    drawn from how far past stages ran over. Nothing is kept until it becomes
+    a proposal draft, and every amount on that draft is Adminium's.
   - **Projects**: a board of running, paused and finished work. Each project
     has its milestones, its deliverables and the client's brief. The
     **deliverable review** shows the file with pins dropped on it, versions
@@ -68,6 +76,18 @@ rather than lorem ipsum.
     sent early or skipped. A later reminder replaces an earlier one still
     waiting, and paying or voiding the invoice drops them. Sending the third
     pauses the project, as the terms the client agreed to say.
+  - **Money**: six months invoiced and collected, what is still owed by how
+    late it is, what is out for signature, and what it costs to open the door
+    each month (a studio manager keeps those running costs).
+  - **Expenses** and **Suppliers**: purchases at cost with their receipts,
+    passed on to the client's draft invoice at cost and never twice, and the
+    address book of the people the studio buys from.
+  - **Time**: hours logged by hand or by a running clock that Adminium keeps,
+    so it survives a reload and shows on another computer. Adminium works out
+    the hours when it stops. Time moves onto the client's draft invoice at the
+    day rate.
+  - **Archive**: finished projects by year, each worth what its sent
+    invoices came to.
   - **Printed copy**: an invoice, proposal, receipt or statement as the
     client receives it, drawn by the add-on, on Letter or A4.
   - **Terms & signature**: accepted is not the same as signed. Who agreed,
@@ -77,6 +97,9 @@ rather than lorem ipsum.
   - **Settings** (studio manager only): the studio, the people clients deal
     with, the email sign-off, which notices the studio gets, the add-on's own
     invoice settings, and the rate card.
+  - **Every email we send**: each email a client or the studio receives, as
+    it will look, in each language, and a test that only ever goes to the
+    studio's own address.
 
 - **The clients' side.**
   - **Sign in by an emailed link or code.** The client types the address the
@@ -99,6 +122,10 @@ rather than lorem ipsum.
   - **A shared handover link**: one finished project's files, fonts and notes
     on one page, with no sign-in and nothing else of the client's, until the
     studio stops the link or it runs out.
+  - **An enquiry form** at `/enquire`, for the studio's own website to link
+    to. It needs no sign-in: the browser does a human check on its own, each
+    address and each hour have a limit, and nothing comes back but when it
+    arrived. The studio gets an email about each one.
 
   Everything a client reads is their own. Another client's document answers
   exactly like one that does not exist.
@@ -119,7 +146,7 @@ rather than lorem ipsum.
   the set-up, void, discard a draft and reopen a finished project. The desk
   hides a button by role, but it is Adminium's grant that refuses the write.
 
-- **Nineteen emails, all in the outbox.** The `messages` table is the outbox,
+- **Twenty emails, all in the outbox.** The `messages` table is the outbox,
   so every email can be seen, approved, edited, sent early or skipped. The
   notices to the studio each have their own switch in Settings.
 
@@ -132,7 +159,8 @@ rather than lorem ipsum.
   invoiced and collected, and this week's milestones. Every card that leads somewhere
   opens its list already filtered to exactly what the card counts. Beside it
   are record pages for clients, enquiries, proposals, projects,
-  deliverables, invoices, payments, emails and the studio's set-up.
+  deliverables, invoices, payments, emails, time, expenses, suppliers, studio
+  dates, running costs and the studio's set-up.
 
 - **Sample data, at 28 July.** Outline's six clients and about six months of
   history, added from Adminium (at install, or later from the app's page) and
