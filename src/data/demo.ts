@@ -124,7 +124,7 @@ export const DEMO_ROWS: Seed = {
     { id: 2, deliverable_id: 3, version_id: 3, side: "studio", author: "Nadia Cole", body: "Yes — new version by Thursday.", pin_x: null, pin_y: null, at: "2026-07-23T15:30:00.000Z" },
   ],
   briefs: [
-    { id: 1, project_id: 1, status: "sent", sent_at: "2026-06-12T10:00:00.000Z" },
+    { id: 1, project_id: 1, status: "open" },
     { id: 2, project_id: 2, status: "open" },
   ],
   brief_answers: [
@@ -151,7 +151,7 @@ export const DEMO_ROWS: Seed = {
     { id: 7, document_id: 7, position: 0, description: "Extra file formats", qty: "2", rate: "90.00", discount_kind: "amount" },
   ],
   payments: [
-    { id: 1, document_id: 2, number: "REC-0017", amount: "2881.85", method: "bank-transfer", paid_on: "2026-06-24", recorded_by: "Nadia Cole", recorded_at: "2026-06-24T10:00:00.000Z", voided: false },
+    { id: 1, document_id: 2, number: "REC-0017", amount: "2656.08", method: "bank-transfer", paid_on: "2026-06-24", recorded_by: "Nadia Cole", recorded_at: "2026-06-24T10:00:00.000Z", voided: false },
     { id: 2, document_id: 5, number: "REC-0016", amount: "300.00", method: "card", paid_on: "2026-06-20", recorded_by: "Tomas Reyes", recorded_at: "2026-06-20T10:00:00.000Z", voided: false },
   ],
   messages: [
