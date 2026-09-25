@@ -485,11 +485,12 @@ export function publicAccessIssues(entries: readonly PublicAccess[], ctx: Public
       /*
        * Where the parent points at this table, the parent's column is the
        * link its rows are read by: a browser that could write it would
-       * re-point its own row at another person's.
+       * re-point its own row at another person's. On any of the app's keys:
+       * one person may hold a session on each.
        */
       if (pointsDown && !pointsUp) {
         entries.forEach((other, j) => {
-          if (other.table !== v.table || (other.key ?? CUSTOMER_KEY) !== key) return;
+          if (other.table !== v.table) return;
           const writes =
             (other.writable ?? []).includes(v.via) ||
             Object.prototype.hasOwnProperty.call(other.writableValues ?? {}, v.via) ||
