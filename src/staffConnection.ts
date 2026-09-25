@@ -75,13 +75,123 @@ export function configBase(bakedBase: string, pathname: string): string {
   return baked;
 }
 
+/**
+ * Everything the staff config says, for a till that boots from it alone.
+ *
+ * Adminium serves it to the signed-in person: which database the app is in,
+ * its real table names (short → real, for an app whose tables carry a
+ * prefix), the venue's zone and currency, the app's settings values, who is
+ * signed in, and the token their writes carry. With it the screens need
+ * neither the dashboard's bootstrap nor its connections list — which a
+ * screens-only cashier may not read.
+ */
+export interface StaffConfig {
+  connectionId: string | null;
+  appName: string | null;
+  tables: Record<string, string>;
+  settings: Record<string, unknown>;
+  timezone: string | null;
+  timezoneSource: string | null;
+  serverTimezone: string | null;
+  currency: string | null;
+  user: { id: string; name: string; email: string } | null;
+  csrfToken: string | null;
+  /**
+   * The app's staff-bound browser keys this person may use, by purpose (a
+   * kiosk's). Empty for everyone else. A key opens nothing without this same
+   * person's sign-in beside it, so it is a handle, not a credential.
+   */
+  publicKeys: Record<string, string>;
+  /**
+   * What this person may do with the app's own tables (by short name) and the
+   * app's roles they hold — so a screen can leave out a button whose write
+   * would be refused. Null from a server that does not say: then every button
+   * shows, and the server refuses what it refuses.
+   */
+  access: StaffAccess | null;
+}
+
+export type TableAction = "read" | "create" | "update" | "delete";
+export interface StaffAccess {
+  tables: Record<string, TableAction[]>;
+  roles: { slug: string; name: string }[];
+}
+
+const ACTIONS: readonly TableAction[] = ["read", "create", "update", "delete"];
+
+/** `access` as the server sent it, keeping only what it means; null when it sent none. */
+function accessOf(value: unknown): StaffAccess | null {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return null;
+  const doc = value as Record<string, unknown>;
+  const tables: Record<string, TableAction[]> = {};
+  for (const [ref, actions] of Object.entries(record(doc.tables))) {
+    if (!Array.isArray(actions)) continue;
+    tables[ref] = ACTIONS.filter((action) => actions.includes(action));
+  }
+  const roles = (Array.isArray(doc.roles) ? doc.roles : []).flatMap((role) => {
+    const r = record(role);
+    const slug = text(r.slug);
+    return slug === null ? [] : [{ slug, name: text(r.name) ?? slug }];
+  });
+  return { tables, roles };
+}
+
+type StaffConfigOptions = {
+  hostedStaff?: boolean;
+  base?: string;
+  pathname?: string;
+  fetchImpl?: typeof fetch;
+};
+
+const text = (value: unknown): string | null => (typeof value === "string" && value !== "" ? value : null);
+const record = (value: unknown): Record<string, unknown> =>
+  value !== null && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+
+/** The whole staff config, or null outside a hosted staff build or when none answers. */
+export async function loadStaffConfig(opts: StaffConfigOptions = {}): Promise<StaffConfig | null> {
+  const hostedStaff = opts.hostedStaff ?? (HOSTED && SURFACE_SIDE === "staff");
+  if (!hostedStaff) return null;
+  const base =
+    opts.base ??
+    configBase(import.meta.env.BASE_URL, opts.pathname ?? window.location.pathname);
+  const doFetch = opts.fetchImpl ?? fetch;
+  try {
+    const res = await doFetch(`${base}surface-config.json`, { cache: "no-store" });
+    if (!res.ok) return null;
+    const doc: unknown = await res.json();
+    if (doc === null || typeof doc !== "object") return null;
+    const d = doc as Record<string, unknown>;
+    setAppName(d.appName as string | null | undefined);
+    const user = record(d.user);
+    return {
+      connectionId: text(d.connectionId),
+      appName: text(d.appName),
+      tables: Object.fromEntries(
+        Object.entries(record(d.tables)).filter((entry): entry is [string, string] => typeof entry[1] === "string"),
+      ),
+      settings: record(d.settings),
+      timezone: text(d.timezone),
+      timezoneSource: text(d.timezoneSource),
+      serverTimezone: text(d.serverTimezone),
+      currency: text(d.currency),
+      user:
+        text(user.id) === null
+          ? null
+          : { id: String(user.id), name: text(user.name) ?? "", email: text(user.email) ?? "" },
+      csrfToken: text(d.csrfToken),
+      publicKeys: Object.fromEntries(
+        Object.entries(record(d.publicKeys)).filter((entry): entry is [string, string] => typeof entry[1] === "string" && entry[1] !== ""),
+      ),
+      access: accessOf(d.access),
+    };
+  } catch {
+    // An older server answers this path with the SPA index (HTML).
+    return null;
+  }
+}
+
 export async function resolveStaffConnectionId(
-  opts: {
-    hostedStaff?: boolean;
-    base?: string;
-    pathname?: string;
-    fetchImpl?: typeof fetch;
-  } = {},
+  opts: StaffConfigOptions = {},
 ): Promise<string | null> {
   const hostedStaff = opts.hostedStaff ?? (HOSTED && SURFACE_SIDE === "staff");
   if (!hostedStaff) return null;

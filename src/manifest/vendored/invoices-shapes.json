@@ -1,0 +1,1396 @@
+{
+  "addOn": "invoices",
+  "version": "draft",
+  "shapes": [
+    {
+      "name": "invoice",
+      "version": 1,
+      "parts": {
+        "document": {
+          "columns": [
+            {
+              "ref": "id",
+              "type": "int",
+              "role": "pk"
+            },
+            {
+              "ref": "number_seq",
+              "type": "int",
+              "nullable": true,
+              "rules": {
+                "sequence": {
+                  "gapless": true,
+                  "startSetting": {
+                    "addOn": "invoices",
+                    "setting": "number_start_invoice"
+                  }
+                }
+              }
+            },
+            {
+              "ref": "number",
+              "type": "text",
+              "maxLength": 24,
+              "nullable": true,
+              "unique": true,
+              "rules": {
+                "format": {
+                  "from": "number_seq",
+                  "prefixSetting": {
+                    "addOn": "invoices",
+                    "setting": "prefix_invoice"
+                  },
+                  "pad": 4
+                }
+              }
+            },
+            {
+              "ref": "status",
+              "type": "enum",
+              "enum": [
+                "draft",
+                "sent",
+                "void"
+              ],
+              "default": "draft"
+            },
+            {
+              "ref": "issued_on",
+              "type": "date",
+              "nullable": true,
+              "rules": {
+                "stamp": {
+                  "set": "today",
+                  "on": {
+                    "column": "status",
+                    "values": [
+                      "sent"
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "ref": "terms",
+              "type": "enum",
+              "enum": [
+                "net7",
+                "net14",
+                "net30",
+                "on-receipt"
+              ],
+              "nullable": true,
+              "rules": {
+                "default": {
+                  "from": {
+                    "addOn": "invoices",
+                    "setting": "default_terms"
+                  }
+                }
+              }
+            },
+            {
+              "ref": "due_on",
+              "type": "date",
+              "nullable": true,
+              "rules": {
+                "stamp": {
+                  "set": {
+                    "addDays": {
+                      "date": "issued_on",
+                      "days": "terms",
+                      "map": {
+                        "net7": 7,
+                        "net14": 14,
+                        "net30": 30,
+                        "on-receipt": 0
+                      }
+                    }
+                  },
+                  "on": {
+                    "column": "status",
+                    "values": [
+                      "sent"
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "ref": "currency",
+              "type": "text",
+              "maxLength": 3,
+              "nullable": true,
+              "rules": {
+                "default": {
+                  "from": "connection.currency"
+                }
+              }
+            },
+            {
+              "ref": "tax_name",
+              "type": "text",
+              "maxLength": 40,
+              "nullable": true,
+              "rules": {
+                "default": {
+                  "from": {
+                    "addOn": "invoices",
+                    "setting": "tax_name"
+                  }
+                }
+              }
+            },
+            {
+              "ref": "tax_rate",
+              "type": "decimal",
+              "scale": 3,
+              "nullable": true,
+              "rules": {
+                "default": {
+                  "from": {
+                    "addOn": "invoices",
+                    "setting": "default_tax_rate"
+                  }
+                }
+              }
+            },
+            {
+              "ref": "subtotal",
+              "type": "decimal",
+              "scale": "currency",
+              "nullable": true,
+              "rules": {
+                "rollup": {
+                  "from": "lines",
+                  "via": "document_id",
+                  "sum": "amount"
+                }
+              }
+            },
+            {
+              "ref": "tax",
+              "type": "decimal",
+              "scale": "currency",
+              "nullable": true,
+              "rules": {
+                "formula": {
+                  "round": {
+                    "div": [
+                      {
+                        "mul": [
+                          "subtotal",
+                          {
+                            "coalesce": [
+                              "tax_rate",
+                              0
+                            ]
+                          }
+                        ]
+                      },
+                      100
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "ref": "total",
+              "type": "decimal",
+              "scale": "currency",
+              "nullable": true,
+              "rules": {
+                "formula": {
+                  "add": [
+                    {
+                      "coalesce": [
+                        "subtotal",
+                        0
+                      ]
+                    },
+                    {
+                      "coalesce": [
+                        "tax",
+                        0
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "ref": "paid",
+              "type": "decimal",
+              "scale": "currency",
+              "nullable": true,
+              "rules": {
+                "rollup": {
+                  "from": "payments",
+                  "via": "document_id",
+                  "sum": "amount",
+                  "where": {
+                    "column": "voided",
+                    "eq": false
+                  },
+                  "balance": {
+                    "column": "balance",
+                    "of": "total"
+                  },
+                  "cap": true
+                }
+              }
+            },
+            {
+              "ref": "balance",
+              "type": "decimal",
+              "scale": "currency",
+              "nullable": true
+            },
+            {
+              "ref": "ladder",
+              "type": "enum",
+              "enum": [
+                "gentle",
+                "standard",
+                "firm"
+              ],
+              "nullable": true,
+              "rules": {
+                "default": {
+                  "from": {
+                    "addOn": "invoices",
+                    "setting": "default_ladder"
+                  }
+                }
+              }
+            },
+            {
+              "ref": "sent_at",
+              "type": "timestamptz",
+              "nullable": true,
+              "rules": {
+                "stamp": {
+                  "set": "now",
+                  "on": {
+                    "column": "status",
+                    "values": [
+                      "sent"
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "ref": "void_reason",
+              "type": "text",
+              "maxLength": 500,
+              "nullable": true
+            },
+            {
+              "ref": "voided_at",
+              "type": "timestamptz",
+              "nullable": true,
+              "rules": {
+                "stamp": {
+                  "set": "now",
+                  "on": {
+                    "column": "status",
+                    "values": [
+                      "void"
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "ref": "voided_by",
+              "type": "text",
+              "maxLength": 120,
+              "nullable": true,
+              "rules": {
+                "stamp": {
+                  "set": "user-name",
+                  "on": {
+                    "column": "status",
+                    "values": [
+                      "void"
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "ref": "from_quote_id",
+              "type": "fk",
+              "references": "quote@1/document",
+              "nullable": true
+            },
+            {
+              "ref": "share_pct",
+              "type": "decimal",
+              "scale": 2,
+              "nullable": true
+            }
+          ],
+          "states": {
+            "column": "status",
+            "initial": "draft",
+            "moves": {
+              "draft": [
+                {
+                  "to": "sent",
+                  "requires": {
+                    "children": {
+                      "lines": 1
+                    },
+                    "where": [
+                      {
+                        "column": "total",
+                        "gt": 0
+                      }
+                    ]
+                  }
+                },
+                "void"
+              ],
+              "sent": [
+                {
+                  "to": "void",
+                  "requires": {
+                    "where": [
+                      {
+                        "column": "paid",
+                        "eq": 0
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            "lock": {
+              "when": [
+                "sent",
+                "void"
+              ],
+              "except": [
+                "due_on",
+                "ladder",
+                "void_reason"
+              ]
+            },
+            "children": {
+              "lines": {
+                "via": "document_id",
+                "lock": true
+              },
+              "payments": {
+                "via": "document_id",
+                "parentIn": [
+                  "sent"
+                ]
+              }
+            },
+            "noDelete": {
+              "when": "numbered"
+            }
+          }
+        },
+        "lines": {
+          "columns": [
+            {
+              "ref": "id",
+              "type": "int",
+              "role": "pk"
+            },
+            {
+              "ref": "document_id",
+              "type": "fk",
+              "references": "document"
+            },
+            {
+              "ref": "position",
+              "type": "int",
+              "default": 0
+            },
+            {
+              "ref": "description",
+              "type": "text",
+              "maxLength": 500,
+              "nullable": true
+            },
+            {
+              "ref": "qty",
+              "type": "decimal",
+              "scale": 3,
+              "default": 1
+            },
+            {
+              "ref": "rate",
+              "type": "decimal",
+              "scale": "currency",
+              "nullable": true,
+              "rules": {
+                "copy": {
+                  "via": "quote_id",
+                  "from": "total",
+                  "mode": "always"
+                }
+              }
+            },
+            {
+              "ref": "discount_kind",
+              "type": "enum",
+              "enum": [
+                "amount",
+                "percent"
+              ],
+              "default": "amount"
+            },
+            {
+              "ref": "discount",
+              "type": "decimal",
+              "scale": "currency",
+              "nullable": true
+            },
+            {
+              "ref": "currency",
+              "type": "text",
+              "maxLength": 3,
+              "nullable": true,
+              "rules": {
+                "copy": {
+                  "via": "document_id",
+                  "from": "currency",
+                  "mode": "always"
+                }
+              }
+            },
+            {
+              "ref": "quote_id",
+              "type": "fk",
+              "references": "quote@1/document",
+              "nullable": true
+            },
+            {
+              "ref": "share_pct",
+              "type": "decimal",
+              "scale": 2,
+              "nullable": true,
+              "rules": {
+                "copy": {
+                  "via": "document_id",
+                  "from": "share_pct",
+                  "mode": "always"
+                }
+              }
+            },
+            {
+              "ref": "amount",
+              "type": "decimal",
+              "scale": "currency",
+              "nullable": true,
+              "rules": {
+                "formula": {
+                  "if": [
+                    {
+                      "isNull": "quote_id"
+                    },
+                    {
+                      "max": [
+                        0,
+                        {
+                          "if": [
+                            {
+                              "eq": [
+                                "discount_kind",
+                                "percent"
+                              ]
+                            },
+                            {
+                              "mul": [
+                                "qty",
+                                "rate",
+                                {
+                                  "sub": [
+                                    1,
+                                    {
+                                      "div": [
+                                        {
+                                          "coalesce": [
+                                            "discount",
+                                            0
+                                          ]
+                                        },
+                                        100
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "sub": [
+                                {
+                                  "mul": [
+                                    "qty",
+                                    "rate"
+                                  ]
+                                },
+                                {
+                                  "coalesce": [
+                                    "discount",
+                                    0
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "round": {
+                        "div": [
+                          {
+                            "mul": [
+                              "rate",
+                              "share_pct"
+                            ]
+                          },
+                          100
+                        ]
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "payments": {
+          "columns": [
+            {
+              "ref": "id",
+              "type": "int",
+              "role": "pk"
+            },
+            {
+              "ref": "document_id",
+              "type": "fk",
+              "references": "document"
+            },
+            {
+              "ref": "number_seq",
+              "type": "int",
+              "nullable": true,
+              "rules": {
+                "sequence": {
+                  "gapless": true,
+                  "startSetting": {
+                    "addOn": "invoices",
+                    "setting": "number_start_receipt"
+                  }
+                }
+              }
+            },
+            {
+              "ref": "number",
+              "type": "text",
+              "maxLength": 24,
+              "nullable": true,
+              "unique": true,
+              "rules": {
+                "format": {
+                  "from": "number_seq",
+                  "prefixSetting": {
+                    "addOn": "invoices",
+                    "setting": "prefix_receipt"
+                  },
+                  "pad": 4
+                }
+              }
+            },
+            {
+              "ref": "amount",
+              "type": "decimal",
+              "scale": "currency",
+              "rules": {
+                "validation": {
+                  "min": 0.001
+                }
+              }
+            },
+            {
+              "ref": "currency",
+              "type": "text",
+              "maxLength": 3,
+              "nullable": true,
+              "rules": {
+                "copy": {
+                  "via": "document_id",
+                  "from": "currency",
+                  "mode": "always"
+                }
+              }
+            },
+            {
+              "ref": "method",
+              "type": "enum",
+              "enum": [
+                "bank-transfer",
+                "card",
+                "cheque",
+                "cash",
+                "other"
+              ],
+              "default": "bank-transfer"
+            },
+            {
+              "ref": "method_note",
+              "type": "text",
+              "maxLength": 120,
+              "nullable": true
+            },
+            {
+              "ref": "paid_on",
+              "type": "date"
+            },
+            {
+              "ref": "recorded_by",
+              "type": "text",
+              "maxLength": 120,
+              "nullable": true,
+              "rules": {
+                "stamp": {
+                  "set": "user-name",
+                  "on": "create"
+                }
+              }
+            },
+            {
+              "ref": "recorded_at",
+              "type": "timestamptz",
+              "nullable": true,
+              "rules": {
+                "stamp": {
+                  "set": "now",
+                  "on": "create"
+                }
+              }
+            },
+            {
+              "ref": "voided",
+              "type": "bool",
+              "default": false
+            },
+            {
+              "ref": "void_reason",
+              "type": "text",
+              "maxLength": 500,
+              "nullable": true
+            },
+            {
+              "ref": "voided_by",
+              "type": "text",
+              "maxLength": 120,
+              "nullable": true,
+              "rules": {
+                "stamp": {
+                  "set": "user-name",
+                  "on": {
+                    "column": "voided",
+                    "values": [
+                      true
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "ref": "voided_at",
+              "type": "timestamptz",
+              "nullable": true,
+              "rules": {
+                "stamp": {
+                  "set": "now",
+                  "on": {
+                    "column": "voided",
+                    "values": [
+                      true
+                    ]
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "documentProfiles": [
+        {
+          "kind": "invoice",
+          "part": "document",
+          "name": {
+            "en-US": "Invoice"
+          },
+          "mapping": {
+            "number": {
+              "column": "number"
+            },
+            "issuedOn": {
+              "column": "issued_on"
+            },
+            "dueOn": {
+              "column": "due_on"
+            },
+            "currency": {
+              "column": "currency"
+            },
+            "taxLabel": {
+              "column": "tax_name"
+            },
+            "taxRate": {
+              "column": "tax_rate"
+            },
+            "subtotal": {
+              "column": "subtotal"
+            },
+            "tax": {
+              "column": "tax"
+            },
+            "total": {
+              "column": "total"
+            },
+            "paid": {
+              "column": "paid"
+            },
+            "amountDue": {
+              "column": "balance"
+            },
+            "status": {
+              "column": "status"
+            },
+            "voidedAt": {
+              "column": "voided_at"
+            },
+            "lines": {
+              "collection": {
+                "table": "lines",
+                "via": "document_id",
+                "orderBy": "position",
+                "columns": {
+                  "description": "description",
+                  "qty": "qty",
+                  "unitPrice": "rate",
+                  "discount": "discount",
+                  "amount": "amount"
+                }
+              }
+            },
+            "payments": {
+              "collection": {
+                "table": "payments",
+                "via": "document_id",
+                "orderBy": "paid_on",
+                "columns": {
+                  "number": "number",
+                  "paidOn": "paid_on",
+                  "amount": "amount",
+                  "method": "method",
+                  "voided": "voided"
+                }
+              }
+            }
+          }
+        },
+        {
+          "kind": "receipt",
+          "part": "payments",
+          "name": {
+            "en-US": "Receipt"
+          },
+          "mapping": {
+            "number": {
+              "column": "number"
+            },
+            "paidOn": {
+              "column": "paid_on"
+            },
+            "amount": {
+              "column": "amount"
+            },
+            "currency": {
+              "column": "currency"
+            },
+            "method": {
+              "column": "method"
+            },
+            "invoiceNumber": {
+              "via": "document_id",
+              "column": "number"
+            },
+            "balanceAfter": {
+              "via": "document_id",
+              "column": "balance"
+            }
+          }
+        }
+      ],
+      "outbox": {
+        "producers": [
+          {
+            "kind": "invoice-sent",
+            "link": "invoice_id",
+            "onChange": {
+              "table": "document",
+              "column": "status",
+              "to": "sent"
+            }
+          },
+          {
+            "kind": "invoice-rung-1",
+            "link": "invoice_id",
+            "onChange": {
+              "table": "document",
+              "column": "status",
+              "to": "sent"
+            },
+            "hold": true,
+            "due": {
+              "date": "due_on",
+              "days": {
+                "setting": {
+                  "addOn": "invoices",
+                  "setting": "ladders"
+                },
+                "byColumn": "ladder",
+                "index": 0
+              },
+              "at": "09:00"
+            },
+            "supersede": "rungs",
+            "dropWhen": [
+              {
+                "column": "balance",
+                "lte": 0,
+                "reason": "paid"
+              },
+              {
+                "column": "status",
+                "eq": "void",
+                "reason": "void"
+              }
+            ]
+          },
+          {
+            "kind": "invoice-rung-2",
+            "link": "invoice_id",
+            "onChange": {
+              "table": "document",
+              "column": "status",
+              "to": "sent"
+            },
+            "hold": true,
+            "due": {
+              "date": "due_on",
+              "days": {
+                "setting": {
+                  "addOn": "invoices",
+                  "setting": "ladders"
+                },
+                "byColumn": "ladder",
+                "index": 1
+              },
+              "at": "09:00"
+            },
+            "supersede": "rungs",
+            "dropWhen": [
+              {
+                "column": "balance",
+                "lte": 0,
+                "reason": "paid"
+              },
+              {
+                "column": "status",
+                "eq": "void",
+                "reason": "void"
+              }
+            ]
+          },
+          {
+            "kind": "invoice-rung-3",
+            "link": "invoice_id",
+            "onChange": {
+              "table": "document",
+              "column": "status",
+              "to": "sent"
+            },
+            "hold": true,
+            "due": {
+              "date": "due_on",
+              "days": {
+                "setting": {
+                  "addOn": "invoices",
+                  "setting": "ladders"
+                },
+                "byColumn": "ladder",
+                "index": 2
+              },
+              "at": "09:00"
+            },
+            "supersede": "rungs",
+            "dropWhen": [
+              {
+                "column": "balance",
+                "lte": 0,
+                "reason": "paid"
+              },
+              {
+                "column": "status",
+                "eq": "void",
+                "reason": "void"
+              }
+            ]
+          },
+          {
+            "kind": "payment-receipt",
+            "link": "payment_id",
+            "onCreate": {
+              "table": "payments"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "quote",
+      "version": 1,
+      "parts": {
+        "document": {
+          "columns": [
+            {
+              "ref": "id",
+              "type": "int",
+              "role": "pk"
+            },
+            {
+              "ref": "number_seq",
+              "type": "int",
+              "nullable": true,
+              "rules": {
+                "sequence": {
+                  "gapless": true,
+                  "startSetting": {
+                    "addOn": "invoices",
+                    "setting": "number_start_quote"
+                  }
+                }
+              }
+            },
+            {
+              "ref": "number",
+              "type": "text",
+              "maxLength": 24,
+              "nullable": true,
+              "unique": true,
+              "rules": {
+                "format": {
+                  "from": "number_seq",
+                  "prefixSetting": {
+                    "addOn": "invoices",
+                    "setting": "prefix_quote"
+                  },
+                  "pad": 4
+                }
+              }
+            },
+            {
+              "ref": "status",
+              "type": "enum",
+              "enum": [
+                "draft",
+                "sent",
+                "accepted",
+                "declined",
+                "withdrawn"
+              ],
+              "default": "draft"
+            },
+            {
+              "ref": "valid_until",
+              "type": "date",
+              "nullable": true
+            },
+            {
+              "ref": "currency",
+              "type": "text",
+              "maxLength": 3,
+              "nullable": true,
+              "rules": {
+                "default": {
+                  "from": "connection.currency"
+                }
+              }
+            },
+            {
+              "ref": "tax_name",
+              "type": "text",
+              "maxLength": 40,
+              "nullable": true,
+              "rules": {
+                "default": {
+                  "from": {
+                    "addOn": "invoices",
+                    "setting": "tax_name"
+                  }
+                }
+              }
+            },
+            {
+              "ref": "tax_rate",
+              "type": "decimal",
+              "scale": 3,
+              "nullable": true,
+              "rules": {
+                "default": {
+                  "from": {
+                    "addOn": "invoices",
+                    "setting": "default_tax_rate"
+                  }
+                }
+              }
+            },
+            {
+              "ref": "subtotal",
+              "type": "decimal",
+              "scale": "currency",
+              "nullable": true,
+              "rules": {
+                "rollup": {
+                  "from": "lines",
+                  "via": "document_id",
+                  "sum": "amount"
+                }
+              }
+            },
+            {
+              "ref": "tax",
+              "type": "decimal",
+              "scale": "currency",
+              "nullable": true,
+              "rules": {
+                "formula": {
+                  "round": {
+                    "div": [
+                      {
+                        "mul": [
+                          "subtotal",
+                          {
+                            "coalesce": [
+                              "tax_rate",
+                              0
+                            ]
+                          }
+                        ]
+                      },
+                      100
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "ref": "total",
+              "type": "decimal",
+              "scale": "currency",
+              "nullable": true,
+              "rules": {
+                "formula": {
+                  "add": [
+                    {
+                      "coalesce": [
+                        "subtotal",
+                        0
+                      ]
+                    },
+                    {
+                      "coalesce": [
+                        "tax",
+                        0
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "ref": "sent_at",
+              "type": "timestamptz",
+              "nullable": true,
+              "rules": {
+                "stamp": {
+                  "set": "now",
+                  "on": {
+                    "column": "status",
+                    "values": [
+                      "sent"
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "ref": "decided_at",
+              "type": "timestamptz",
+              "nullable": true,
+              "rules": {
+                "stamp": {
+                  "set": "now",
+                  "on": {
+                    "column": "status",
+                    "values": [
+                      "accepted",
+                      "declined",
+                      "withdrawn"
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "ref": "withdraw_reason",
+              "type": "text",
+              "maxLength": 500,
+              "nullable": true
+            }
+          ],
+          "states": {
+            "column": "status",
+            "initial": "draft",
+            "moves": {
+              "draft": [
+                {
+                  "to": "sent",
+                  "requires": {
+                    "children": {
+                      "lines": 1
+                    },
+                    "where": [
+                      {
+                        "column": "total",
+                        "gt": 0
+                      }
+                    ]
+                  }
+                }
+              ],
+              "sent": [
+                "accepted",
+                "declined",
+                "withdrawn"
+              ]
+            },
+            "lock": {
+              "when": [
+                "sent",
+                "accepted",
+                "declined",
+                "withdrawn"
+              ],
+              "except": [
+                "valid_until",
+                "withdraw_reason"
+              ]
+            },
+            "children": {
+              "lines": {
+                "via": "document_id",
+                "lock": true
+              }
+            },
+            "onlyLater": [
+              "valid_until"
+            ]
+          }
+        },
+        "lines": {
+          "columns": [
+            {
+              "ref": "id",
+              "type": "int",
+              "role": "pk"
+            },
+            {
+              "ref": "document_id",
+              "type": "fk",
+              "references": "document"
+            },
+            {
+              "ref": "position",
+              "type": "int",
+              "default": 0
+            },
+            {
+              "ref": "description",
+              "type": "text",
+              "maxLength": 500,
+              "nullable": true
+            },
+            {
+              "ref": "qty",
+              "type": "decimal",
+              "scale": 3,
+              "default": 1
+            },
+            {
+              "ref": "rate",
+              "type": "decimal",
+              "scale": "currency",
+              "nullable": true
+            },
+            {
+              "ref": "discount_kind",
+              "type": "enum",
+              "enum": [
+                "amount",
+                "percent"
+              ],
+              "default": "amount"
+            },
+            {
+              "ref": "discount",
+              "type": "decimal",
+              "scale": "currency",
+              "nullable": true
+            },
+            {
+              "ref": "currency",
+              "type": "text",
+              "maxLength": 3,
+              "nullable": true,
+              "rules": {
+                "copy": {
+                  "via": "document_id",
+                  "from": "currency",
+                  "mode": "always"
+                }
+              }
+            },
+            {
+              "ref": "amount",
+              "type": "decimal",
+              "scale": "currency",
+              "nullable": true,
+              "rules": {
+                "formula": {
+                  "max": [
+                    0,
+                    {
+                      "if": [
+                        {
+                          "eq": [
+                            "discount_kind",
+                            "percent"
+                          ]
+                        },
+                        {
+                          "mul": [
+                            "qty",
+                            "rate",
+                            {
+                              "sub": [
+                                1,
+                                {
+                                  "div": [
+                                    {
+                                      "coalesce": [
+                                        "discount",
+                                        0
+                                      ]
+                                    },
+                                    100
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "sub": [
+                            {
+                              "mul": [
+                                "qty",
+                                "rate"
+                              ]
+                            },
+                            {
+                              "coalesce": [
+                                "discount",
+                                0
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      },
+      "documentProfiles": [
+        {
+          "kind": "quote",
+          "part": "document",
+          "name": {
+            "en-US": "Proposal"
+          },
+          "mapping": {
+            "number": {
+              "column": "number"
+            },
+            "validUntil": {
+              "column": "valid_until"
+            },
+            "currency": {
+              "column": "currency"
+            },
+            "taxLabel": {
+              "column": "tax_name"
+            },
+            "taxRate": {
+              "column": "tax_rate"
+            },
+            "subtotal": {
+              "column": "subtotal"
+            },
+            "tax": {
+              "column": "tax"
+            },
+            "total": {
+              "column": "total"
+            },
+            "status": {
+              "column": "status"
+            },
+            "lines": {
+              "collection": {
+                "table": "lines",
+                "via": "document_id",
+                "orderBy": "position",
+                "columns": {
+                  "description": "description",
+                  "qty": "qty",
+                  "unitPrice": "rate",
+                  "discount": "discount",
+                  "amount": "amount"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

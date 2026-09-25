@@ -135,6 +135,16 @@ const repoSlug = (() => {
   if (m === null) throw new Error(`origin is not a GitHub repository (${origin})`);
   return m[1];
 })();
+// Sample data rides in the package exactly when the manifest names it (the
+// install reads `seeds/<file>` from the unpacked archive): a generic rule, so
+// this script stays byte-identical across the apps that ship one and those
+// that do not.
+const sampleFile = manifest.sampleData?.file;
+if (sampleFile !== undefined && !existsSync(join(root, sampleFile))) {
+  throw new Error(`manifest.json names sample data at ${sampleFile}, and there is no such file. Run \`npm run sample\`.`);
+}
+const seeds = sampleFile === undefined ? [] : ['seeds'];
+
 const staging = mkdtempSync(join(tmpdir(), `app-release-${key}-`));
 let released;
 let integrity;
@@ -148,7 +158,7 @@ try {
         description: manifest.description?.fallback ?? `Built surfaces for the ${key} app.`,
         license: manifest.license ?? 'AGPL-3.0-only',
         repository: { type: 'git', url: `git+https://github.com/${repoSlug}.git` },
-        files: ['manifest.json', ...sides],
+        files: ['manifest.json', ...sides, ...seeds],
       },
       null,
       2,
@@ -156,6 +166,7 @@ try {
   );
   cpSync(join(root, 'manifest.json'), join(staging, 'manifest.json'));
   for (const side of sides) cpSync(join(built, side), join(staging, side), { recursive: true });
+  if (seeds.length > 0) cpSync(join(root, 'seeds'), join(staging, 'seeds'), { recursive: true });
 
   // X-RAY BEFORE UPLOADING ANYTHING. A released version is immutable, so a
   // defect found after the upload is in the bucket forever. `npm pack` is only
@@ -170,15 +181,17 @@ try {
   const listed = execFileSync('tar', ['-tzf', join(staging, packed)], { encoding: 'utf8' })
     .split('\n')
     .filter(Boolean);
-  const stray = listed.filter(
-    (p) => !/^package\/(manifest\.json|package\.json|staff\/|customer\/)/.test(p),
-  );
+  const allowed = seeds.length > 0
+    ? /^package\/(manifest\.json|package\.json|staff\/|customer\/|seeds\/)/
+    : /^package\/(manifest\.json|package\.json|staff\/|customer\/)/;
+  const stray = listed.filter((p) => !allowed.test(p));
   if (stray.length > 0) {
     throw new Error(`tarball carries files outside the surface set:\n  ${stray.join('\n  ')}`);
   }
 
   console.log(`${name}@${version}`);
   console.log(`  sides:     ${sides.join(', ')}`);
+  if (sampleFile !== undefined) console.log(`  sample:    ${sampleFile}`);
   console.log(`  entries:   ${listed.length}`);
   console.log(`  bytes:     ${bytes.length}`);
   console.log(`  integrity: ${integrity}`);

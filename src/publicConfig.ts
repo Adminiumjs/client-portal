@@ -27,7 +27,6 @@
  * normalized here, in the one synced place, so no splice re-derives it.
  */
 
-import { setAppName } from "./i18n/ambient.ts";
 import { HOSTED, SURFACE_SIDE } from "./surface.ts";
 // The mount-path math lives with the staff resolver because that is the one
 // module every app in the fleet has; it is not staff-specific (29 D9).
@@ -37,6 +36,12 @@ export interface SurfaceConfig {
   /** Absolute origin to call, never empty once resolved. */
   baseUrl: string;
   publishableKey: string;
+  /**
+   * The app's tables' real names by their short ones, when Adminium named them
+   * at install (`reservations` → `pos_reservations`) — what the app's public
+   * refs are called. Absent for a baked build and an older server.
+   */
+  tables?: Record<string, string>;
 }
 
 /** Test seams only — production call sites pass nothing. */
@@ -90,9 +95,6 @@ export async function resolveSurfaceConfig(
     if (!res.ok) return null;
     const doc: unknown = await res.json();
     if (doc === null || typeof doc !== "object") return null;
-    // Carried on the customer document too: a mapped storefront domain renders
-    // the operator's name, not the sample's.
-    setAppName((doc as { appName?: unknown }).appName as string | null | undefined);
     const key = (doc as { publishableKey?: unknown }).publishableKey;
     if (typeof key !== "string" || key === "") return null;
     const served = (doc as { baseUrl?: unknown }).baseUrl;
@@ -100,10 +102,21 @@ export async function resolveSurfaceConfig(
       typeof served === "string" && served !== ""
         ? served
         : (opts.origin ?? window.location.origin);
-    return { baseUrl, publishableKey: key };
+    const tables = tablesOf((doc as { tables?: unknown }).tables);
+    return { baseUrl, publishableKey: key, ...(tables === null ? {} : { tables }) };
   } catch {
     // Network failure, or the SPA fallback answered with HTML (an instance
     // whose server predates the config route): both are "not configured".
     return null;
   }
+}
+
+/** A `tables` map of strings to strings, or null — anything else is ignored. */
+function tablesOf(value: unknown): Record<string, string> | null {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return null;
+  const out: Record<string, string> = {};
+  for (const [short, real] of Object.entries(value as Record<string, unknown>)) {
+    if (typeof real === "string" && real !== "") out[short] = real;
+  }
+  return Object.keys(out).length === 0 ? null : out;
 }

@@ -1,7 +1,7 @@
 /**
  * The vendored `@adminium/manifest` surface this repo's suite uses.
  *
- * The five modules beside this one are verbatim copies of the monorepo's
+ * The modules beside this one are verbatim copies of the monorepo's
  * `packages/manifest` and `packages/add-on-contracts` sources — see the header
  * each carries, and `scripts/sync-manifest-validator.mjs`, which writes them.
  * Never hand-edit one: run that script, or `--check` it in CI.
@@ -32,3 +32,9 @@ export {
   type ManifestIssue,
   type ValidateManifestResult,
 } from "./validate.ts";
+export {
+  shapeConformanceIssues,
+  shapeKey,
+  type ShapeDefinitionView,
+  type ShapeIssue,
+} from "./shapes.ts";

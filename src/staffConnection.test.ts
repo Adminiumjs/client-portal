@@ -7,8 +7,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-import { appName, setAppName } from "./i18n/ambient.ts";
-import { configBase, resolveStaffConnectionId } from "./staffConnection.ts";
+import { configBase, loadStaffConfig, resolveStaffConnectionId } from "./staffConnection.ts";
 
 const ok = (doc: unknown) =>
   vi.fn(async () =>
@@ -24,28 +23,6 @@ describe("resolveStaffConnectionId", () => {
     expect(
       await resolveStaffConnectionId({ hostedStaff: true, base: "/apps/clients/staff/", fetchImpl }),
     ).toBe("con_42");
-  });
-
-  it("takes the operator's name for the app off the same document", async () => {
-    /*
-     * The name an operator set in Adminium reaches the app's own chrome. It
-     * rides the config document rather than a second request, because the app
-     * already fetches this one before it renders anything — a separate call
-     * would be a second chance to paint the wrong name first.
-     */
-    setAppName(null);
-    const fetchImpl = ok({ connectionId: "con_42", appName: "Acme Client Hub" });
-    await resolveStaffConnectionId({ hostedStaff: true, base: "/apps/clients/staff/", fetchImpl });
-    expect(appName()).toBe("Acme Client Hub");
-  });
-
-  it("leaves the app's own name in place when the operator set none", async () => {
-    // Null means "keep yours". Nothing here invents a name, and the shell's
-    // fallback to `chrome.brand` is what renders.
-    setAppName(null);
-    const fetchImpl = ok({ connectionId: "con_42", appName: null });
-    await resolveStaffConnectionId({ hostedStaff: true, base: "/apps/clients/staff/", fetchImpl });
-    expect(appName()).toBeNull();
   });
 
   it("returns null for an UNBOUND surface — a complete answer, not a failure", async () => {
@@ -108,5 +85,51 @@ describe("configBase", () => {
     // One bundle must never fetch another surface's binding.
     expect(configBase(BAKED, "/apps/clinic/berlin/staff/x")).toBe(BAKED);
     expect(configBase(BAKED, "/apps/clients/berlin/customer/x")).toBe(BAKED);
+  });
+});
+
+describe("loadStaffConfig", () => {
+  it("reads everything a till boots from, and keeps nothing it does not understand", async () => {
+    const fetchImpl = ok({
+      connectionId: "con_42",
+      appName: null,
+      tables: { tickets: "pos_tickets", odd: 7 },
+      settings: { business_type: "retail" },
+      timezone: "Europe/Lisbon",
+      timezoneSource: "operator",
+      serverTimezone: "UTC",
+      currency: "EUR",
+      user: { id: "usr_1", name: "Cara", email: "cara@example.com" },
+      csrfToken: "tok",
+      publicKeys: { kiosk: "adm_pub_k", broken: 3 },
+      access: { tables: { tickets: ["read", "update", "fly"], odd: "all" }, roles: [{ slug: "pos-cashier", name: "POS cashier" }, { name: "no slug" }] },
+    });
+    expect(await loadStaffConfig({ hostedStaff: true, base: "/apps/pos/staff/", fetchImpl })).toEqual({
+      connectionId: "con_42",
+      appName: null,
+      tables: { tickets: "pos_tickets" },
+      settings: { business_type: "retail" },
+      timezone: "Europe/Lisbon",
+      timezoneSource: "operator",
+      serverTimezone: "UTC",
+      currency: "EUR",
+      user: { id: "usr_1", name: "Cara", email: "cara@example.com" },
+      csrfToken: "tok",
+      publicKeys: { kiosk: "adm_pub_k" },
+      access: { tables: { tickets: ["read", "update"] }, roles: [{ slug: "pos-cashier", name: "POS cashier" }] },
+    });
+  });
+
+  it("says nothing of access when the server said nothing, so no button is hidden on a guess", async () => {
+    const fetchImpl = ok({ connectionId: "con_42", tables: {} });
+    const config = await loadStaffConfig({ hostedStaff: true, base: "/apps/pos/staff/", fetchImpl });
+    expect(config?.access).toBeNull();
+    expect(config?.publicKeys).toEqual({});
+  });
+
+  it("is null outside a hosted staff build", async () => {
+    const fetchImpl = ok({});
+    expect(await loadStaffConfig({ hostedStaff: false, fetchImpl })).toBeNull();
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 });

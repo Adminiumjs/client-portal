@@ -425,7 +425,18 @@ export function compareVersions(a, b) {
   return 0;
 }
 
-/** The newest published Adminium, from the registry's `latest` tag. */
+/**
+ * The newest published Adminium — the greater of the `latest` and `next`
+ * dist-tags.
+ *
+ * `next` counts on purpose. A release candidate is published, so an add-on that
+ * needs it CAN be installed; reading `latest` alone made the floor check refuse
+ * every add-on above the stable line for as long as a new major sat on `next`.
+ * That bit on 2026-09-19: 0.3.0-rc.0 shipped to `next`, `latest` rolled back to
+ * 0.2.9, and the invoices add-on could not declare the 0.3.0 floor its own page
+ * requires. `latest` may be the GREATER of the two (a stable release with no rc
+ * pending), so this compares rather than preferring `next`.
+ */
 export async function newestAdminium({ registry = registryFromEnv(), fetchImpl = fetch } = {}) {
   const url = `${registry}/${ADMINIUM_PACKAGE.replace('/', '%2f')}`;
   let res;
@@ -442,9 +453,12 @@ export async function newestAdminium({ registry = registryFromEnv(), fetchImpl =
     await res.body?.cancel();
     throw new R2Error(`${url} answered HTTP ${String(res.status)}`, 'compat');
   }
-  const latest = (await res.json().catch(() => null))?.['dist-tags']?.latest;
-  if (typeof latest !== 'string' || !SEMVER_RE.test(latest)) throw new R2Error(`${url} names no latest version`, 'compat');
-  return latest;
+  const tags = (await res.json().catch(() => null))?.['dist-tags'] ?? {};
+  const usable = ['latest', 'next']
+    .map((name) => tags[name])
+    .filter((v) => typeof v === 'string' && SEMVER_RE.test(v));
+  if (usable.length === 0) throw new R2Error(`${url} names no latest or next version`, 'compat');
+  return usable.reduce((a, b) => (compareVersions(a, b) >= 0 ? a : b));
 }
 
 /** Refuse a manifest whose minimum no published Adminium meets. Returns the minimum. */
@@ -454,7 +468,16 @@ export function assertMinimumReleased(manifest, newest) {
   if (typeof minimum !== 'string' || !SEMVER_RE.test(minimum)) {
     throw new R2Error(`${label}: manifest.json has no compatibility.minAdminiumVersion that is a version`, 'compat');
   }
-  if (compareVersions(minimum, newest) > 0) {
+  // Compared on the RELEASE TRIPLE, the way the server does it. @adminium/
+  // manifest's compareSemver (packages/manifest/src/schema.ts) splits on '-'
+  // and ignores what follows, so an 0.3.0-rc.0 instance reads as 0.3.0 and
+  // installs an add-on whose floor is 0.3.0. Using strict semver here instead
+  // made this gate refuse to publish what every running server would accept:
+  // a prerelease sorts BELOW its release, so 0.3.0-rc.0 failed a 0.3.0 floor.
+  // A gate that predicts "no server can meet this claim" has to ask the
+  // question the server asks.
+  const triple = (v) => v.split('+')[0].split('-')[0];
+  if (compareVersions(triple(minimum), triple(newest)) > 0) {
     throw new R2Error(
       `${label} claims it needs Adminium ${minimum}, but the newest published release is ${newest}. ` +
         'No server can meet that claim, and a released file keeps it forever. Set ' +

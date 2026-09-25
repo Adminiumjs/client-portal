@@ -57,10 +57,31 @@ if (!existsSync(product)) {
 /** source path (relative to the product) → vendored basename. */
 const FILES = [
   ['packages/manifest/src/schema.ts', 'schema.ts'],
+  // The modules `schema.ts` was split into when the manifest learned booking,
+  // the outbox and a person's own rows: each is imported by `schema.ts`, so a
+  // copy without them does not compile.
+  ['packages/manifest/src/refs.ts', 'refs.ts'],
+  ['packages/manifest/src/semver.ts', 'semver.ts'],
+  ['packages/manifest/src/booking.ts', 'booking.ts'],
+  ['packages/manifest/src/public-access.ts', 'public-access.ts'],
+  ['packages/manifest/src/outbox.ts', 'outbox.ts'],
+  // An app role's limits on what its update writes, and a calendar page's columns.
+  ['packages/manifest/src/roles.ts', 'roles.ts'],
+  ['packages/manifest/src/page-calendar.ts', 'page-calendar.ts'],
   ['packages/manifest/src/validate.ts', 'validate.ts'],
+  ['packages/manifest/src/sample.ts', 'sample.ts'],
+  // What an invoicing app declares: worked-out values, states and locks, the
+  // add-ons it needs, the documents it ships, and tables built on an add-on's
+  // shape (with the pure check that a table really is one).
+  ['packages/manifest/src/formula.ts', 'formula.ts'],
+  ['packages/manifest/src/states.ts', 'states.ts'],
+  ['packages/manifest/src/add-ons.ts', 'add-ons.ts'],
+  ['packages/manifest/src/documents.ts', 'documents.ts'],
+  ['packages/manifest/src/shapes.ts', 'shapes.ts'],
   ['packages/add-on-contracts/src/add-on-block.ts', 'add-on-block.ts'],
   ['packages/add-on-contracts/src/contracts.ts', 'contracts.ts'],
   ['packages/add-on-contracts/src/slots.ts', 'slots.ts'],
+  ['packages/add-on-contracts/src/nav-groups.ts', 'nav-groups.ts'],
 ];
 const VENDORED = new Set(FILES.map(([, base]) => base));
 
@@ -99,7 +120,9 @@ function specifiersIn(text) {
  *
  * It also reads `export { a, b as c }` lists, not just declarations. A symbol
  * this cannot place becomes a refusal downstream, which is the safe direction:
- * an openly failed sync beats a subtly wrong copy.
+ * an openly failed sync beats a subtly wrong copy. A RE-export
+ * (`export { a } from './b.js'`) is skipped: it names the symbol's home rather
+ * than being one, and that home is scanned in its own right.
  */
 function exportIndex() {
   const index = new Map();
@@ -110,7 +133,7 @@ function exportIndex() {
     const declared =
       /^export\s+(?:declare\s+)?(?:const|let|var|function|type|interface|class|enum)\s+([A-Za-z0-9_$]+)/gm;
     for (const [, name] of text.matchAll(declared)) names.push(name);
-    for (const [, list] of text.matchAll(/^export\s*\{([^}]*)\}/gm)) {
+    for (const [, list] of text.matchAll(/^export\s*\{([^}]*)\}(?!\s*from\b)/gm)) {
       for (const entry of list.split(',')) {
         const parts = entry.trim().replace(/^type\s+/, '').split(/\s+as\s+/);
         const exported = (parts[parts.length - 1] ?? '').trim();
@@ -155,7 +178,7 @@ function vendor(srcRel, base) {
     ` * WHY A COPY. \`@adminium/manifest\` is not published to npm and this app is a\n` +
     ` * standalone repo that must build from a clean clone, so it cannot depend on\n` +
     ` * the monorepo. It lives under \`testing/\` because \`zod\` is a devDependency\n` +
-    ` * here and a runtime dependency the host does not carry (24 D7) — nothing in\n` +
+    ` * here and a runtime dependency the host does not carry — nothing in\n` +
     ` * the shipped bundle's import graph may reach it, which sources.test.ts gates.\n` +
     ` *\n` +
     ` * The only edits are import specifiers: \`.js\` becomes \`.ts\`, and the\n` +

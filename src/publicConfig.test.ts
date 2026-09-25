@@ -48,6 +48,20 @@ describe("resolveSurfaceConfig", () => {
     });
   });
 
+  it("carries the tables' real names when Adminium sends them, and nothing that is not a name", async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValue(jsonRes(200, { ...CONFIG, tables: { reservations: "pos_reservations", settings: "pos_settings", bad: 7, empty: "" } }));
+    const config = await resolveSurfaceConfig({
+      baked: {},
+      hostedCustomer: true,
+      base: "/apps/pos/customer/",
+      origin: "https://book.example.com",
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    });
+    expect(config?.tables).toEqual({ reservations: "pos_reservations", settings: "pos_settings" });
+  });
+
   it("a served absolute baseUrl passes through untouched", async () => {
     const fetchImpl = vi
       .fn()

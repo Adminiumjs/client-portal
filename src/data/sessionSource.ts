@@ -45,7 +45,7 @@
  * the app can say so on screen (see the fallback in `config()`).
  */
 
-import type { SnapshotPort } from "./snapshotPort.ts";
+import type { ListOptions, SnapshotPort } from "./snapshotPort.ts";
 
 /**
  * Ref name → table name.
@@ -81,8 +81,45 @@ export interface SessionPortOptions {
    * deployment this app ships as and ambiguous the moment there are two.
    */
   connectionId?: string | undefined;
+  /**
+   * The staff config's own facts (`surface-config.json`), when the till was
+   * served one: the signed-in person's token and the venue's zone and money.
+   * With a token and a `connectionId` the transport reads neither the
+   * dashboard's bootstrap nor its connections list — a screens-only cashier
+   * may read neither.
+   */
+  staff?: {
+    csrfToken: string | null;
+    timezone?: string | null;
+    timezoneSource?: string | null;
+    serverTimezone?: string | null;
+    currency?: string | null;
+  };
+  /** A fresh token after `CSRF_FAILED` — the staff config again, for a till booted from it. */
+  refreshToken?: () => Promise<string | null>;
   /** Test seam. */
   fetchImpl?: typeof fetch;
+  /** Test seam: how a read waits out a rate limit. */
+  sleep?: (ms: number) => Promise<void>;
+}
+
+/*
+ * A READ REFUSED FOR RATE is read again. Adminium answers 429 before it runs
+ * anything, so repeating a GET is safe, and the desk opening needs a burst of
+ * them: a desk that meets the limit while it starts must wait and go on, not
+ * stop on a screen that says "try again in 15 seconds" and never does. Twice,
+ * after what `Retry-After` asks (capped), then the refusal stands. A write is
+ * never repeated here: the person sees it refused and decides.
+ */
+const RATE_RETRIES = 2;
+const RATE_WAIT_CAP_MS = 30_000;
+const RATE_WAIT_DEFAULT_MS = 5_000;
+
+/** How long a 429 asks to wait, from `Retry-After` in seconds; a default when it says nothing usable. */
+export function rateLimitWait(retryAfter: string | null): number {
+  const seconds = retryAfter === null ? Number.NaN : Number(retryAfter);
+  if (!Number.isFinite(seconds) || seconds < 0) return RATE_WAIT_DEFAULT_MS;
+  return Math.min(Math.ceil(seconds * 1000), RATE_WAIT_CAP_MS);
 }
 
 /*
@@ -166,7 +203,16 @@ function sourceOf(override: string | undefined, row: ConnectionRow): TimezoneSou
 }
 
 interface SchemaReply {
-  model?: { tables?: { name: string; columns?: { name: string }[] }[] };
+  model?: {
+    tables?: { id?: string; name: string; columns?: { name: string }[] }[];
+    /** A foreign key, by the id the data API names it with in `children`. */
+    relations?: {
+      id: string;
+      through?: unknown;
+      from?: { tableId?: string; columns?: string[] };
+      to?: { tableId?: string };
+    }[];
+  };
 }
 
 export class SessionPortError extends Error {
@@ -174,12 +220,15 @@ export class SessionPortError extends Error {
      with `erasableSyntaxOnly`, which rejects the shorthand. */
   readonly status: number;
   readonly code: string;
+  /** What the server said beyond the message — a refused write's column issues. */
+  readonly details: unknown;
 
-  constructor(message: string, status: number, code: string) {
+  constructor(message: string, status: number, code: string, details?: unknown) {
     super(message);
     this.name = "SessionPortError";
     this.status = status;
     this.code = code;
+    this.details = details;
   }
 }
 
@@ -194,6 +243,7 @@ export function sessionPort(opts: SessionPortOptions): SnapshotPort {
 
 function buildTransport(opts: SessionPortOptions): SessionTransport {
   const doFetch = opts.fetchImpl ?? globalThis.fetch.bind(globalThis);
+  const sleep = opts.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
   let csrfToken: string | null = null;
   let connectionId: string | null = opts.connectionId ?? null;
   /** Adminium's own zone, for the fallback below. Null on an older Adminium. */
@@ -214,16 +264,22 @@ function buildTransport(opts: SessionPortOptions): SessionTransport {
 
   async function call<T>(path: string, init?: RequestInit): Promise<T> {
     const mutating = (init?.method ?? "GET").toUpperCase() !== "GET";
-    const response = await doFetch(path, {
-      credentials: "same-origin",
-      ...init,
-      headers: {
-        accept: "application/json",
-        ...(init?.body !== undefined ? { "content-type": "application/json" } : {}),
-        ...(mutating && csrfToken !== null ? { [CSRF_HEADER]: csrfToken } : {}),
-        ...init?.headers,
-      },
-    });
+    const send = () =>
+      doFetch(path, {
+        credentials: "same-origin",
+        ...init,
+        headers: {
+          accept: "application/json",
+          ...(init?.body !== undefined ? { "content-type": "application/json" } : {}),
+          ...(mutating && csrfToken !== null ? { [CSRF_HEADER]: csrfToken } : {}),
+          ...init?.headers,
+        },
+      });
+    let response = await send();
+    for (let retry = 0; !mutating && response.status === 429 && retry < RATE_RETRIES; retry += 1) {
+      await sleep(rateLimitWait(response.headers.get("retry-after")));
+      response = await send();
+    }
 
     let body: unknown = null;
     try {
@@ -233,17 +289,54 @@ function buildTransport(opts: SessionPortOptions): SessionTransport {
     }
 
     if (!response.ok) {
-      const envelope = body as { error?: { code?: string; message?: string } } | null;
+      const envelope = body as { error?: { code?: string; message?: string; details?: unknown } } | null;
       throw new SessionPortError(
         envelope?.error?.message ?? `Request failed with status ${String(response.status)}.`,
         response.status,
         envelope?.error?.code ?? "INTERNAL",
+        envelope?.error?.details,
       );
     }
     return body as T;
   }
 
+  /** The connection's schema, read once: the till asks it about tables and links. */
+  let schemaRead: Promise<SchemaReply> | null = null;
+  async function schemaOf(): Promise<SchemaReply> {
+    schemaRead ??= discover().then((conn) =>
+      call<SchemaReply>(`/api/v1/connections/${encodeURIComponent(conn)}/schema`),
+    );
+    try {
+      return await schemaRead;
+    } catch (error) {
+      schemaRead = null;
+      throw error;
+    }
+  }
+
+  let discovered = false;
   async function discover(): Promise<string> {
+    /*
+     * BOOTED FROM THE STAFF CONFIG: the person, the token and the venue are
+     * already known, and asking the dashboard for them would be refused for a
+     * screens-only cashier.
+     */
+    const staff = opts.staff;
+    if (staff?.csrfToken && connectionId !== null) {
+      if (!discovered) {
+        discovered = true;
+        csrfToken = staff.csrfToken;
+        serverTimezone = staff.serverTimezone ?? null;
+        tenantTimezone = opts.timezone ?? staff.timezone ?? null;
+        tenantTimezoneSource = sourceOf(opts.timezone, {
+          id: connectionId,
+          timezone: staff.timezone ?? null,
+          timezoneSource: staff.timezoneSource ?? null,
+        });
+        tenantCurrency = opts.currency ?? staff.currency ?? null;
+      }
+      return connectionId;
+    }
     const boot = await call<BootstrapReply>("/api/v1/bootstrap");
     // Absent only if the server is unauthenticated, which `call` already threw
     // on — so this is a contract check, not a fallback.
@@ -432,10 +525,7 @@ function buildTransport(opts: SessionPortOptions): SessionTransport {
     },
 
     async assertRefs(required) {
-      const conn = await discover();
-      const schema = await call<SchemaReply>(
-        `/api/v1/connections/${encodeURIComponent(conn)}/schema`,
-      );
+      const schema = await schemaOf();
       const byTable = new Map(
         (schema.model?.tables ?? []).map((t) => [
           t.name,
@@ -469,23 +559,62 @@ function buildTransport(opts: SessionPortOptions): SessionTransport {
       }
     },
 
-    async list<T>(ref: string, { limit, offset }: { limit: number; offset: number }) {
+    async list<T>(ref: string, { limit, offset, where, order, count }: ListOptions) {
       const conn = await discover();
       const table = opts.tableOfRef[ref];
       if (table === undefined) {
         throw new SessionPortError(`unknown ref "${ref}"`, 400, "UNKNOWN_REF");
       }
       const size = Math.min(limit, PAGE_MAX);
-      const query = `limit=${String(size)}&offset=${String(offset)}`;
-      const res = await call<{ data?: T[] }>(
+      let query = `limit=${String(size)}&offset=${String(offset)}`;
+      if (where !== undefined) query += `&where=${encodeURIComponent(JSON.stringify(where))}`;
+      if (order !== undefined) query += `&order=${encodeURIComponent(order)}`;
+      if (count === true) query += "&count=exact";
+      const res = await call<{ data?: T[]; page?: { total?: number | null } }>(
         `/api/v1/data/${encodeURIComponent(conn)}/${encodeURIComponent(table)}?${query}`,
       );
-      return { data: res.data ?? [] };
+      // Only a count that was asked for is reported: an absent one is not zero.
+      return count === true ? { data: res.data ?? [], total: res.page?.total ?? null } : { data: res.data ?? [] };
     },
   };
 
   return {
     port,
+    connection: discover,
+    async tableId(name: string): Promise<string> {
+      const table = ((await schemaOf()).model?.tables ?? []).find((t) => t.name === name);
+      if (table === undefined) throw new SessionPortError(`table "${name}" is absent`, 412, "SCHEMA_MISMATCH");
+      return table.id ?? name;
+    },
+    async relation(child: string, column: string): Promise<string> {
+      const model = (await schemaOf()).model;
+      const table = (model?.tables ?? []).find((t) => t.name === child);
+      const found = (model?.relations ?? []).find(
+        (r) =>
+          (r.through === null || r.through === undefined) &&
+          r.from?.tableId === (table?.id ?? child) &&
+          r.from?.columns?.length === 1 &&
+          r.from.columns[0] === column,
+      );
+      if (found === undefined) {
+        throw new SessionPortError(`nothing links "${child}.${column}" to its parent`, 412, "SCHEMA_MISMATCH");
+      }
+      return found.id;
+    },
+    async refresh(): Promise<void> {
+      if (opts.refreshToken !== undefined) {
+        csrfToken = (await opts.refreshToken()) ?? csrfToken;
+        return;
+      }
+      const boot = await call<BootstrapReply>("/api/v1/bootstrap");
+      csrfToken = boot.data?.csrfToken ?? null;
+    },
+    async get<T>(path: string): Promise<T> {
+      // The connection is discovered first so a booted-from-config transport
+      // has its session, exactly as a list would.
+      await discover();
+      return call<T>(path);
+    },
     async mutate<T>(
       path: string,
       method: "POST" | "PATCH" | "DELETE",
@@ -528,6 +657,31 @@ export interface SessionTransport {
    * `CSRF_FAILED` that looks like a permissions problem.
    */
   mutate: <T>(path: string, method: "POST" | "PATCH" | "DELETE", body?: unknown) => Promise<T>;
+  /**
+   * A `GET` of a dashboard route through the same session, for the reads a
+   * `SnapshotPort` has no method for — a booking table's free times, one
+   * record by its key. The path is the caller's, whole; the answer is the
+   * route's own envelope. Never carries the CSRF token (the server checks
+   * none on a read).
+   */
+  get: <T>(path: string) => Promise<T>;
+  /** The connection the app's tables are in (discovered on first use). */
+  connection: () => Promise<string>;
+  /**
+   * A table's id in the connection's schema (`public.pos_tickets`) — what a
+   * live-updates channel names it by.
+   */
+  tableId: (name: string) => Promise<string>;
+  /**
+   * The id the data API names a child link by, in a write's `children`: the
+   * foreign key `child.column` pointing at the parent being written.
+   */
+  relation: (child: string, column: string) => Promise<string>;
+  /**
+   * A fresh CSRF token, after a write came back `CSRF_FAILED` — the token
+   * rotates with the session, and one retry with the new one is the answer.
+   */
+  refresh: () => Promise<void>;
 }
 
 export function createSessionTransport(opts: SessionPortOptions): SessionTransport {

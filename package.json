@@ -8,20 +8,19 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "build:demo": "tsc -b && vite build --base=/demo/client-portal/",
+    "build:demo": "tsc -b && vite build --base=/demo/client-portal/app/",
     "build:surface:staff": "VITE_ADMINIUM_SURFACE_SIDE=staff tsc -b && VITE_ADMINIUM_SURFACE_SIDE=staff vite build --base=/apps/clients/staff/ --outDir dist-surface/clients/staff",
     "build:surface:customer": "VITE_ADMINIUM_SURFACE_SIDE=customer tsc -b && VITE_ADMINIUM_SURFACE_SIDE=customer vite build --base=/apps/clients/customer/ --outDir dist-surface/clients/customer",
     "build:surface": "npm run build:surface:staff && npm run build:surface:customer",
     "preview": "vite preview",
     "test": "vitest run",
-    "demo:status": "node db/demo.mjs status",
-    "demo:import": "node db/demo.mjs import",
-    "demo:wipe": "node db/demo.mjs wipe",
-    "demo:reset": "node db/demo.mjs reset",
-    "dev:hosted": "VITE_ADMINIUM_SURFACE_SIDE=staff vite"
+    "dev:hosted": "VITE_ADMINIUM_SURFACE_SIDE=staff vite",
+    "manifest": "vite-node scripts/write-manifest.ts",
+    "lexicon": "node scripts/sync-lexicon.mjs",
+    "lexicon:check": "node scripts/sync-lexicon.mjs --check"
   },
   "dependencies": {
-    "@adminiumjs/public-client": "^0.2.2",
+    "@adminiumjs/public-client": "0.3.0",
     "lucide-react": "^0.462.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
