@@ -617,7 +617,7 @@ function buildTransport(opts: SessionPortOptions): SessionTransport {
     },
     async mutate<T>(
       path: string,
-      method: "POST" | "PATCH" | "DELETE",
+      method: "POST" | "PUT" | "PATCH" | "DELETE",
       body?: unknown,
     ): Promise<T> {
       if (csrfToken === null) {
@@ -651,12 +651,12 @@ function buildTransport(opts: SessionPortOptions): SessionTransport {
 export interface SessionTransport {
   port: SnapshotPort;
   /**
-   * `POST`/`PATCH`/`DELETE` against a dashboard route, carrying the session and
+   * `POST`/`PUT`/`PATCH`/`DELETE` against a dashboard route, carrying the session and
    * the CSRF token. Throws `SessionPortError` unless `config()` has run — the
    * token does not exist before then, and a tokenless write fails with a
    * `CSRF_FAILED` that looks like a permissions problem.
    */
-  mutate: <T>(path: string, method: "POST" | "PATCH" | "DELETE", body?: unknown) => Promise<T>;
+  mutate: <T>(path: string, method: "POST" | "PUT" | "PATCH" | "DELETE", body?: unknown) => Promise<T>;
   /**
    * A `GET` of a dashboard route through the same session, for the reads a
    * `SnapshotPort` has no method for — a booking table's free times, one

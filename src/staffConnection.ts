@@ -109,6 +109,18 @@ export interface StaffConfig {
    * shows, and the server refuses what it refuses.
    */
   access: StaffAccess | null;
+  /**
+   * The add-ons attached to this app and switched on, by key: the version, and
+   * the settings the add-on marks for a browser (never a secret). Empty when
+   * none is attached, or from a server that does not say — then a feature that
+   * needs one stays off.
+   */
+  addOns: Record<string, StaffAddOn>;
+}
+
+export interface StaffAddOn {
+  version: string | null;
+  settings: Record<string, unknown>;
 }
 
 export type TableAction = "read" | "create" | "update" | "delete";
@@ -147,6 +159,17 @@ const text = (value: unknown): string | null => (typeof value === "string" && va
 const record = (value: unknown): Record<string, unknown> =>
   value !== null && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 
+/** The attached add-ons as the server lists them; anything else is dropped rather than guessed at. */
+function addOnsOf(value: unknown): Record<string, StaffAddOn> {
+  const out: Record<string, StaffAddOn> = {};
+  for (const [key, entry] of Object.entries(record(value))) {
+    if (entry === null || typeof entry !== "object" || Array.isArray(entry)) continue;
+    const e = entry as Record<string, unknown>;
+    out[key] = { version: text(e.version), settings: record(e.settings) };
+  }
+  return out;
+}
+
 /** The whole staff config, or null outside a hosted staff build or when none answers. */
 export async function loadStaffConfig(opts: StaffConfigOptions = {}): Promise<StaffConfig | null> {
   const hostedStaff = opts.hostedStaff ?? (HOSTED && SURFACE_SIDE === "staff");
@@ -183,6 +206,7 @@ export async function loadStaffConfig(opts: StaffConfigOptions = {}): Promise<St
         Object.entries(record(d.publicKeys)).filter((entry): entry is [string, string] => typeof entry[1] === "string" && entry[1] !== ""),
       ),
       access: accessOf(d.access),
+      addOns: addOnsOf(d.addOns),
     };
   } catch {
     // An older server answers this path with the SPA index (HTML).

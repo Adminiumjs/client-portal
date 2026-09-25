@@ -103,6 +103,7 @@ describe("loadStaffConfig", () => {
       csrfToken: "tok",
       publicKeys: { kiosk: "adm_pub_k", broken: 3 },
       access: { tables: { tickets: ["read", "update", "fly"], odd: "all" }, roles: [{ slug: "pos-cashier", name: "POS cashier" }, { name: "no slug" }] },
+      addOns: { invoices: { version: "1.0.3", settings: { business_name: "Harbour Café" } }, odd: 3 },
     });
     expect(await loadStaffConfig({ hostedStaff: true, base: "/apps/pos/staff/", fetchImpl })).toEqual({
       connectionId: "con_42",
@@ -117,6 +118,7 @@ describe("loadStaffConfig", () => {
       csrfToken: "tok",
       publicKeys: { kiosk: "adm_pub_k" },
       access: { tables: { tickets: ["read", "update"] }, roles: [{ slug: "pos-cashier", name: "POS cashier" }] },
+      addOns: { invoices: { version: "1.0.3", settings: { business_name: "Harbour Café" } } },
     });
   });
 
@@ -125,6 +127,8 @@ describe("loadStaffConfig", () => {
     const config = await loadStaffConfig({ hostedStaff: true, base: "/apps/pos/staff/", fetchImpl });
     expect(config?.access).toBeNull();
     expect(config?.publicKeys).toEqual({});
+    // No add-on said attached: a feature that needs one stays off.
+    expect(config?.addOns).toEqual({});
   });
 
   it("is null outside a hosted staff build", async () => {
