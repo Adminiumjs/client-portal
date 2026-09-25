@@ -25,6 +25,7 @@ import Brief from "./Brief.tsx";
 import Find from "./Find.tsx";
 import Expired from "./Expired.tsx";
 import { handoverFiles } from "./Handover.tsx";
+import { versionSource } from "./Review.tsx";
 import Terms from "../../sheets/client/Terms.tsx";
 import Receipt from "../../sheets/client/Receipt.tsx";
 import { sayRefusal } from "./shared/page.ts";
@@ -302,22 +303,107 @@ describe("the sheets", () => {
 });
 
 describe("the shared handover", () => {
-  it("offers each approved deliverable's latest file, then the studio's own files", () => {
-    const files = handoverFiles(
-      {
-        studio: null,
-        project: { id: 4, number: "PRJ-04", name: "Studio identity", done_on: null, handover_notes: null, share_expires_on: null },
-        fonts: [],
-        files: [{ id: 1, project_id: 4, client_id: null, file: "store:files/print-notes.pdf", link: null, note: "For the printer", position: 0, client_key: null }],
-        deliverables: [{ id: 5, title: "Final mark files", position: 0 } as Tables["deliverables"]],
-        versions: [{ id: 4, deliverable_id: 5, v: 1, file: null, link: "https://files.example/kiln-mark.zip", posted_at: "2026-02-25T13:00:00.000Z" } as Tables["deliverable_versions"]],
-      },
-      (ref, id) => `signed:${ref}/${id}`,
-    );
-    expect(files).toEqual([
-      { key: "v4", name: "kiln-mark.zip", what: "Final mark files", href: "https://files.example/kiln-mark.zip" },
-      { key: "f1", name: "print-notes.pdf", what: "For the printer", href: "signed:handover_files/1" },
+  const view = {
+    studio: null,
+    project: { id: 4, number: "PRJ-04", name: "Studio identity", done_on: null, handover_notes: null, share_expires_on: null },
+    fonts: [],
+    files: [
+      { id: 1, project_id: 4, client_id: null, file: "store:files/print-notes.pdf", link: null, note: "For the printer", position: 0, client_key: null },
+      { id: 2, project_id: 4, client_id: null, file: null, link: "https://files.example/colours.ase", note: null, position: 1, client_key: null },
+    ],
+    deliverables: [{ id: 5, title: "Final mark files", position: 0 } as Tables["deliverables"]],
+    versions: [{ id: 4, deliverable_id: 5, v: 1, file: null, link: "https://files.example/kiln-mark.zip", posted_at: "2026-02-25T13:00:00.000Z" } as Tables["deliverable_versions"]],
+  };
+
+  it("offers each approved deliverable's latest file, then the studio's own files — links as links, stored files fetched with the share link's session", async () => {
+    const fetched: string[] = [];
+    const files = handoverFiles(view, async (ref, id, column) => {
+      fetched.push(`${ref}/${id}/${column}`);
+      return { blob: new Blob(["pdf"]), filename: "print-notes.pdf", inline: true };
+    });
+    expect(files.map((f) => [f.key, f.name, f.what, f.source?.kind ?? null])).toEqual([
+      ["v4", "kiln-mark.zip", "Final mark files", "link"],
+      ["f1", "print-notes.pdf", "For the printer", "private"],
+      ["f2", "colours.ase", "", "link"],
     ]);
+    expect(files[0]!.source).toEqual({ kind: "link", href: "https://files.example/kiln-mark.zip" });
+    const stored = files[1]!.source;
+    if (stored?.kind !== "private") throw new Error("expected a stored file");
+    expect((await stored.fetch()).filename).toBe("print-notes.pdf");
+    expect(fetched).toEqual(["handover_files/1/file"]);
+  });
+
+  it("offers a stored file as a plain row when the page cannot fetch it — never a bare address", () => {
+    expect(handoverFiles(view, null).map((f) => f.source?.kind ?? null)).toEqual(["link", null, "link"]);
+  });
+});
+
+describe("a private file on the review", () => {
+  it("is fetched with the session through the port's file(), never a bare link", async () => {
+    const asked: string[] = [];
+    const port = studio.world.portal(1);
+    setPortalPort({
+      ...port,
+      fileUrl: () => {
+        throw new Error("files are fetched with the session");
+      },
+      file: async (ref, id, column) => {
+        asked.push(`${ref}/${id}/${column}`);
+        return { blob: new Blob(["x"]), filename: "window-a-v2.pdf", inline: true };
+      },
+    });
+    const stored = versionSource({ id: 9, deliverable_id: 3, v: 2, file: "store:versions/window-a-v2.pdf", link: null } as Tables["deliverable_versions"], "window-a-v2.pdf");
+    if (stored?.kind !== "private") throw new Error("expected a stored file");
+    await stored.fetch();
+    expect(asked).toEqual(["deliverable_versions/9/file"]);
+    // A version the studio shared as a link opens at that link.
+    expect(versionSource({ id: 3, deliverable_id: 3, v: 1, file: null, link: "https://files.example/window-a-v1.pdf" } as Tables["deliverable_versions"], "x")).toEqual({ kind: "link", href: "https://files.example/window-a-v1.pdf" });
+  });
+
+  it("draws a stored file's tile as a button that fetches it, with its download beside it", async () => {
+    setPortalPort({ ...studio.world.portal(1), file: async () => ({ blob: new Blob(["x"]), filename: "a.pdf", inline: true }) });
+    select("deliverable", 3);
+    await loadClientDeliverable(3);
+    upsertPortal("deliverable_versions", [{ ...usePortal.getState().rows.deliverable_versions[3]!, file: "store:versions/window-a-v1.pdf", link: null }]);
+    const html = draw(<Review />);
+    expect(html).toMatch(/<button type="button" class="cl-art-tile ol-gi" aria-label="Open window-a-v1.pdf"/);
+    expect(html).toMatch(/<button type="button" class="icon-btn cl-art-download ol-gi" aria-label="Download window-a-v1.pdf"/);
+    expect(html).not.toContain("store:versions");
+  });
+});
+
+describe("how to pay", () => {
+  it("reads the payment instructions from the port for the signed-in client, and none in the studio's preview", async () => {
+    let asked = 0;
+    setPortalPort({
+      ...studio.world.portal(1),
+      paymentInstructions: async () => {
+        asked += 1;
+        return "Bank transfer to Outline Studio";
+      },
+    });
+    const { usePaymentInstructions } = await import("./Invoice.tsx");
+    const seen: (string | null)[] = [];
+    const Probe = () => {
+      seen.push(usePaymentInstructions(4));
+      return null;
+    };
+    // Effects do not run on the server side of React: call the read the hook makes, as the page does.
+    draw(<Probe />);
+    expect(seen).toEqual([null]);
+    const { readPaymentInstructions } = await import("./Invoice.tsx");
+    expect(await readPaymentInstructions()).toBe("Bank transfer to Outline Studio");
+    useUi.setState({ preview: { clientId: 1, back: "client" } });
+    expect(await readPaymentInstructions()).toBeNull();
+    useUi.setState({ preview: null });
+    expect(asked).toBe(1);
+  });
+
+  it("falls back to where the details are when the server serves none", async () => {
+    select("invoice", 4);
+    await loadClientInvoice(4);
+    const page = text(draw(<Invoice />));
+    expect(page).toContain("The studio’s payment details are in the email that brought you this invoice.");
   });
 });
 

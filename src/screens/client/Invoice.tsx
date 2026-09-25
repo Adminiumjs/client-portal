@@ -31,22 +31,30 @@ import { openInNewTab, portOrNull, sayRefusal, useOpened, useSignedIn } from "./
 
 /**
  * The studio's payment instructions, as Adminium serves them to the
- * signed-in client (never before sign-in). Null while none are served.
+ * signed-in client (never before sign-in, never in the studio's preview).
+ * Null when there are none or this server cannot say — the page then says
+ * where else the details are.
  */
-function usePaymentInstructions(invoiceId: Id | null): string | null {
+export async function readPaymentInstructions(): Promise<string | null> {
+  if (useUi.getState().preview !== null) return null;
+  try {
+    const value = (await portOrNull()?.paymentInstructions?.()) ?? null;
+    return value !== null && value.trim() !== "" ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The instructions for the invoice on show, read when it opens. */
+export function usePaymentInstructions(invoiceId: Id | null): string | null {
   const preview = useUi((s) => s.preview !== null);
   const [text, setText] = useState<string | null>(null);
   useEffect(() => {
-    if (preview || invoiceId === null) return;
-    const port = portOrNull() as { paymentInstructions?: () => Promise<string | null> } | null;
-    if (port?.paymentInstructions === undefined) return;
+    if (invoiceId === null) return;
     let live = true;
-    port
-      .paymentInstructions()
-      .then((value) => {
-        if (live) setText(value !== null && value.trim() !== "" ? value : null);
-      })
-      .catch(() => undefined);
+    void readPaymentInstructions().then((value) => {
+      if (live) setText(value);
+    });
     return () => {
       live = false;
     };

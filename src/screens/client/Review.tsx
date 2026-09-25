@@ -22,19 +22,17 @@ import { pinsOn, thread } from "./review/model.ts";
 import { Section, Tile, useDay, useSelected } from "./shared/bits.tsx";
 import { dayOf, versionFile, versionLabel, versionsOf } from "./shared/model.ts";
 import { portOrNull, sayRefusal, useOpened, useSignedIn } from "./shared/page.ts";
+import { fileSource, openPrivate, savePrivate, type FileSource } from "./shared/files.ts";
 
-/** Where a version's file opens: a short-lived private link to the stored file, else the link the studio shared. */
-export function fileHref(v: Tables["deliverable_versions"] | undefined): string | null {
+/**
+ * Where a version's file comes from: the link the studio shared, else the
+ * stored file, fetched with the client's session (never a bare address).
+ */
+export function versionSource(v: Tables["deliverable_versions"] | undefined, name: string): FileSource {
   if (v === undefined) return null;
-  if (v.file !== null && v.file !== "") {
-    try {
-      const url = portOrNull()?.fileUrl("deliverable_versions", v.id, "file");
-      if (url !== undefined && url !== "") return url;
-    } catch {
-      // No private links on this client: fall back to the shared link, if any.
-    }
-  }
-  return v.link !== null && v.link !== "" ? v.link : null;
+  const port = portOrNull();
+  const fetch = port?.file === undefined ? null : () => port.file!("deliverable_versions", v.id, "file");
+  return fileSource(v, name, fetch);
 }
 
 export default function Review() {
@@ -63,10 +61,22 @@ export default function Review() {
   const current = versions[0];
   const earlier = versions.slice(1);
   const file = versionFile(current);
-  const href = fileHref(current);
+  const source = versionSource(current, file || d.title);
   const pins = current === undefined ? [] : pinsOn(allNotes, current.id);
   const said = thread(allNotes, d.id);
   const status = d.status === "approved" ? "approved" : d.status === "changes" ? "changes" : "pending";
+  const openLabel = t("client.review.openFile", { file: file || d.title });
+  const saveLabel = t("client.review.download", { file: file || d.title });
+  const art = (
+    <>
+      <Tile icon={d.icon} size={72} />
+      {pins.map((pin) => (
+        <span key={pin.id} className="cl-pin" aria-hidden="true" style={{ insetBlockStart: `${pin.y}%`, insetInlineStart: `${pin.x}%` }}>
+          {pin.n}
+        </span>
+      ))}
+    </>
+  );
 
   const send = async () => {
     const body = message.trim();
@@ -119,30 +129,27 @@ export default function Review() {
         </div>
         <div className="cl-review-body">
           <div className="cl-art">
-            {href !== null ? (
-              <a className="cl-art-tile ol-gi" href={href} target="_blank" rel="noopener noreferrer" aria-label={t("client.review.openFile", { file: file || d.title })}>
-                <Tile icon={d.icon} size={72} />
-                {pins.map((pin) => (
-                  <span key={pin.id} className="cl-pin" aria-hidden="true" style={{ insetBlockStart: `${pin.y}%`, insetInlineStart: `${pin.x}%` }}>
-                    {pin.n}
-                  </span>
-                ))}
+            {source === null ? (
+              <span className="cl-art-tile">{art}</span>
+            ) : source.kind === "link" ? (
+              <a className="cl-art-tile ol-gi" href={source.href} target="_blank" rel="noopener noreferrer" aria-label={openLabel}>
+                {art}
               </a>
             ) : (
-              <span className="cl-art-tile">
-                <Tile icon={d.icon} size={72} />
-                {pins.map((pin) => (
-                  <span key={pin.id} className="cl-pin" aria-hidden="true" style={{ insetBlockStart: `${pin.y}%`, insetInlineStart: `${pin.x}%` }}>
-                    {pin.n}
-                  </span>
-                ))}
-              </span>
+              <button type="button" className="cl-art-tile ol-gi" aria-label={openLabel} onClick={() => void openPrivate(source, t("client.blocked"))}>
+                {art}
+              </button>
             )}
-            {href !== null && (
-              <a className="icon-btn cl-art-download ol-gi" href={href} download target="_blank" rel="noopener noreferrer" aria-label={t("client.review.download", { file: file || d.title })} title={t("client.review.download", { file: file || d.title })}>
-                <Download size={16} aria-hidden="true" />
-              </a>
-            )}
+            {source !== null &&
+              (source.kind === "link" ? (
+                <a className="icon-btn cl-art-download ol-gi" href={source.href} download target="_blank" rel="noopener noreferrer" aria-label={saveLabel} title={saveLabel}>
+                  <Download size={16} aria-hidden="true" />
+                </a>
+              ) : (
+                <button type="button" className="icon-btn cl-art-download ol-gi" aria-label={saveLabel} title={saveLabel} onClick={() => void savePrivate(source, t("client.fileFailed"))}>
+                  <Download size={16} aria-hidden="true" />
+                </button>
+              ))}
           </div>
           {current?.note !== null && current?.note !== undefined && current.note.trim() !== "" && <span className="cl-muted cl-body">{current.note}</span>}
         </div>

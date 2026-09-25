@@ -1996,3 +1996,21 @@
     display: none !important;
   }
 }
+
+/* a file fetched with the session opens from a button, drawn like the link it replaces */
+button.cl-art-tile,
+button.cl-file {
+  padding: 0;
+  background: transparent;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+button.cl-art-tile {
+  border: 1px solid var(--border);
+}
+button.cl-file {
+  border: none;
+  border-block-end: 1px solid var(--border);
+  padding: 12px 16px;
+}
