@@ -9,7 +9,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import * as act from "./actions.ts";
 import { acceptAndSign } from "./clientActions.ts";
-import { useDesk } from "./desk.ts";
+import { upsertAll, useDesk } from "./desk.ts";
 import { fakeStudio, tableOf, type FakeStudio } from "../testing/fakeStudio.ts";
 
 let studio: FakeStudio;
@@ -135,6 +135,20 @@ describe("the composer", () => {
     );
     expect(trail().slice(-2)).toEqual(["update proposals", "update proposals"]);
     expect(studio.writes.at(-1)).toMatchObject({ id: 3, values: { status: "withdrawn", withdraw_reason: "Replaced by a revision" } });
+  });
+
+  it("leaves a declined original its own decision when a revision of it is sent", async () => {
+    const draft = ok(await act.makeRevision(3));
+    const declined = { ...useDesk.getState().rows.proposals[3]!, status: "declined" as const };
+    upsertAll("proposals", [declined]);
+    const copied = tableOf(studio, "proposal_lines").filter((l) => l["document_id"] === draft.id);
+    ok(
+      await act.sendProposal(
+        { id: draft.id, client: { id: 1 }, title: "Shopfront identity", scope: null, split: "5050", valid_until: "2026-08-25", terms_version_id: 3, revision_of: 3, lines: copied.map((l) => ({ id: l["id"] as number, description: String(l["description"]), qty: String(l["qty"]), rate: String(l["rate"]) })) },
+        { replacedReason: "Replaced by a revision" },
+      ),
+    );
+    expect(studio.writes.filter((w) => w.id === 3)).toEqual([]);
   });
 
   it("sends a reminder, extends, and withdraws", async () => {

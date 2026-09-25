@@ -173,8 +173,8 @@ const clientValues = (input: ClientInput): RowValues => ({
 const lineValues = (line: LineInput, position: number): RowValues => ({
   position,
   description: line.description.trim(),
-  qty: line.qty.trim(),
-  rate: line.rate.trim(),
+  qty: blank(line.qty) ?? "1",
+  rate: blank(line.rate),
   discount_kind: "amount",
   discount: blank(line.discount ?? null),
 });
@@ -353,7 +353,9 @@ export function sendProposal(draft: ProposalDraft, opts: { replacedReason: strin
       const steps = proposalSaveSteps(draft);
       steps.push({ name: "send", run: (ctx) => update("proposals", ctx.result<Proposal>("proposal").id, { status: "sent" }) });
       const original = draft.revision_of ?? null;
-      if (original !== null) {
+      // Only a proposal still out with the client is withdrawn; a declined or
+      // withdrawn one keeps its own decision.
+      if (original !== null && held("proposals", original)?.status === "sent") {
         steps.push({ name: "withdraw-original", run: () => update("proposals", original, { status: "withdrawn", withdraw_reason: opts.replacedReason }) });
       }
       return steps;
@@ -395,7 +397,8 @@ export function makeRevision(proposalId: Id): Promise<Outcome<Proposal>> {
               title: original.title,
               scope: original.scope,
               split: original.split,
-              valid_until: original.valid_until,
+              // A revision is offered afresh: three weeks from today.
+              valid_until: addDays(today(), 21),
               terms_version_id: original.terms_version_id,
               revision_of: proposalId,
               client_key: ctx.key,
@@ -499,7 +502,8 @@ export function startProject(proposalId: Id, input: StartProjectInput): Promise<
       { name: "project", run: (ctx) => insert("projects", { client_id: proposal.client_id, proposal_id: proposalId, name: input.name.trim(), client_key: ctx.key }) },
       ...input.milestones.map((m, i): Step => ({
         name: `milestone:${String(i)}`,
-        run: (ctx) => insert("milestones", { project_id: ctx.result<Project>("project").id, title: m.title.trim(), due_on: m.due_on, position: i, client_key: ctx.key }),
+        // The first milestone is the one under way.
+        run: (ctx) => insert("milestones", { project_id: ctx.result<Project>("project").id, title: m.title.trim(), due_on: m.due_on, state: i === 0 ? "now" : "next", position: i, client_key: ctx.key }),
       })),
       ...stageSteps(proposal, (ctx) => ctx.result<Project>("project").id, input.firstStage),
     ];

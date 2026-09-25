@@ -113,6 +113,16 @@ export function open(view: DeskView | ClientView, id: Id): void {
   scrollTop();
 }
 
+/** Open the printed copy of a proposal or an invoice. */
+export function openPrint(table: "proposals" | "invoices", id: Id): void {
+  useUi.setState((s) => ({
+    view: "print",
+    menu: false,
+    selected: { ...s.selected, invoice: table === "invoices" ? id : null, proposal: table === "proposals" ? id : s.selected.proposal },
+  }));
+  scrollTop();
+}
+
 /** Open the composer on a new document or a draft. */
 export function openComposer(target: ComposerTarget): void {
   useUi.setState({ view: "composer", composer: target, menu: false });
