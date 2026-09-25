@@ -1,1 +1,404 @@
-/* The composer area's own layout. Shared pieces are in primitives.css; tokens in tokens.css. */
+/* The composer area's own layout (and its send sheet). Shared pieces are in primitives.css. */
+
+.cmp {
+  container: cmp / inline-size;
+}
+.cmp-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.cmp-top .btn {
+  height: 31px;
+  gap: 7px;
+  color: var(--fg-muted);
+  border-color: var(--border);
+}
+.cmp-id {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--fg-muted);
+}
+.cmp-cols {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+@container cmp (min-width: 740px) {
+  .cmp-cols {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 318px;
+    gap: 16px;
+    align-items: start;
+  }
+  .cmp-rail {
+    position: sticky;
+    inset-block-start: 74px;
+  }
+}
+.cmp-main {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.cmp-card {
+  padding: 17px;
+}
+.cmp-h2 {
+  margin: 0 0 13px;
+}
+.cmp-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.cmp-card-head .cmp-h2 {
+  margin: 0;
+}
+.cmp-card-head .btn {
+  height: 30px;
+  border-radius: 9px;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+.cmp-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 12px;
+}
+.cmp-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cmp-title-field {
+  margin-block-start: 12px;
+}
+.cmp-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--fg-muted);
+}
+.cmp-label-sub {
+  font-weight: 600;
+  color: var(--fg-subtle);
+}
+.cmp-input {
+  height: 38px;
+  padding-inline: 10px;
+  border-radius: 10px;
+  font-size: var(--text-md);
+  font-weight: 600;
+  width: 100%;
+}
+.cmp-mono {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 500;
+}
+.cmp-title {
+  padding-inline: 11px;
+  font-size: 14px;
+  font-weight: 700;
+}
+.cmp-chips-row {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-block-start: 12px;
+}
+.cmp-chips-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.cmp-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.cmp-chip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 9px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--fg-muted);
+}
+.cmp-chip[aria-pressed="true"] {
+  border-color: transparent;
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+.cmp-due {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--fg-subtle);
+}
+
+/* scope */
+.cmp-scope {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin-block-start: 12px;
+}
+.cmp-para {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+.cmp-para-text {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 11px;
+  border-radius: 11px;
+  font-size: var(--text-md);
+  line-height: 1.55;
+  resize: vertical;
+}
+.cmp-del {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  color: var(--fg-subtle);
+}
+
+/* lines: wide, one row each; narrow, a card each */
+.cmp-lines-head {
+  display: none;
+}
+.cmp-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin-block-start: 10px;
+}
+.cmp-line-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.cmp-line {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) 32px;
+  gap: 8px;
+  align-items: center;
+  padding: 11px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-2);
+}
+.cmp-line .cmp-input {
+  height: 36px;
+  border-radius: 9px;
+  font-size: 13px;
+}
+.cmp-desc {
+  grid-column: 1 / -1;
+}
+.cmp-num {
+  text-align: end;
+  font-family: var(--font-mono);
+  font-weight: 500 !important;
+  direction: ltr;
+}
+.cmp-amount {
+  grid-column: 1 / 4;
+  text-align: end;
+  font-family: var(--font-mono);
+  font-size: var(--text-md);
+  font-weight: 600;
+}
+@container cmp (min-width: 740px) {
+  .cmp-lines-head,
+  .cmp-line {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 58px 94px 94px 104px 32px;
+    gap: 8px;
+  }
+  .cmp-lines-head {
+    margin-block-start: 13px;
+    padding-inline-start: 2px;
+    font-size: var(--text-kicker);
+    font-weight: 800;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--fg-subtle);
+  }
+  .cmp-lines-head span:nth-child(n + 2) {
+    text-align: end;
+  }
+  .cmp-line {
+    padding: 0;
+    border: none;
+    background: transparent;
+  }
+  .cmp-desc,
+  .cmp-amount {
+    grid-column: auto;
+  }
+}
+.cmp-problem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-inline-start: 2px;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--danger);
+}
+.cmp-problem svg {
+  flex: 0 0 auto;
+}
+
+/* the rail */
+.cmp-rail-card {
+  padding: 17px;
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+.cmp-rail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.cmp-rail-id {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--fg-subtle);
+}
+.cmp-sums {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.cmp-sum {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.cmp-sum dt {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg-muted);
+}
+.cmp-sum dd {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-md);
+  font-weight: 500;
+}
+.cmp-sum--total {
+  align-items: flex-end;
+  padding-block-start: 9px;
+  border-block-start: 1px solid var(--border);
+}
+.cmp-sum--total dt {
+  font-size: var(--text-md);
+  font-weight: 800;
+  color: var(--fg);
+}
+.cmp-sum--total dd {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+.cmp-later {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-subtle);
+}
+.cmp-to {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 11px 12px;
+  border-radius: 11px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.cmp-to-name {
+  font-size: 12px;
+  font-weight: 700;
+}
+.cmp-to-sub {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--fg-muted);
+}
+.cmp-rail .btn--wide {
+  height: 44px;
+  border-radius: 12px;
+  font-size: 14px;
+}
+.cmp-save {
+  height: 40px;
+  border-radius: 12px;
+}
+.cmp-foot {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--fg-subtle);
+  text-wrap: pretty;
+}
+
+/* the send sheet */
+.cmp-send-facts {
+  margin: 0;
+  display: grid;
+  gap: 12px;
+}
+.cmp-send-facts > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.cmp-send-facts dt {
+  font-size: var(--text-kicker);
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+}
+.cmp-send-facts dd {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.cmp-send-mono {
+  font-family: var(--font-mono);
+  font-weight: 600 !important;
+}
+.cmp-send-foot {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--fg-subtle);
+}

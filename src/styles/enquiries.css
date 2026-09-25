@@ -1,1 +1,250 @@
 /* The enquiries area's own layout. Shared pieces are in primitives.css; tokens in tokens.css. */
+
+.enq {
+  container: enq / inline-size;
+}
+.enq-title {
+  font-size: var(--text-hero);
+}
+.enq-lead {
+  margin-block-start: 8px;
+  font-size: 14px;
+}
+.enq-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.enq-next {
+  margin-inline-start: auto;
+  height: 33px;
+  padding: 0 12px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--fg);
+  gap: 7px;
+}
+.enq-cols {
+  display: grid;
+  gap: 14px;
+  align-items: start;
+  grid-template-columns: minmax(0, 1fr);
+}
+@container enq (min-width: 880px) {
+  .enq-cols {
+    grid-template-columns: minmax(280px, 0.8fr) minmax(0, 1.2fr);
+  }
+}
+
+/* the list */
+.enq-list {
+  overflow: hidden;
+}
+.enq-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.enq-row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  padding: 13px 15px;
+  border: none;
+  border-inline-start: 3px solid transparent;
+  border-block-end: 1px solid var(--border);
+  background: transparent;
+  color: var(--fg);
+  cursor: pointer;
+  text-align: start;
+  font: inherit;
+}
+.enq-row--on {
+  border-inline-start-color: var(--accent);
+  background: var(--surface-2);
+}
+.enq-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  background: var(--fg-subtle);
+}
+.enq-dot--good {
+  background: var(--pos);
+}
+.enq-dot--maybe {
+  background: var(--warn);
+}
+.enq-row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+.enq-row-business,
+.enq-row-line {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.enq-row-business {
+  font-size: var(--text-md);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.enq-row-line {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-subtle);
+}
+.enq-row-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+  flex: 0 0 auto;
+}
+.enq-row-side .pill,
+.enq-detail-meta .pill {
+  font-size: 10.5px;
+}
+.enq-row-when {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--fg-subtle);
+}
+
+/* the open enquiry */
+.enq-detail {
+  overflow: hidden;
+  align-self: start;
+  container: enqdetail / inline-size;
+}
+.enq-detail-head {
+  padding: clamp(16px, 2.2vw, 20px);
+  border-block-end: 1px solid var(--border);
+}
+.enq-detail-meta {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+.enq-number {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-muted);
+}
+.enq-fit--good {
+  background: var(--pos-soft);
+  color: var(--pos);
+}
+.enq-fit--maybe {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+.enq-fit--no {
+  background: var(--surface-3);
+  color: var(--fg-subtle);
+}
+.enq-ago {
+  margin-inline-start: auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--fg-subtle);
+}
+.enq-business {
+  margin: 11px 0 0;
+  font-size: clamp(19px, 2.4vw, 24px);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+}
+.enq-who {
+  margin: 7px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg-muted);
+  overflow-wrap: anywhere;
+}
+.enq-facts {
+  margin: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  border-block-end: 1px solid var(--border);
+}
+.enq-fact {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 13px 16px;
+}
+.enq-fact + .enq-fact {
+  border-block-start: 1px solid var(--border);
+}
+@container enqdetail (min-width: 560px) {
+  .enq-facts {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .enq-fact + .enq-fact {
+    border-block-start: none;
+    border-inline-start: 1px solid var(--border);
+  }
+}
+.enq-fact dt {
+  font-size: var(--text-kicker);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+}
+.enq-fact dd {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  text-wrap: pretty;
+}
+.enq-detail-body {
+  padding: clamp(16px, 2.2vw, 20px);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.enq-body {
+  margin: 0;
+  font-size: var(--text-body);
+  line-height: 1.7;
+  font-weight: 500;
+  color: var(--fg-muted);
+  text-wrap: pretty;
+  white-space: pre-line;
+}
+.enq-reply {
+  padding: 12px 13px;
+  border-radius: 12px;
+  font-size: var(--text-md);
+  line-height: 1.6;
+  resize: vertical;
+}
+.enq-actions {
+  display: flex;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+.enq-no {
+  color: var(--fg-muted);
+}
+.enq-foot {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.6;
+  color: var(--fg-subtle);
+  text-wrap: pretty;
+}
