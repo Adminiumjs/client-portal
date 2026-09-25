@@ -1,0 +1,59 @@
+<!doctype html><html lang="cs-CZ" dir="ltr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Stvrzenka REC-S0003</title><style>:root { color-scheme: only light; --accent: #4f46e5; --ink: #191920; --mid: #4a4a54; --mut: #6a6a75; --sub: #8a8a95; --line: #e6e6ea; }
+@page { size: A4; margin: 16mm; }
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: #ffffff;
+  color: var(--ink);
+  font: 12.5px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+.sheet { position: relative; max-width: 178mm; margin: 0 auto; padding: 10mm 0; }
+.fig { font-variant-numeric: tabular-nums; unicode-bidi: isolate; white-space: nowrap; }
+.void { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; overflow: hidden; }
+.void span { transform: rotate(-24deg); font-size: 120px; font-weight: 800; letter-spacing: .08em; color: rgba(25,25,32,.08); border: 10px solid rgba(25,25,32,.08); border-radius: 26px; padding: 0 .25em; line-height: 1.15; }
+.letterhead { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 20px; align-items: start; padding-block-end: 22px; border-block-end: 1px solid var(--line); }
+.brand { display: flex; align-items: center; gap: 11px; }
+.mark { inline-size: 40px; block-size: 40px; border-radius: 11px; background: var(--accent); color: #ffffff; display: flex; align-items: center; justify-content: center; font-size: 19px; font-weight: 800; flex: 0 0 auto; }
+.mark-image { max-inline-size: 120px; max-block-size: 48px; }
+.brand .name { font-size: 18px; font-weight: 800; letter-spacing: -.02em; }
+.from { display: flex; flex-direction: column; gap: 3px; text-align: end; font-size: 11.5px; font-weight: 600; color: var(--mut); }
+.parties { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 28px; align-items: start; padding-block: 22px; }
+.label { font-size: 9.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--sub); }
+.to { display: flex; flex-direction: column; gap: 4px; min-inline-size: 0; }
+.to .who { font-size: 14px; font-weight: 700; }
+.to .line { color: var(--mut); white-space: pre-line; }
+.meta { display: flex; flex-direction: column; gap: 7px; min-inline-size: 190px; }
+.meta .pair { display: flex; gap: 16px; justify-content: space-between; }
+.meta .k { font-size: 11.5px; font-weight: 700; color: var(--sub); }
+.meta .v { font-weight: 600; }
+h1 { margin: 6px 0 18px; font-size: 24px; font-weight: 800; letter-spacing: -.03em; line-height: 1.2; }
+table { inline-size: 100%; border-collapse: collapse; border-block-start: 1px solid var(--ink); }
+th, td { padding: 9px 4px; border-block-end: 1px solid var(--line); vertical-align: top; }
+th { text-align: start; font-size: 9.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--sub); }
+th.right, td.right { text-align: end; }
+td.right { color: var(--mut); }
+td.right:last-child { color: var(--ink); font-weight: 600; }
+td .note { display: block; font-size: 11px; color: var(--sub); }
+.ladder { margin-block-start: 12px; margin-inline-start: auto; inline-size: 52%; }
+.ladder .row { display: flex; justify-content: space-between; gap: 16px; padding: 3px 0; }
+.ladder .row .k { color: var(--sub); font-weight: 700; }
+.ladder .row.total { border-block-start: 2px solid var(--accent); margin-block-start: 4px; padding-block-start: 7px; font-weight: 800; font-size: 15px; }
+.ladder .row.total .k { color: var(--ink); }
+.ledger { margin-block-start: 16px; margin-inline-start: auto; inline-size: 58%; }
+.ledger .label { padding-block-end: 6px; border-block-end: 1px solid var(--line); }
+.ledger .pay { display: grid; grid-template-columns: 90px minmax(0,1fr) auto; gap: 10px; padding: 3px 0; }
+.ledger .pay .d { color: var(--mut); }
+.ledger .due { display: flex; justify-content: space-between; gap: 24px; margin-block-start: 6px; padding-block-start: 8px; border-block-start: 1px solid var(--ink); font-weight: 800; }
+.ledger .due .fig { font-size: 16px; }
+.signed { margin-block-start: 20px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; }
+.signed .name { font-size: 17px; font-weight: 700; font-style: italic; }
+.signed .line { font-size: 11px; color: var(--mut); }
+.passage { margin-block-start: 14px; }
+.passage p { margin: 3px 0 0; white-space: pre-line; color: var(--mid); }
+.foot { display: grid; grid-template-columns: minmax(150px,auto) minmax(0,1fr); gap: 24px; margin-block-start: 36px; padding: 14px 16px; border-radius: 10px; background: #f7f7f9; }
+.foot .col { display: flex; flex-direction: column; gap: 5px; min-inline-size: 0; }
+.foot .col + .col { margin-block-start: 0; }
+.foot .line { white-space: pre-line; color: var(--mid); }
+.foot .strong { font-weight: 700; color: var(--ink); }
+.signature { margin-block-start: 12px; font-size: 10.5px; color: var(--sub); }
+@media print { .sheet { padding: 0; } }</style></head><body><main class="sheet"><header class="letterhead"><div class="brand"><span class="mark" aria-hidden="true">O</span><span class="name"><bdi>Outline</bdi></span></div><div class="from"><span><bdi>hello@outline.example</bdi></span><span><bdi>+1 (503) 555-0142</bdi></span><span><bdi>outline.example</bdi></span></div></header><section class="parties"><div class="to"><span class="label">Přijato od</span><span class="who"><bdi>Northlight Records</bdi></span><span class="line"><bdi>Devi Raman</bdi></span><span class="line"><bdi>devi@northlight.example</bdi></span></div><div class="meta"><span class="pair"><span class="k">Stvrzenka</span><span class="v"><span class="fig">REC-S0003</span></span></span><span class="pair"><span class="k">K faktuře</span><span class="v"><span class="fig">INV-S2024</span></span></span><span class="pair"><span class="k">Přijato</span><span class="v"><span class="fig">3. 2. 2026</span></span></span><span class="pair"><span class="k">Způsob</span><span class="v"><span class="fig">Bankovní převod</span></span></span></div></section><h1><bdi>Stvrzenka REC-S0003 · k INV-S2024</bdi></h1><table><thead><tr><th>Popis</th><th class="right">Množství</th><th class="right">Za jednotku</th><th class="right">Částka</th></tr></thead><tbody><tr><td><bdi>Platba k INV-S2024</bdi></td><td class="right"><span class="fig">1</span></td><td class="right"><span class="fig">1 085,00 US$</span></td><td class="right"><span class="fig">1 085,00 US$</span></td></tr></tbody></table><section class="ladder"><div class="row"><span class="k">Celkem na faktuře</span><span class="fig">1 085,00 US$</span></div><div class="row total"><span class="k">Přijato 3. 2. 2026</span><span class="fig">1 085,00 US$</span></div><div class="row"><span class="k">Zbývá uhradit</span><span class="fig">0,00 US$</span></div></section><section class="foot"><div class="col"><span class="label">Děkujeme</span><span class="line"><bdi>1 085,00 US$ přijato 3. 2. 2026</bdi></span><span class="line"><bdi>zbývá uhradit 0,00 US$</bdi></span></div><div class="col"><span class="label">Poznámka</span><span class="line"><bdi>Tato stvrzenka potvrzuje přijetí peněz. Není to nová faktura.</bdi></span></div></section><div class="signature">Outline · 28. 7. 2026</div></main></body></html>
