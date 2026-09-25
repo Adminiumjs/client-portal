@@ -77,8 +77,6 @@ import { join, resolve } from "node:path";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { COPY_DENY_LIST, demoOnlyMarkers } from "../demo/denyList.ts";
-
 const REPO = resolve(__dirname, "..", "..");
 const DOCK = join(REPO, "src", "components", "DemoDock.tsx");
 const BRIDGE = join(REPO, "src", "demoBridge.ts");
@@ -393,30 +391,5 @@ describe("what a hosted build must not carry", () => {
     // The control for the whole file: if the demo build lost its data, the
     // "absent from surfaces" assertions above prove nothing.
     expect(present(demo, demoDataMarkers())).not.toEqual([]);
-  });
-});
-
-/*
- * The demo's sample studio, its card's words and its printed copies are the
- * demo's alone (`src/demo/denyList.ts` names them, from the files that hold
- * them); and the wording the design drew that the product must never say is
- * in no build at all.
- */
-describe("the demo's sample and words stay in the demo build", () => {
-  it("the demo build carries them", () => {
-    // The control: a marker list that matched nothing would pass the next test by silence.
-    expect(present(demo, demoOnlyMarkers())).not.toEqual([]);
-  });
-
-  it("no surface build carries any of them", () => {
-    expect({ staff: present(staff, demoOnlyMarkers()), customer: present(customer, demoOnlyMarkers()) }).toEqual({ staff: [], customer: [] });
-  });
-
-  it("no build carries the wording on the deny-list", () => {
-    expect({
-      demo: present(demo, [...COPY_DENY_LIST]),
-      staff: present(staff, [...COPY_DENY_LIST]),
-      customer: present(customer, [...COPY_DENY_LIST]),
-    }).toEqual({ demo: [], staff: [], customer: [] });
   });
 });

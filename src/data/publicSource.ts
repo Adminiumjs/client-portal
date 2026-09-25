@@ -31,7 +31,7 @@ import { normalise, normaliseAll } from "./rows.ts";
 import { realTables } from "./tableOfRef.ts";
 import type { ListCondition } from "./snapshotPort.ts";
 import { PortError, type ClientNote, type CodeResult, type DocumentKind, type HandoverView, type Me, type PortalPort, type PrivateFile, type PublicStudio, type SentPayment, type StatementPeriod } from "./ports.ts";
-import type { TableRef, Tables } from "./types.ts";
+import type { Id, TableRef, Tables } from "./types.ts";
 
 export interface PublicRefLike {
   actions: string[];
@@ -362,7 +362,11 @@ export async function publicPortalPort(client: PortalClient, opts: PublicPortalO
         ]);
         const project = projects[0];
         if (project === undefined) throw new PortError("LINK_STOPPED", "this link has been stopped", 410);
-        return { studio: settings[0] ?? null, project, fonts, files, deliverables, versions };
+        // A stored file comes through the share link's own session, never the signed-in client's.
+        const fetchFile = h.file;
+        const file =
+          fetchFile === undefined ? undefined : (table: "deliverable_versions" | "handover_files", id: Id, column: "file") => guard(() => fetchFile.call(h, href(table), id, column));
+        return { studio: settings[0] ?? null, project, fonts, files, deliverables, versions, ...(file === undefined ? {} : { file }) };
       }),
   };
 }

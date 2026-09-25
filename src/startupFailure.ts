@@ -11,7 +11,7 @@
  * A server's own message (a refusal, a missing table) arrives as text and is
  * shown as sent; the headline and this app's own sentences are translated.
  */
-import { MESSAGES } from "./i18n/messages/index.ts";
+import { RUNTIME_MESSAGES } from "./i18n/messages/runtime.ts";
 import { dirFor, type LocaleTag } from "./i18n/locales.ts";
 
 /** This app's name as a failure screen says it: the product's, never a studio's. */
@@ -45,7 +45,7 @@ function titleKey(code: string | null): string {
 }
 
 function lookup(locale: LocaleTag, key: string): string {
-  return MESSAGES[locale]?.[key] ?? MESSAGES["en-US"][key] ?? key;
+  return RUNTIME_MESSAGES[locale]?.[key] ?? RUNTIME_MESSAGES["en-US"][key] ?? key;
 }
 
 /** The words, language and direction of the failure screen. */

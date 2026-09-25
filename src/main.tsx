@@ -129,9 +129,12 @@ async function bootClients(): Promise<void> {
     showStartupFailure({ key: "startup.noServer" }, "NO_BACKEND");
     return;
   }
+  // A shared handover opens on its own key, beside the portal's: the link's code is its only claim.
+  const handoverKey = config.publicKeys?.["handover"];
+  const handover = handoverKey === undefined ? null : createPublicClient({ baseUrl: config.baseUrl, publishableKey: handoverKey } as never);
   const [{ publicPortalPort }, portal, { linkFragment }] = await Promise.all([import("./data/publicSource.ts"), import("./state/portal.ts"), import("./app/deepLink.ts")]);
   try {
-    const port = await publicPortalPort(client as never, { tables: config.tables ?? {} });
+    const port = await publicPortalPort(client as never, { tables: config.tables ?? {}, handover: handover as never });
     portal.setPortalPort(port);
     setZone(port.timeZone());
     setTimezoneClaim(port.timeZone(), "operator");

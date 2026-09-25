@@ -58,9 +58,28 @@ export const AREAS = {
   client,
 } as const;
 
-export const MESSAGES = Object.fromEntries(
-  LOCALE_TAGS.map((t) => [t, Object.assign({}, ...Object.values(AREAS).map((a) => (a as Record<LocaleTag, Record<string, string>>)[t] ?? {}))]),
-) as Record<LocaleTag, Record<string, string>>;
+/**
+ * The areas the clients' side reads: the shared chrome and its own. The
+ * customer build carries only these (`runtime.ts`); every other build — the
+ * desk, which also previews the clients' side, and the demo — carries them all.
+ * The surface build test fails if a clients'-side module names a key outside
+ * them, or if the customer bundle carries a key of any other area.
+ */
+export const CUSTOMER_AREAS = { chrome, client } as const;
+
+/** One lookup table per locale, flattened from some of the areas. */
+export function bundleOf(areas: readonly object[]): Record<LocaleTag, Record<string, string>> {
+  return Object.fromEntries(
+    LOCALE_TAGS.map((t) => [t, Object.assign({}, ...areas.map((a) => (a as Record<LocaleTag, Record<string, string>>)[t] ?? {}))]),
+  ) as Record<LocaleTag, Record<string, string>>;
+}
+
+/**
+ * Every area's strings, for the build (the nav labels Adminium shows) and the
+ * tests. The page itself looks keys up in `RUNTIME_MESSAGES` (`runtime.ts`).
+ * Marked pure so a bundle that never reads it drops it, and the areas with it.
+ */
+export const MESSAGES = /*#__PURE__*/ bundleOf(Object.values(AREAS));
 
 /** Keys are typed off English — the source of truth — so a typo is a compile error. */
 export type MessageKey =

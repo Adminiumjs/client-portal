@@ -12,7 +12,8 @@
  * and `en-US` formatting.
  */
 import { DEFAULT_LOCALE, type LocaleTag } from "./locales.ts";
-import { MESSAGES, type MessageKey } from "./messages/index.ts";
+import type { MessageKey } from "./messages/index.ts";
+import { RUNTIME_MESSAGES } from "./messages/runtime.ts";
 import type { TFunction } from "./index.tsx";
 import { formatMoney } from "../lib/money.ts";
 import type { Decimal } from "../data/types.ts";
@@ -26,7 +27,7 @@ type NumberFn = (value: number, opts?: Intl.NumberFormatOptions) => string;
  * second locale is selectable the provider has mounted and replaced this.
  */
 const fallbackT: TFunction = (key, params, count) => {
-  let raw = MESSAGES[DEFAULT_LOCALE][key] ?? key;
+  let raw = RUNTIME_MESSAGES[DEFAULT_LOCALE][key] ?? key;
   if (count !== undefined && raw.includes("|")) {
     const variants = raw.split("|");
     raw = count === 1 ? variants[0] : variants[variants.length - 1];

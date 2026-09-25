@@ -4,7 +4,8 @@
  * (`documents/subject.ts`): the add-on's own shape profiles map the columns
  * (`invoice` → invoices + lines + payments, `receipt` → a payment and its
  * invoice, `quote` → a proposal + its lines), and the client's name, contact,
- * address and email fill the customer slots. Money goes as integer minor
+ * address, email and tax number fill the customer slots (the app's manifest
+ * maps the same five through `client_id`). Money goes as integer minor
  * units of the document's currency, a rate as basis points, a date as the
  * studio's day.
  *
@@ -37,6 +38,7 @@ const SLOTS: Record<PrintedKind, Record<string, SlotType>> = {
     customerLines: "text[]",
     customerEmail: "email",
     customerContact: "text",
+    customerTaxNumber: "text",
     currency: "currency",
     title: "text",
     terms: "text",
@@ -58,6 +60,7 @@ const SLOTS: Record<PrintedKind, Record<string, SlotType>> = {
     customerLines: "text[]",
     customerEmail: "email",
     customerContact: "text",
+    customerTaxNumber: "text",
     currency: "currency",
     amount: "money",
     paidWith: "text",
@@ -74,6 +77,7 @@ const SLOTS: Record<PrintedKind, Record<string, SlotType>> = {
     customerLines: "text[]",
     customerEmail: "email",
     customerContact: "text",
+    customerTaxNumber: "text",
     currency: "currency",
     title: "text",
     taxName: "text",
@@ -149,6 +153,7 @@ const CUSTOMER: Record<string, (client: Row) => unknown> = {
   customerContact: (c) => c["contact_name"],
   customerEmail: (c) => c["email"],
   customerLines: (c) => c["address"],
+  customerTaxNumber: (c) => c["tax_number"],
 };
 
 const invoiceOf = (payment: Row, rows: Rows) => rows.invoices.find((i) => String(i.id) === String(payment["document_id"]));

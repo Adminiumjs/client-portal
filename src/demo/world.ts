@@ -15,7 +15,7 @@
  * with that studio's own number prefixes.
  */
 import type { LiveFrame } from "../data/live.ts";
-import { PortError, type DeskReads, type DeskWrites, type DocumentKind, type HandoverView, type Page, type PortalPort, type SearchHit } from "../data/ports.ts";
+import { PortError, type DeskReads, type DeskWrites, type DocumentKind, type HandoverView, type Page, type PortalPort, type PrivateFile, type SearchHit } from "../data/ports.ts";
 import { kindOfStatus, SinkError } from "../data/sink.ts";
 import type { ListCondition } from "../data/snapshotPort.ts";
 import { TABLE_REFS, type Id, type TableRef, type Tables } from "../data/types.ts";
@@ -152,6 +152,14 @@ export function sortRows(rows: Row[], order: string | undefined): Row[] {
 export function createWorld(source: Seed | SampleSource, base: () => number, zone: string, actor: Actor, options: WorldOptions = {}): DemoWorld {
   const sampled = isSampleSource(source);
   let settings: Record<string, unknown> = { ...(options.settings ?? (sampled ? DEMO_SETTINGS : HAND_SETTINGS)) };
+  /** The files uploaded during the visit, by the value stored in their row. */
+  const uploads = new Map<string, { blob: Blob; filename: string }>();
+  /** A row's stored file, as a client's page receives it; one the demo never received is not found. */
+  const uploaded = (value: unknown): PrivateFile => {
+    const kept = typeof value === "string" ? uploads.get(value) : undefined;
+    if (kept === undefined) throw new PortError("FILE_NOT_FOUND", "the demo holds no such file", 404);
+    return { blob: kept.blob, filename: kept.filename, inline: /^(image\/|application\/pdf$)/.test(kept.blob.type) };
+  };
   const currency = options.currency ?? DEMO_CURRENCY;
   let offset = 0;
   const now = () => base() + offset;
@@ -279,8 +287,11 @@ export function createWorld(source: Seed | SampleSource, base: () => number, zon
     async remove(ref, id) {
       deskWrite(() => engine.remove(ref, id, desk));
     },
-    async upload(_ref, _column, _file, filename) {
-      return `demo-file:${filename}`;
+    async upload(_ref, _column, file, filename) {
+      // The bytes stay in memory for the visit: a client's page fetches them back through `file()`.
+      const stored = `demo-file:${filename}`;
+      uploads.set(stored, { blob: file, filename });
+      return stored;
     },
     async regenerateCode(ref, id, column) {
       return copy(deskWrite(() => engine.update(ref, id, { [column]: drawCode(16) }, desk)));
@@ -379,6 +390,18 @@ export function createWorld(source: Seed | SampleSource, base: () => number, zon
         return url;
       },
       fileUrl: (ref, id) => String(find(ref, id)?.["link"] ?? "about:blank"),
+      file: async (ref, id, column) => {
+        guard();
+        const row = find(ref, id);
+        if (row === undefined || !own(ref)(row)) throw new PortError("PUBLIC_REF_NOT_FOUND", "not found", 404);
+        return uploaded(row[column]);
+      },
+      // What the studio wrote in the add-on's settings (the Settings screen), or none.
+      paymentInstructions: async () => {
+        guard();
+        const text = settings["invoices.payment_instructions"];
+        return typeof text === "string" && text.trim() !== "" ? text : null;
+      },
       accept: async (id, name) => write("proposals", id, { status: "accepted", signed_name: name.trim() }, (r) => r["status"] === "sent" && inDate(r)),
       sign: async (id, name) => write("proposals", id, { signed_name: name.trim() }, (r) => r["status"] === "accepted" && (r["signed_name"] === null || r["signed_name"] === "")),
       decline: async (id, note) => write("proposals", id, { status: "declined", decline_note: note === null || note.trim() === "" ? null : note.trim() }, (r) => r["status"] === "sent" && inDate(r)),
@@ -403,6 +426,15 @@ export function createWorld(source: Seed | SampleSource, base: () => number, zon
           files: select("handover_files", { column: "project_id", op: "eq", value: project.id }),
           deliverables: deliverables.map((d) => copy<"deliverables">(d)),
           versions: select("deliverable_versions", { column: "deliverable_id", op: "in", value: deliverables.map((d) => d.id) }),
+          // Only this handover's own files: an approved version, or one of its handover files.
+          file: async (ref, id, column) => {
+            const row = find(ref, id);
+            const ours =
+              row !== undefined &&
+              (ref === "handover_files" ? String(row["project_id"]) === String(project.id) : deliverables.some((d) => String(d.id) === String(row["deliverable_id"])));
+            if (!ours) throw new PortError("PUBLIC_REF_NOT_FOUND", "not found", 404);
+            return uploaded(row[column]);
+          },
         };
       },
     };
@@ -445,6 +477,7 @@ export function createWorld(source: Seed | SampleSource, base: () => number, zon
       offset = 0;
       linkLive = true;
       settings = { ...(options.settings ?? (sampled ? DEMO_SETTINGS : HAND_SETTINGS)) };
+      uploads.clear();
       bringIn();
       clockJumped();
       reloads.forEach((l) => l());

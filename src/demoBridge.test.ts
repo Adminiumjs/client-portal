@@ -123,6 +123,8 @@ describe("the shortcuts", () => {
     expect(signals.map(([name]) => name)).toEqual(["signin.fill", "signin.fill", "enquiries.call", "composer.fill"]);
     expect(signals[0]![1]).toEqual({ email: "amara@hearthandloaf.example" });
     expect(signals[1]![1]).toEqual({ email: "someone@elsewhere.example", send: "yes" });
+    // Only what the call form has: an enquiry keeps no phone number.
+    expect(Object.keys(signals[2]![1]).sort()).toEqual(["body", "business", "email", "name"]);
     expect(JSON.parse(signals[3]![1]["lines"]!)).toHaveLength(2);
   });
 });

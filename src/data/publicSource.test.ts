@@ -219,6 +219,24 @@ describe("the shared handover", () => {
     expect(openShared).toHaveBeenCalledWith("CODE");
   });
 
+  it("fetches a stored handover file through the link's own session, never the signed-in client's", async () => {
+    const scope: PublicConfigLike = { ...handoverScope, refs: { ...handoverScope.refs, clients_handover_files: r(["read"], ["id", "file"]) } };
+    const blob = new Blob(["%PDF"], { type: "application/pdf" });
+    const hfile = vi.fn(async () => ({ blob, filename: "fonts.zip", inline: false }));
+    const cfile = vi.fn();
+    const hlist = vi.fn(async (ref: string) => ({ data: ref === "clients_projects" ? [{ id: 4, name: "Studio identity" }] : [] }));
+    const handover = { ...fakeClient().client, config: async () => scope, openShared: async () => "opened" as const, list: hlist as never, file: hfile };
+    const port = await publicPortalPort({ ...fakeClient().client, file: cfile }, { handover });
+    const view = await port.openHandover("CODE");
+    expect(await view.file?.("handover_files", 7, "file")).toMatchObject({ filename: "fonts.zip", inline: false });
+    expect(hfile).toHaveBeenCalledWith("clients_handover_files", 7, "file");
+    expect(cfile).not.toHaveBeenCalled();
+    // A handover client that cannot fetch files offers none: the page lists them instead.
+    const bare = { ...fakeClient().client, config: async () => scope, openShared: async () => "opened" as const, list: hlist as never };
+    const plain = await (await publicPortalPort(fakeClient().client, { handover: bare })).openHandover("CODE");
+    expect(plain.file).toBeUndefined();
+  });
+
   it("tells a stopped link from one that opens nothing", async () => {
     for (const [answer, code] of [
       ["closed", "LINK_STOPPED"],

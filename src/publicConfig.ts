@@ -42,6 +42,12 @@ export interface SurfaceConfig {
    * refs are called. Absent for a baked build and an older server.
    */
   tables?: Record<string, string>;
+  /**
+   * The app's other browser keys, by what they open (`handover` — a shared
+   * link's own key), when Adminium serves them. Absent for a baked build, an
+   * app with none and an older server.
+   */
+  publicKeys?: Record<string, string>;
 }
 
 /** Test seams only — production call sites pass nothing. */
@@ -103,7 +109,8 @@ export async function resolveSurfaceConfig(
         ? served
         : (opts.origin ?? window.location.origin);
     const tables = tablesOf((doc as { tables?: unknown }).tables);
-    return { baseUrl, publishableKey: key, ...(tables === null ? {} : { tables }) };
+    const publicKeys = tablesOf((doc as { publicKeys?: unknown }).publicKeys);
+    return { baseUrl, publishableKey: key, ...(tables === null ? {} : { tables }), ...(publicKeys === null ? {} : { publicKeys }) };
   } catch {
     // Network failure, or the SPA fallback answered with HTML (an instance
     // whose server predates the config route): both are "not configured".
@@ -111,7 +118,7 @@ export async function resolveSurfaceConfig(
   }
 }
 
-/** A `tables` map of strings to strings, or null — anything else is ignored. */
+/** A map of strings to strings (`tables`, `publicKeys`), or null — anything else is ignored. */
 function tablesOf(value: unknown): Record<string, string> | null {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return null;
   const out: Record<string, string> = {};

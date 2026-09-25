@@ -210,7 +210,7 @@ function shortcuts(): Record<DemoShortcutId, () => Promise<void> | void> {
       if (invoice !== undefined) await asClient(invoice["client_id"], "invoice", invoice.id);
     },
     "call-comes-in": () =>
-      sendDemoSignal("enquiries.call", { name: "Rosa Lindqvist", business: "Orchard Row Cider", phone: "+1 (503) 555-0199", email: "rosa@orchardrow.example", body: say("demo.fill.callBody") }),
+      sendDemoSignal("enquiries.call", { name: "Rosa Lindqvist", business: "Orchard Row Cider", email: "rosa@orchardrow.example", body: say("demo.fill.callBody") }),
     "sample-proposal": () => {
       const client = w.rows.clients.find((c) => c["company"] === "Slow Signal") ?? w.rows.clients[0];
       sendDemoSignal("composer.fill", {

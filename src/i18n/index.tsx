@@ -36,7 +36,8 @@ import {
   resolveLocale,
   type LocaleTag,
 } from "./locales.ts";
-import { MESSAGES, type MessageKey } from "./messages/index.ts";
+import type { MessageKey } from "./messages/index.ts";
+import { RUNTIME_MESSAGES } from "./messages/runtime.ts";
 
 const STORAGE_KEY = "client-portal-locale";
 
@@ -138,8 +139,8 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo<I18nValue>(() => {
-    const bundle = MESSAGES[locale];
-    const fallback = MESSAGES[DEFAULT_LOCALE];
+    const bundle = RUNTIME_MESSAGES[locale];
+    const fallback = RUNTIME_MESSAGES[DEFAULT_LOCALE];
     const pr = new Intl.PluralRules(locale);
     const nf = new Intl.NumberFormat(locale);
 

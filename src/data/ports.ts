@@ -244,6 +244,12 @@ export interface HandoverView {
   files: Tables["handover_files"][];
   deliverables: Tables["deliverables"][];
   versions: Tables["deliverable_versions"][];
+  /**
+   * A stored file of this handover — an approved version's or one of the
+   * studio's handover files — fetched through the share link's own session.
+   * Absent where the page cannot fetch one: the file is then listed, not linked.
+   */
+  file?(ref: "deliverable_versions" | "handover_files", id: Id, column: "file"): Promise<PrivateFile>;
 }
 
 export interface PortalPort {
