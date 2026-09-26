@@ -23,7 +23,7 @@
     "e2e": "playwright test"
   },
   "dependencies": {
-    "@adminiumjs/public-client": "0.3.1",
+    "@adminiumjs/public-client": "0.3.4",
     "lucide-react": "^0.462.0",
     "pdfjs-dist": "6.3.289",
     "react": "^19.0.0",
