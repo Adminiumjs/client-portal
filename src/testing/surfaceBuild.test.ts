@@ -60,7 +60,8 @@
  *
  * An app with a customer side builds it with source maps, and the modules in
  * them are checked against the staff-only screens `src/surface-nav.ts`
- * declares (`src/screens/<View>.tsx`). A guest's page that shipped the till
+ * declares (`src/screens/<View>.tsx`, or the screens module `App.tsx` imports
+ * the view from). A guest's page that shipped the till
  * would ship its code, its strings and its endpoints to every visitor.
  *
  * ── Markers are derived, not written down ───────────────────────────────────
@@ -82,6 +83,7 @@ const DOCK = join(REPO, "src", "components", "DemoDock.tsx");
 const BRIDGE = join(REPO, "src", "demoBridge.ts");
 const DEMO_TYPES = join(REPO, "src", "demo-types.ts");
 const NAV = join(REPO, "src", "surface-nav.ts");
+const APP = join(REPO, "src", "app", "App.tsx");
 const DEMO_DATA = join(REPO, "src", "data", "demo.ts");
 
 /** Every `.js` byte of a build, concatenated. */
@@ -161,8 +163,12 @@ function demoToolMarkers(): string[] {
 }
 
 /**
- * The staff-only screens' modules, from `surface-nav.ts`: every view whose
- * entry says `side: 'staff'` and has a `src/screens/<View>.tsx`.
+ * The staff-only screens' modules, from `surface-nav.ts`: for every view whose
+ * entry says `side: 'staff'`, its own `src/screens/<View>.tsx` — or, where the
+ * app keeps several screens in one module, the `src/screens/` module that
+ * `App.tsx` imports `<View>` from. hotel-reservations keeps every desk screen in
+ * `Desk.tsx`, and a file-per-view lookup alone found nothing there, so this
+ * gate could not see its till at all.
  */
 function staffScreenModules(): string[] {
   const src = readFileSync(NAV, "utf8");
@@ -173,11 +179,25 @@ function staffScreenModules(): string[] {
     const view = /view:\s*["']([^"']+)["']/.exec(body)?.[1];
     if (view !== undefined) views.add(view);
   }
-  const files = [...views]
-    .map((view) => join("src", "screens", `${view.charAt(0).toUpperCase()}${view.slice(1)}.tsx`))
-    .filter((file) => existsSync(join(REPO, file)));
-  if (files.length === 0) throw new Error(`no staff screen module found from ${NAV} — this gate cannot see the till`);
-  return files;
+  const app = existsSync(APP) ? readFileSync(APP, "utf8") : "";
+  const imports = [...app.matchAll(/import\s+(\w+)?\s*,?\s*(?:\{([^}]*)\})?\s*from\s*["']\.\.\/screens\/([\w-]+)\.tsx["']/g)].map(
+    (m) => ({
+      names: [m[1], ...(m[2] ?? "").split(",").map((n) => n.trim().split(/\s+as\s+/)[0])],
+      file: join("src", "screens", `${m[3]}.tsx`),
+    }),
+  );
+  const files = new Set<string>();
+  for (const view of views) {
+    const name = `${view.charAt(0).toUpperCase()}${view.slice(1)}`;
+    const own = join("src", "screens", `${name}.tsx`);
+    if (existsSync(join(REPO, own))) {
+      files.add(own);
+      continue;
+    }
+    for (const { names, file } of imports) if (names.includes(name)) files.add(file);
+  }
+  if (files.size === 0) throw new Error(`no staff screen module found from ${NAV} — this gate cannot see the till`);
+  return [...files];
 }
 
 /** Every source module a build's source maps name, relative to the repo. */
