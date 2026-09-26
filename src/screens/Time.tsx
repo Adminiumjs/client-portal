@@ -106,9 +106,7 @@ export default function Time() {
     for (const line of Object.values(heldLines)) if (line.time_entry_id !== null) out.set(line.time_entry_id, line.document_id);
     return out;
   }, [heldLines]);
-  /** Carried by a line (a voided invoice's included): these cannot be moved onto another invoice. */
-  const invoiced = useMemo(() => new Set(invoicedBy.keys()), [invoicedBy]);
-  /** Billed by an invoice that is not voided: what the sums count as invoiced. */
+  /** Billed by an invoice that is not voided: what the sums count as invoiced, and what a move leaves. A voided invoice's line lets go of its hours when they move. */
   const billed = useMemo(() => billedEntries(invoicedBy, invoices), [invoicedBy, invoices]);
 
   const companyOfClient = (clientId: Id | null | undefined): string => (clientId === null || clientId === undefined ? "" : (clients[clientId]?.company ?? ""));
@@ -119,9 +117,7 @@ export default function Time() {
   const choices = useMemo(() => filterChoices(entries, projects, (id) => clients[id]?.company ?? null), [entries, projects, clients]);
   const current: TimeFilter = choices.some((c) => c.id === filter) ? filter : "all";
   const rows = useMemo(() => rowsFor(entries, current), [entries, current]);
-  const notInvoiced = rows.filter((e) => !invoiced.has(e.id));
-  /** On show, not billed, and held by a voided invoice's line: nothing to move, and not "all invoiced" either. */
-  const onVoided = rows.some((e) => invoiced.has(e.id) && !billed.has(e.id));
+  const notInvoiced = rows.filter((e) => !billed.has(e.id));
   const footHours = sumHours(notInvoiced);
   const selectedProject = filterProject(current);
 
@@ -164,7 +160,7 @@ export default function Time() {
 
   const moveOrSay = () => {
     if (notInvoiced.length === 0) {
-      toast(onVoided ? t("time.foot.voidedOnly") : t("time.foot.allInvoicedToast"), { icon: onVoided ? "info" : "check" });
+      toast(t("time.foot.allInvoicedToast"), { icon: "check" });
       return;
     }
     setSheet({ kind: "move" });
@@ -239,7 +235,7 @@ export default function Time() {
         )}
 
         <div className="time-foot">
-          <span className="time-foot-label">{notInvoiced.length === 0 ? (onVoided ? t("time.foot.voidedOnly") : t("time.foot.none")) : selectedProject === null ? t("time.foot.all") : t("time.foot.project", { project: projects[selectedProject]?.name ?? "" })}</span>
+          <span className="time-foot-label">{notInvoiced.length === 0 ? t("time.foot.none") : selectedProject === null ? t("time.foot.all") : t("time.foot.project", { project: projects[selectedProject]?.name ?? "" })}</span>
           <span className="time-foot-figures">
             {hours(footHours)}
             {rate !== null && ` · ${money(amountAt(footHours, rate))}`}
@@ -262,7 +258,7 @@ export default function Time() {
         />
       )}
       {sheet?.kind === "stop" && <StopClock entry={sheet.entry} why={sheet.why} company={companyOf(projects[sheet.entry.project_id])} onClose={() => setSheet(null)} />}
-      {sheet?.kind === "move" && <MoveOntoInvoice entries={notInvoiced} invoiced={invoiced} rate={rate} companyOf={(id) => companyOfClient(id)} onClose={() => setSheet(null)} />}
+      {sheet?.kind === "move" && <MoveOntoInvoice entries={notInvoiced} invoiced={billed} rate={rate} companyOf={(id) => companyOfClient(id)} onClose={() => setSheet(null)} />}
     </section>
   );
 }

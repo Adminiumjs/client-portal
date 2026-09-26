@@ -2,9 +2,10 @@
  * What the Time screen's buttons do, apart from drawing: each is one of the
  * time actions (`state/timeActions.ts`), called with what the screen shows.
  *
- *   Move onto an invoice   the entries the filter shows that no line carries
- *                          yet, at the rate card's hourly rate, onto each
- *                          client's draft (a new one titled for the project)
+ *   Move onto an invoice   the entries the filter shows that no invoice bills
+ *                          (a voided one's line lets go of them), at the rate
+ *                          card's hourly rate, onto each client's draft (a
+ *                          new one titled for the project)
  *   Stop                   the clock stops; Adminium stamps the moment and
  *                          works the hours out from its two stamps. What Stop
  *                          alone cannot settle (a clock Adminium finds ran
@@ -19,7 +20,7 @@ import { moveTimeOntoInvoice, stopClock } from "../../state/timeActions.ts";
 import { isLogged } from "./model.ts";
 import { refusalWords, type Words } from "./words.ts";
 
-/** The entries a move takes: logged, on no line yet. */
+/** The entries a move takes: logged, and billed by no invoice (`invoiced`: those an invoice that is not void bills). */
 export const toMove = (entries: readonly TimeEntry[], invoiced: ReadonlySet<Id>): TimeEntry[] => entries.filter((e) => isLogged(e) && !invoiced.has(e.id));
 
 /**

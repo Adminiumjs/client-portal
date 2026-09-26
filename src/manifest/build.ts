@@ -31,7 +31,7 @@ export const VERSION = "0.2.1";
  * without gaps, states, sign-in links, held emails, and apps built on an
  * add-on's shape. Written from the version actually released, never guessed.
  */
-export const MIN_ADMINIUM = "0.3.3";
+export const MIN_ADMINIUM = "0.3.4";
 
 const ENV = {
   VITE_ADMINIUM_API_BASE_URL: { required: false, example: "https://admin.example.com" },

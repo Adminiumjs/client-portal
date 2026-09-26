@@ -14,7 +14,9 @@
  *      document has lines and a total above zero; a void invoice took no
  *      money); a locked row changes only its exceptions; a date that only
  *      moves later; a child under a locked parent, or a payment under an
- *      invoice that is not sent;
+ *      invoice that is not sent — but a void invoice's line may let go of
+ *      the hours or the purchase it carried; and the hours or the purchase a
+ *      line carries stay as billed while its invoice is not void;
  *   3. the stamps (who, when, from which door), then the running number
  *      without gaps and its text with the add-on's prefix, a drawn code;
  *   4. the formulas, the rollups and the balance they leave, and the cap: a
@@ -344,8 +346,12 @@ export function createEngine(opts: EngineOptions): Engine {
     );
   }
 
-  /** The parents a child row is tied to, before and after — each judged: a locked parent takes no change to its lines, and a parent outside `parentIn` takes none at all. */
-  function judgeParents(ref: TableRef, sides: { now: Row | null; was: Row | null }, writer: Writer): { parentRef: TableRef; parent: Row; clear: string[] }[] {
+  /**
+   * The parents a child row is tied to, before and after — each judged: a locked parent takes no
+   * change to its lines (but the one its state releases), and a parent outside `parentIn` takes
+   * none at all. `changed` is an update's changed columns, what a release is judged on.
+   */
+  function judgeParents(ref: TableRef, sides: { now: Row | null; was: Row | null }, writer: Writer, changed?: readonly string[]): { parentRef: TableRef; parent: Row; clear: string[] }[] {
     const out: { parentRef: TableRef; parent: Row; clear: string[] }[] = [];
     for (const [parentRef, rule] of Object.entries(STATES) as [TableRef, StatesRule][]) {
       const child = rule.children?.[ref];
@@ -358,7 +364,7 @@ export function createEngine(opts: EngineOptions): Engine {
         out.push({ parentRef, parent, clear: child.clearOnCreate ?? [] });
         if (writer.origin === "history") continue;
         const state = parent[rule.column] === null || parent[rule.column] === undefined ? null : String(parent[rule.column]);
-        if (child.lock === true && lockedNow(parentRef, parent)) {
+        if (child.lock === true && lockedNow(parentRef, parent) && !released(child, state, sides, changed)) {
           refuse(409, "RECORD_LOCKED", `${ref} rows cannot change while their ${parentRef} is ${state ?? "locked"}.`, { table: ref, parent: parentRef, state });
         }
         if (child.parentIn !== undefined && (state === null || !child.parentIn.includes(state))) {
@@ -372,6 +378,45 @@ export function createEngine(opts: EngineOptions): Engine {
       }
     }
     return out;
+  }
+
+  /**
+   * Whether a change to a locked child is one its parent's state releases: an update, under the
+   * same parent, that only EMPTIES columns the release lists. Setting one to a value, changing any
+   * other column, moving the row to another parent, creating and deleting stay locked.
+   */
+  function released(child: NonNullable<StatesRule["children"]>[string], state: string | null, sides: { now: Row | null; was: Row | null }, changed: readonly string[] | undefined): boolean {
+    const release = child.release;
+    if (release === undefined || state === null || !release.when.includes(state)) return false;
+    if (changed === undefined || changed.length === 0 || sides.now === null || sides.was === null) return false;
+    if (!sameValue(sides.now[child.via], sides.was[child.via])) return false;
+    return changed.every((column) => release.columns.includes(column) && empty(sides.now![column]));
+  }
+
+  /**
+   * The first column of this row a line linking to it keeps (`lockLinked`) that the update
+   * changed, with the linking table — or null. A link keeps unless the line's parent is in a
+   * state that releases that link; a line with no parent keeps.
+   */
+  function linkKept(ref: TableRef, stored: Row, now: Row, changed: readonly string[]): { column: string; by: string } | null {
+    for (const [parentRef, rule] of Object.entries(STATES) as [TableRef, StatesRule][]) {
+      for (const [childRef, child] of Object.entries(rule.children ?? {})) {
+        for (const [link, columns] of Object.entries(child.lockLinked ?? {})) {
+          if (DEMO_RULES.references[childRef]?.[link] !== ref) continue;
+          // What the write named first, then what its formulas moved.
+          const column = changed.find((name) => columns.includes(name)) ?? columns.find((name) => !sameValue(stored[name], now[name]));
+          if (column === undefined) continue;
+          const holds = (rows[childRef as TableRef] ?? []).some((line) => {
+            if (String(line[link]) !== String(stored.id)) return false;
+            const parent = empty(line[child.via]) ? undefined : find(parentRef, line[child.via]);
+            const state = parent === undefined ? null : String(parent[rule.column] ?? rule.initial);
+            return !(state !== null && child.release?.when.includes(state) === true && child.release.columns.includes(link));
+          });
+          if (holds) return { column, by: childRef };
+        }
+      }
+    }
+    return null;
   }
 
   /** An update of a row that keeps states: the move, then the lock, then the dates that only move later. */
@@ -681,7 +726,7 @@ export function createEngine(opts: EngineOptions): Engine {
         const decided = decidedBy(ref, "update", values, stored);
         const rule = STATES[ref];
         if (rule !== undefined) judgeOwnUpdate(ref, rule, stored, values, changed, decided, writer);
-        judgeParents(ref, { now: { ...stored, ...values } as Row, was: stored }, writer);
+        judgeParents(ref, { now: { ...stored, ...values } as Row, was: stored }, writer, changed);
         stampRow(ref, "update", values, stored, writer);
       }
       const balances = balancesNow();
@@ -690,6 +735,9 @@ export function createEngine(opts: EngineOptions): Engine {
       unique(ref, row);
       settle();
       if (!history) {
+        // Judged once the formulas have moved: a change to their inputs moves what a line billed.
+        const kept = linkKept(ref, stored, row, changed);
+        if (kept !== null) refuse(409, "RECORD_LOCKED", `This ${ref} row is linked from ${kept.by}: ${kept.column} can no longer change.`, { column: kept.column, linkedFrom: kept.by });
         keepRanges(ref, row, values, "update");
         capHolds(balances);
         seal(ref, "update", values, stored, row);

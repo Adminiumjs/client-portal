@@ -19,7 +19,9 @@
  *      pressed twice at once, put each entry and purchase on ONE line; one
  *      running clock per person, its hours counted by Adminium from its own
  *      start and stop stamps; an invoiced entry kept; a line taken off a
- *      draft frees it, a sent one's lines are locked;
+ *      draft frees it, a sent one's lines are locked; the hours and the cost
+ *      a line bills stay as billed, and a voided invoice's lines let go of
+ *      them, so the desk bills them again;
  *   8. an enquiry from the studio's site: behind the human check, only its
  *      own columns, landing as a new enquiry from the web, and the studio
  *      emailed about it; the per-address limit;
@@ -48,7 +50,8 @@ import { realTables } from "../data/tableOfRef.ts";
 import { setClockSource, setZone } from "../lib/clock.ts";
 import { resetDesk, setDeskReads, setDeskWrites, upsert } from "../state/desk.ts";
 import { takeOffDraft } from "../state/invoiceDrafts.ts";
-import { addPurchase, passOn } from "../state/officeActions.ts";
+import { discardDraft, voidInvoice } from "../state/actions.ts";
+import { addPurchase, editPurchase, passOn } from "../state/officeActions.ts";
 import { editTime, logTime, moveTimeOntoInvoice, removeTime, startClock, stopClock } from "../state/timeActions.ts";
 import { COLUMNS, resolveSample } from "../data/sampleRows.ts";
 import { setServerZone } from "../data/venueTime.ts";
@@ -385,6 +388,60 @@ describe.skipIf(why !== null)(`the contract with a built Adminium${why === null 
         expect([a.ok, b.ok]).toEqual([true, true]);
         const carried = (await rows("invoice_lines")).filter((l) => l["expense_id"] === id);
         expect(carried.map((l) => [Number(l["qty"]), Number(l["rate"])])).toEqual([[1, 42.1]]);
+      }, 120_000);
+
+      it("keeps billed hours and costs as billed, and bills what a voided invoice let go of again, through the desk's own code", async () => {
+        // The refusal names the lines' table as Adminium's schema knows it (`<schema>.<table>`).
+        const byLines = (from: unknown) => String(from).endsWith(`.${real["invoice_lines"]!}`);
+        const entries = (await rows("time_entries")).filter((e) => String(e["note"]).endsWith(", contract run"));
+        const ids = entries.map((e) => e.id).sort((a, b) => a - b);
+        expect(ids).toHaveLength(2);
+        const sent = (await rows("invoices")).find((i) => i["title"] === "Time, contract run")!;
+        expect(sent["status"]).toBe("sent");
+
+        // Billed on a sent invoice: the hours, the day and the project stay, whichever door writes; the note is the studio's.
+        const edited = await editTime(ids[0]!, { hours: "3" });
+        expect(!edited.ok && [edited.code, byLines(edited.details["linkedFrom"])]).toEqual(["ALREADY_INVOICED", true]);
+        for (const values of [{ logged_hours: "3" }, { date: "2026-07-20" }]) {
+          const raw = await staff.patch(`${data("time_entries")}/${String(ids[0])}`, { values });
+          expect([raw.status, raw.code, byLines(raw.details["linkedFrom"])]).toEqual([409, "RECORD_LOCKED", true]);
+        }
+        expect((await editTime(ids[0]!, { note: "Sleeve layouts, contract run" })).ok).toBe(true);
+
+        // A purchase on a draft: its cost and "pass on" stay too.
+        const purchase = (await rows("expenses")).find((e) => e["what"] === "Proof prints, contract run")!;
+        const cost = await editPurchase(purchase.id, { amount: "50" });
+        expect(!cost.ok && cost.code).toBe("ALREADY_INVOICED");
+        const rebill = await staff.patch(`${data("expenses")}/${String(purchase.id)}`, { values: { rebill: false } });
+        expect([rebill.status, rebill.code, byLines(rebill.details["linkedFrom"])]).toEqual([409, "RECORD_LOCKED", true]);
+
+        // Voided: its lines take nothing but an emptied link, and the hours are free.
+        expect((await voidInvoice(sent.id, "Raised in error")).ok).toBe(true);
+        const voidedLines = (await rows("invoice_lines")).filter((l) => l["document_id"] === sent.id);
+        const figures = await staff.patch(`${data("invoice_lines")}/${String(voidedLines[0]!.id)}`, { values: { qty: "1" } });
+        const moved = await staff.patch(`${data("invoice_lines")}/${String(voidedLines[0]!.id)}`, { values: { time_entry_id: purchase.id } });
+        expect([figures.status, figures.code, moved.status, moved.code]).toEqual([409, "RECORD_LOCKED", 409, "RECORD_LOCKED"]);
+
+        // Moved again by the desk: each voided line lets go, and the hours go on a new draft — kept again there.
+        const again = await moveTimeOntoInvoice(ids, { rate: "125.00", newTitle: () => "Time, billed again" });
+        expect(again.ok, JSON.stringify(again).slice(0, 800)).toBe(true);
+        const now = await rows("invoice_lines");
+        expect(now.filter((l) => l["document_id"] === sent.id).map((l) => l["time_entry_id"])).toEqual([null, null]);
+        const carriers = now.filter((l) => ids.includes(l["time_entry_id"] as Id));
+        expect(carriers.map((l) => l["time_entry_id"]).sort()).toEqual(ids);
+        expect(new Set(carriers.map((l) => l["document_id"])).size).toBe(1);
+        const draft = (await rows("invoices")).find((i) => i.id === carriers[0]!["document_id"])!;
+        expect([draft["status"], draft.id === sent.id]).toEqual(["draft", false]);
+        const keptAgain = await editTime(ids[0]!, { hours: "3" });
+        expect(!keptAgain.ok && keptAgain.code).toBe("ALREADY_INVOICED");
+
+        // A draft discarded (voided) lets go of its purchase the same way: passed on again, it is on one line.
+        const purchaseDraft = (await rows("invoice_lines")).find((l) => l["expense_id"] === purchase.id)!["document_id"] as Id;
+        expect((await discardDraft(purchaseDraft)).ok).toBe(true);
+        const passed = await passOn([purchase.id], { newTitle: () => "Purchases, billed again" });
+        expect(passed.ok && passed.value.lines.map((l) => l.expense_id)).toEqual([purchase.id]);
+        const holding = (await rows("invoice_lines")).filter((l) => l["expense_id"] === purchase.id);
+        expect(holding.map((l) => l["document_id"] === purchaseDraft)).toEqual([false]);
       }, 120_000);
 
       it("takes an enquiry from the studio's site behind the human check, as a new one from the web, and tells the studio", async () => {

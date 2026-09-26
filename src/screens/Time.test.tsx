@@ -22,7 +22,7 @@ import { fakeStudio, tableOf, type FakeStudio } from "../testing/fakeStudio.ts";
 import { moveNotInvoiced, stopOrAsk, toMove } from "./time/act.ts";
 import { Entries } from "./time/Entries.tsx";
 import { logProblem } from "./time/LogForm.tsx";
-import { hourly } from "./time/model.ts";
+import { billedEntries, hourly } from "./time/model.ts";
 import { refusalWords } from "./time/words.ts";
 import Time from "./Time.tsx";
 
@@ -51,6 +51,12 @@ beforeEach(async () => {
 
 const held = () => Object.values(useDesk.getState().rows.time_entries);
 const invoicedNow = () => new Set(Object.values(useDesk.getState().rows.invoice_lines).flatMap((l) => (l.time_entry_id === null ? [] : [l.time_entry_id])));
+/** The entries an invoice that is not void bills: what a move leaves. */
+const billedNow = () =>
+  billedEntries(
+    new Map(Object.values(useDesk.getState().rows.invoice_lines).flatMap((l) => (l.time_entry_id === null ? [] : [[l.time_entry_id, l.document_id] as const]))),
+    useDesk.getState().rows.invoices,
+  );
 const rate = () => hourly(Object.values(useDesk.getState().rows.rates), Object.values(useDesk.getState().rows.settings)[0] ?? null)!;
 
 describe("the Time screen, drawn", () => {
@@ -125,7 +131,7 @@ describe("the Time screen, drawn", () => {
     expect(html).toContain("Nothing to invoice");
   });
 
-  it("counts hours on a voided invoice as not invoiced, and says the invoice was voided — they can't move again", async () => {
+  it("counts hours on a voided invoice as not invoiced, says the invoice was voided — and moves them again: the voided line lets go of them", async () => {
     const moved = ok(await moveNotInvoiced(held().filter((e) => e.id === 3), invoicedNow(), rate(), () => "Time"));
     const invoiceId = moved.invoices[0]!.id;
     await studio.world.writes.update("invoices", invoiceId, { status: "sent" });
@@ -139,20 +145,20 @@ describe("the Time screen, drawn", () => {
     expect(count(html, '<span class="time-chip">Not invoiced</span>')).toBe(2);
     // All 9.5 hours count as not invoiced: nothing bills the voided four.
     expect(html).toMatch(/data-sum="open".*?9\.5 h.*?\$1,235\.00 at \$130\.00 an hour/);
-    // What Move would take is the 5.5 hours no line holds: the voided line still holds the other four.
-    expect(html).toMatch(/time-foot-figures">5\.5 h · \$715\.00/);
-    expect(toMove(held(), invoicedNow()).map((e) => e.id).sort()).toEqual([1, 2]);
+    // What Move takes is all 9.5 hours: the voided line lets go of its four as they move.
+    expect(html).toMatch(/time-foot-figures">9\.5 h · \$1,235\.00/);
+    expect(toMove(held(), billedNow()).map((e) => e.id).sort()).toEqual([1, 2, 3]);
 
-    // Once every hour on show is held by a voided invoice, the foot says so — not that everything is invoiced.
-    const rest = ok(await moveNotInvoiced(held().filter((e) => e.id !== 3), invoicedNow(), rate(), () => "Time"));
-    for (const invoice of rest.invoices) {
-      await studio.world.writes.update("invoices", invoice.id, { status: "sent" });
-      await studio.world.writes.update("invoices", invoice.id, { status: "void", void_reason: "Raised in error" });
-    }
-    await refreshRows("invoices", rest.invoices.map((i) => i.id));
-    const all = draw();
-    expect(all).toContain("Nothing here can go on an invoice: the rest is held by a voided one");
-    expect(all).not.toContain("Everything here is invoiced");
+    // Moved again: the voided line empties its link (and keeps everything else), and a new draft carries the hours.
+    const voidedLine = tableOf(studio, "invoice_lines").find((l) => l["time_entry_id"] === 3)!;
+    const again = ok(await moveNotInvoiced(held().filter((e) => e.id === 3), billedNow(), rate(), () => "Time"));
+    expect(again.lines.map((l) => l.time_entry_id)).toEqual([3]);
+    expect(again.invoices[0]!.id).not.toBe(invoiceId);
+    expect(tableOf(studio, "invoice_lines").find((l) => l.id === voidedLine["id"])).toMatchObject({ document_id: invoiceId, time_entry_id: null, qty: voidedLine["qty"] });
+    expect(studio.writes.find((w) => w.op === "update" && w.table === "invoice_lines")!.values).toEqual({ time_entry_id: null });
+    const after = draw();
+    expect(count(after, "Invoice voided")).toBe(0);
+    expect(count(after, '<span class="time-chip">Not invoiced</span>')).toBe(2);
   });
 
   it("draws an empty studio, a read in progress and a failed read", () => {

@@ -7,6 +7,9 @@
  *   on a draft           "Take it off the draft" (asked twice): the line goes, and
  *                        the purchase waits to be passed on again
  *   on a sent invoice    its lines are locked; "Open INV-…"
+ *   on a voided invoice  nothing was charged: "Open INV-…", and "Pass it on"
+ *                        again when it is marked to pass on (the voided line
+ *                        lets go of it)
  *   ours                 the studio's own, never passed on
  *
  * The receipt can be added or replaced (the file first, then the purchase
@@ -178,7 +181,7 @@ export function PurchaseSheet({ expense, onClose }: { expense: Expense; onClose:
 
         <div className={`ex-sh-standing ex-sh-standing--${standing}`}>
           <p>{standingText}</p>
-          {standing === "to-pass-on" && company !== null && (
+          {(standing === "to-pass-on" || (standing === "voided" && expense.rebill)) && company !== null && (
             <Button kind="primary" icon={Wallet} busy={busy} onClick={() => void passIt()}>
               {t("expenses.tag.to-pass-on")}
             </Button>

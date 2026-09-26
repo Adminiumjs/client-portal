@@ -9,7 +9,8 @@
  * supplier, a receipt). Each row's chip says how it stands: "Pass it on" puts
  * that one purchase on the client's draft invoice, "Passed on" opens where it
  * went, "Ours" is the studio's, "Invoice voided" opens the purchase: the
- * invoice it went on was voided, so nothing was charged for it. The foot passes every waiting purchase on at
+ * invoice it went on was voided, so nothing was charged for it, and one marked
+ * to pass on waits to be passed on again. The foot passes every waiting purchase on at
  * once: one line per purchase, its cost as it was stored, on each client's
  * draft (a new draft when they have none) — Adminium works out the totals.
  *
@@ -75,8 +76,6 @@ export default function Expenses() {
   const figures = useMemo(() => expenseFigures(expenses, carriers), [expenses, carriers]);
   const rows = useMemo(() => expenses.filter((e) => inFilter(filter, e, carriers)).sort(newestFirst), [expenses, filter, carriers]);
   const waiting = useMemo(() => passable(expenses, carriers), [expenses, carriers]);
-  /** Marked to pass on, but held by a voided invoice's line: nothing Pass on can take, and not "nothing waiting" either. */
-  const onVoided = expenses.some((e) => e.rebill && standingOf(e, carriers) === "voided");
 
   const studio = settings?.name ?? "";
   const who = (e: Expense): string => {
@@ -251,7 +250,7 @@ export default function Expenses() {
         )}
 
         <div className="ex-foot">
-          <span className="ex-foot-label">{waiting.length > 0 ? t("expenses.foot.waiting") : onVoided ? t("expenses.foot.voidedOnly") : t("expenses.foot.nothing")}</span>
+          <span className="ex-foot-label">{waiting.length > 0 ? t("expenses.foot.waiting") : t("expenses.foot.nothing")}</span>
           <span className="ex-foot-amt money">{money(waitingSum)}</span>
           <Button kind="primary" icon={ReceiptText} busy={busy === "all"} disabled={busy !== null && busy !== "all"} onClick={() => void passAll()}>
             {waiting.length > 0 ? t("expenses.foot.passOn", { count: number(waiting.length) }, waiting.length) : t("expenses.foot.clear")}

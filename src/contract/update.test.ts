@@ -32,10 +32,12 @@
  *      it afterwards keeps every row the studio and its clients made; and
  *      the new release's sample, added after that, never writes a row twice.
  *
- * WHAT ADMINIUM 0.3.3 GETS WRONG ON AN UPDATE is pinned, each in its own test
- * named `ADMINIUM 0.3.3 DEFECT`: the defect proved exactly as it stands, so
- * the test fails the day Adminium fixes it — and the right assertion, written
- * beside it, is switched on then. None is worked around.
+ * And what an update must keep of the promises a fresh install makes: the
+ * guest key reaches the new public enquiry door; the handover link's own key
+ * still opens the links already sent; a link column the update adds keeps its
+ * one-of-a-kind rule, and the time it bills keeps its hours until a void
+ * invoice lets go of it; a text default is declared as it was; and a sample
+ * row the update only widened is not counted as the studio's change.
  *
  * It runs where the plain contract runs (`contract.test.ts`), with the
  * published tarball of the release it updates; `ADMINIUM_REQUIRE_CONTRACT`
@@ -425,26 +427,15 @@ describe.skipIf(why !== null)(`the update of a live ${FROM} install to ${TO}${wh
         }
       }, 120_000);
 
-      it(`keeps the text defaults of a table the update rebuilds${engine === "sqlite" ? " — ADMINIUM 0.3.3 DEFECT on SQLite: quoted twice" : ""}`, async () => {
+      it("keeps the text defaults of a table the update rebuilds", async () => {
         /*
          * `messages.kind` gains `new-enquiry`, which SQLite can only take by
-         * rebuilding the table. The rebuild copies every row faithfully, but
-         * re-declares `status DEFAULT 'queued'` as `DEFAULT '''queued'''`: the
-         * SQLite adapter reads a default back WITH its quotes
-         * (`packages/adapter-sqlite/src/type-map.ts` `classifyDefault`:
-         * `{ kind: 'literal', text: "'queued'" }`) and `renderDefault`
-         * (`apps/server/src/schema-ddl/compile.ts`) quotes a text literal again.
-         * A row inserted past Adminium without a status would read `'queued'`,
-         * quotes and all (Adminium's own writes set it, so its outbox is not
-         * hit). RIGHT, as Postgres and MySQL already do: nothing redeclared.
+         * rebuilding the table. The rebuild declares `status DEFAULT 'queued'`
+         * as it was, never quoted a second time: a row inserted past Adminium
+         * without a status would otherwise read `'queued'`, quotes and all.
+         * Nothing is redeclared, on any engine.
          */
-        const status = redeclared.filter((line) => line.startsWith(`${prefix}messages.status:`));
-        if (engine === "sqlite") {
-          expect(status).toEqual([`${prefix}messages.status: varchar(32) NOT NULL DEFAULT 'queued' → varchar(32) NOT NULL DEFAULT '''queued'''`]);
-        } else {
-          expect(status).toEqual([]);
-        }
-        expect(redeclared.filter((line) => !line.startsWith(`${prefix}messages.status:`))).toEqual([]);
+        expect(redeclared).toEqual([]);
       });
 
       it("adds the new record pages, and grants the new tables to Studio and Studio manager exactly as the manifest says", async () => {
@@ -489,42 +480,39 @@ describe.skipIf(why !== null)(`the update of a live ${FROM} install to ${TO}${wh
         expect(mail.subject).toBe("A new enquiry from Rosa Vento");
       }, 240_000);
 
-      it("ADMINIUM 0.3.3 DEFECT — the new public enquiry door is made, and the app's live key never reaches it", async () => {
+      it("gives the app's live guest key the new public enquiry door, which takes an enquiry behind the human check", async () => {
         /*
-         * The update saves the endpoint (`publicAccess.endpoints` lists
-         * `<prefix>enquiries`), but `installPublicAccess`
-         * (`apps/server/src/apps/manifest-public.ts`) gives a key only to a
-         * purpose with NO live key; the live guest key keeps the access it was
-         * made with at 0.2.0's install, and its scope is derived (the operator
-         * cannot widen it either). The studio's enquiry form therefore answers
-         * nobody on every updated install. RIGHT: the door is in the guest
-         * config and takes an enquiry behind the human check, as on a fresh
-         * install (`contract.test.ts`).
+         * The update saves the new endpoint and grants it to the guest key the
+         * install made at 0.2.0 (an update allows public access unless the
+         * operator says not to). So the studio's enquiry form answers on an
+         * updated install as on a fresh one (`contract.test.ts`): the door is
+         * in the guest config, refused without the human check, and takes an
+         * enquiry with it.
          */
         expect((updated.app["publicAccess"] as { endpoints: string[] }).endpoints).toContain(real["enquiries"]);
+        expect((updated.app["publicAccess"] as { granted?: Record<string, string[]> }).granted).toEqual({ customer: [real["enquiries"]] });
         const guest = await guestOf();
         const refs = await refsOf(guest);
-        expect(Object.keys(refs).filter((ref) => ref.startsWith(real["enquiries"]!))).toEqual([]);
+        const [door, entry] = Object.entries(refs).find(([ref, r]) => ref.startsWith(real["enquiries"]!) && r.writable.includes("body"))!;
+        expect([entry.actions, entry.expose]).toEqual([["create"], ["received_at"]]);
         const form = { name: "Rosa Vento", email: "rosa.door@ventoandsons.example", business: "Vento & Sons", body: "A sign, and a name people can find." };
-        const refused = await guest.post(`/api/v1/public/records/${real["enquiries"]!}`, { values: form }, await proof(guest, "write"));
-        expect(refused.status).toBeGreaterThanOrEqual(400);
-        expect((await rows("enquiries")).some((e) => e["email"] === form.email)).toBe(false);
+        const unproved = await guest.post(`/api/v1/public/records/${door}`, { values: form });
+        expect(unproved.status).toBeGreaterThanOrEqual(400);
+        const sent = await guest.post(`/api/v1/public/records/${door}`, { values: form }, await proof(guest, "write"));
+        expect(sent.status).toBe(201);
+        expect((await rows("enquiries")).some((e) => e["email"] === form.email)).toBe(true);
       }, 120_000);
 
-      it("ADMINIUM 0.3.3 DEFECT — the update revokes the handover link's own key, and never makes it again", async () => {
+      it("keeps the handover link's own key: every handover link the studio sent before the update still opens", async () => {
         /*
          * `publicKeys: { handover: {} }` is a key a shared link opens by its
-         * token, with no staff binding. The update's key loop
-         * (`apps/server/src/routes/apps/index.ts`, `writePages`: "A second key
-         * follows the version") revokes every live second key whose
-         * `staffBindingOf` is null — which a token-opened key's always is — and
-         * `withheld` then stops it being made again. Every handover link a
-         * studio has sent stops opening. RIGHT: the handover key is live after
-         * the update and still opens the handover side.
+         * token, with no staff binding. The new version still declares it, so
+         * the update keeps it as it is: the same key, live, opening the
+         * handover side.
          */
-        expect((await surfaceConfig()).publicKeys?.["handover"]).toBeUndefined();
+        expect((await surfaceConfig()).publicKeys?.["handover"]).toBe(handoverKey);
         const handover = new Caller(server.base, { authorization: `Bearer ${handoverKey}`, origin: server.base });
-        expect((await handover.get("/api/v1/public/config")).status).toBe(401);
+        expect((await handover.get("/api/v1/public/config")).status).toBe(200);
       }, 60_000);
 
       it(`settles money on the invoices made in ${FROM}, and refuses an overpayment`, async () => {
@@ -543,26 +531,48 @@ describe.skipIf(why !== null)(`the update of a live ${FROM} install to ${TO}${wh
         expect([Number(entry["hours"]), entry["client_id"]]).toEqual([2, made.client]);
       }, 120_000);
 
-      it("ADMINIUM 0.3.3 DEFECT — a link column the update adds loses its one-of-a-kind rule: the same hours go on two lines", async () => {
+      it("keeps a link column's one-of-a-kind rule when the update adds it: the same hours never go on two lines", async () => {
         /*
          * `invoice_lines.time_entry_id` / `expense_id` are `unique: true` (one
          * line per entry, per purchase — what stops the same hours being billed
-         * twice; a fresh install refuses the second line with UNIQUE_VIOLATION,
-         * `contract.test.ts`). The update adds them through `editBodyFor` →
-         * `linkColumnFor` (`apps/server/src/routes/apps/index.ts`), whose column
-         * shape has no `unique`, and no index is made. RIGHT: the second line
-         * is refused, 409 UNIQUE_VIOLATION.
+         * twice). The update adds them with the rule, as a fresh install makes
+         * them (`contract.test.ts`): the second line is refused, 409
+         * UNIQUE_VIOLATION.
          */
         const entry = (await rows("time_entries")).find((e) => e["project_id"] === made.project)!;
         const draft = ok(await staff.post<{ data: Row }>(data("invoices"), { values: { client_id: made.client, title: "Time, after the update" } }), 201).data;
         ok(await staff.post(data("invoice_lines"), { values: { document_id: draft.id, description: "Signage time", qty: "2", rate: "125", time_entry_id: entry.id } }), 201);
         const again = await staff.post(data("invoice_lines"), { values: { document_id: draft.id, description: "Again", qty: "1", rate: "1", time_entry_id: entry.id } });
-        expect(again.status).toBe(201);
-        // The schema says why: the link columns came with their foreign keys, and without the unique index a fresh install has.
+        expect([again.status, again.code]).toEqual([409, "UNIQUE_VIOLATION"]);
+        // The schema says so: each link column came with its foreign key and its one-of-a-kind rule.
         const came = constraintsMoved[`${prefix}invoice_lines`]!.came;
-        expect(came.filter((c) => /time_entry_id|expense_id/.test(c) && /unique/i.test(c))).toEqual([]);
+        console.info(`[invoice_lines constraints came, ${engine}] ${JSON.stringify(came)}`);
+        expect(came.filter((c) => /time_entry_id|expense_id/.test(c) && /unique/i.test(c)).length).toBeGreaterThanOrEqual(2);
         expect(came.filter((c) => /time_entry_id|expense_id/.test(c) && /fk|FOREIGN KEY/i.test(c))).toHaveLength(2);
-        expect((await rows("invoice_lines")).filter((l) => l["time_entry_id"] === entry.id)).toHaveLength(2);
+        expect((await rows("invoice_lines")).filter((l) => l["time_entry_id"] === entry.id)).toHaveLength(1);
+      }, 60_000);
+
+      it("keeps the hours a line bills on the updated install, and lets a void invoice's line let go of them to be billed again", async () => {
+        /*
+         * The invoice's states come with the update: while a line of an
+         * invoice that is not void carries an entry, its hours, day and
+         * project stay as billed, whichever door writes; once the invoice is
+         * void its line may empty the link (and nothing else), and the hours
+         * go on another invoice, kept again there.
+         */
+        const entry = (await rows("time_entries")).find((e) => e["project_id"] === made.project)!;
+        const line = (await rows("invoice_lines")).find((l) => l["time_entry_id"] === entry.id)!;
+        const kept = await staff.patch(`${data("time_entries")}/${String(entry.id)}`, { values: { logged_hours: "5" } });
+        // The refusal names the lines' table as Adminium's schema knows it (`<schema>.<table>`).
+        expect([kept.status, kept.code, String(kept.details["linkedFrom"]).endsWith(`.${prefix}invoice_lines`)]).toEqual([409, "RECORD_LOCKED", true]);
+        ok(await staff.patch(`${data("invoices")}/${String(line["document_id"])}`, { values: { status: "void", void_reason: "Raised in error" } }));
+        const figures = await staff.patch(`${data("invoice_lines")}/${String(line.id)}`, { values: { qty: "1" } });
+        expect([figures.status, figures.code]).toEqual([409, "RECORD_LOCKED"]);
+        ok(await staff.patch(`${data("invoice_lines")}/${String(line.id)}`, { values: { time_entry_id: null } }));
+        const draft = ok(await staff.post<{ data: Row }>(data("invoices"), { values: { client_id: made.client, title: "Time, billed again" } }), 201).data;
+        ok(await staff.post(data("invoice_lines"), { values: { document_id: draft.id, description: "Signage time", qty: "2", rate: "125", time_entry_id: entry.id } }), 201);
+        const keptAgain = await staff.patch(`${data("time_entries")}/${String(entry.id)}`, { values: { logged_hours: "5" } });
+        expect([keptAgain.status, keptAgain.code]).toEqual([409, "RECORD_LOCKED"]);
       }, 60_000);
 
       // ── the sample, after the update ────────────────────────────────────────
@@ -586,26 +596,19 @@ describe.skipIf(why !== null)(`the update of a live ${FROM} install to ${TO}${wh
         expect([counts["suppliers"], counts["expenses"], counts["running_costs"], counts["events"], counts["time_entries"]]).toEqual([0, 0, 0, 0, 1]);
       }, 120_000);
 
-      it("ADMINIUM 0.3.3 DEFECT — every sample row of a table the update widened reads as changed", async () => {
+      it("counts a sample row the update only widened as unchanged: what a removal keeps is the studio's own edits", async () => {
         /*
          * A sample row's hashes (`<prefix>sample_data.row_hash/col_hashes`) are
-         * of the columns it had when added. `analyse`
-         * (`apps/server/src/apps/sample-data.ts`) hashes the row as it reads
-         * NOW — the added `expense_id`/`time_entry_id` (null) included — so every
-         * sample invoice line differs, reads "changed" in exactly those
-         * columns, and a removal that keeps changed rows (the default) keeps
-         * them, and with them every invoice, project and client they point at.
-         * RIGHT: a column the ledger never recorded counts as a change only
-         * when it holds a value; the changed list is the studio's own edits.
+         * of the columns it had when added. A column the update added, still
+         * empty, is not a change: were it one, every sample invoice line would
+         * read "changed", and a removal that keeps changed rows (the default)
+         * would keep them, and every invoice, project and client they point at.
          */
         const plan = ok(await staff.post<{ changed: { ref: string; label: string | null; columns: string[] }[] }>("/api/v1/apps/clients/sample-data/remove-plan"));
-        const lines = plan.changed.filter((c) => c.ref === "invoice_lines");
-        const sampledLines = sampleBefore.tables.find((t) => t.ref === "invoice_lines")!.count;
-        expect(lines).toHaveLength(sampledLines);
-        for (const line of lines) expect(line.columns.sort()).toEqual(NEW_COLUMNS["invoice_lines"]);
-        // Everything else it calls changed is what it called changed before the update.
-        const key = (c: { ref: string; label: string | null }) => `${c.ref}|${String(c.label)}`;
-        expect(plan.changed.filter((c) => c.ref !== "invoice_lines").map(key).sort()).toEqual(expect.arrayContaining(changedBefore.map(key).sort()));
+        expect(plan.changed.filter((c) => c.ref === "invoice_lines")).toEqual([]);
+        const key = (c: { ref: string; label: string | null; columns: string[] }) => `${c.ref}|${String(c.label)}|${[...c.columns].sort().join(",")}`;
+        // The studio's own edits since the snapshot: the settings the new-enquiry test switched on.
+        expect(plan.changed.map(key).sort()).toEqual([...changedBefore.map(key), "settings|studio|notify_enquiry,reply_to"].sort());
       }, 60_000);
 
       it("removes the sample afterwards, keeping every row the studio and its clients made", async () => {
@@ -644,11 +647,11 @@ describe.skipIf(why !== null)(`the update of a live ${FROM} install to ${TO}${wh
       it(`never writes the ${TO} sample twice: added again after the removal, it is refused whole or lands without a copy`, async () => {
         /*
          * The removal kept the studio's sample clients (their invoices were
-         * paid into, voided, or — the pinned defect above — read as changed).
-         * Adminium 0.3.3 refuses an add that would repeat a one-of-a-kind value
-         * such a row holds (a client's email), in ONE transaction: nothing of
-         * the add is written. A later Adminium that takes kept rows back
-         * instead may let it through; either way no row is ever there twice.
+         * paid into or voided). Adminium refuses an add that would repeat a
+         * one-of-a-kind value such a row holds (a client's email), in ONE
+         * transaction: nothing of the add is written. An Adminium that takes
+         * kept rows back instead may let it through; either way no row is ever
+         * there twice.
          */
         const counts = async () => Object.fromEntries(Object.entries(await raw()).map(([name, t]) => [name, t.rows.length]));
         const was = await counts();

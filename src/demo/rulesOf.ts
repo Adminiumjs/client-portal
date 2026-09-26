@@ -37,7 +37,19 @@ export interface StatesRule {
   /** From each state, the moves it allows (a bare name is a move with no conditions). */
   moves: Record<string, Move[]>;
   lock?: { when: string[]; except: string[] };
-  children?: Record<string, { via: string; lock?: boolean; parentIn?: string[]; clearOnCreate?: string[] }>;
+  children?: Record<
+    string,
+    {
+      via: string;
+      lock?: boolean;
+      parentIn?: string[];
+      clearOnCreate?: string[];
+      /** In these states of the parent, a locked child may still EMPTY these columns of its own, and change nothing else. */
+      release?: { when: string[]; columns: string[] };
+      /** A child's link → the columns of the row it points at that stay as they are while the link holds. */
+      lockLinked?: Record<string, string[]>;
+    }
+  >;
   noDelete?: { when: "numbered" | string[] };
   onlyLater?: string[];
   lockedWhenReferencedBy?: { table: string; via: string; in: string[] }[];

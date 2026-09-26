@@ -185,7 +185,7 @@ function partStates(
   shape: string,
   part: string,
   tableOf: Record<string, string>,
-  extend: { except?: string[]; clearOnCreate?: Record<string, string[]>; roles?: Record<string, string[]> } = {},
+  extend: { except?: string[]; clearOnCreate?: Record<string, string[]>; roles?: Record<string, string[]>; children?: Record<string, Record<string, unknown>> } = {},
 ): Record<string, unknown> {
   const states = structuredClone(shapeOf(shape).parts[part]!.states!) as {
     moves: Record<string, (string | { to: string; requires?: { children?: Record<string, number> }; roles?: string[] })[]>;
@@ -215,7 +215,8 @@ function partStates(
     states.children = Object.fromEntries(
       Object.entries(states.children).map(([ref, rule]) => {
         const own = extend.clearOnCreate?.[map(ref)];
-        return [map(ref), own === undefined ? rule : { ...rule, clearOnCreate: [...(rule.clearOnCreate ?? []), ...own] }];
+        const cleared = own === undefined ? rule : { ...rule, clearOnCreate: [...(rule.clearOnCreate ?? []), ...own] };
+        return [map(ref), { ...cleared, ...extend.children?.[map(ref)] }];
       }),
     );
   }
@@ -853,6 +854,19 @@ export const TABLES: Table[] = [
       except: ["client_paid_note", "client_paid_amount", "client_paid_on", "client_paid", "client_paid_at"],
       // A recorded payment answers the client's "I've sent it": the flag goes.
       clearOnCreate: { payments: ["client_paid_note", "client_paid_amount", "client_paid_on", "client_paid", "client_paid_at"] },
+      children: {
+        invoice_lines: {
+          // A void invoice charges nothing: its lines may let go of the hours and the purchase
+          // they carried (and change nothing else), so that work can go on another invoice.
+          release: { when: ["void"], columns: ["time_entry_id", "expense_id"] },
+          // While an invoice that is not void carries them, the hours and the purchase stay what
+          // its line billed, whichever door writes to them.
+          lockLinked: {
+            time_entry_id: ["hours", "logged_hours", "project_id", "date"],
+            expense_id: ["amount", "project_id", "client_id", "rebill"],
+          },
+        },
+      },
     }),
   },
   {
@@ -864,7 +878,8 @@ export const TABLES: Table[] = [
       ...withWords(partColumns("invoice@1", "lines", BUILT, LINE_WORDS), { discount_kind: DISCOUNT_KIND }),
       clientOf("document_id"),
       // The hours or the purchase a line puts on the invoice. The line is the one record of it: an
-      // entry is invoiced while a line points at it, and free again once a draft's line is removed.
+      // entry is invoiced while a line points at it, and free again once a draft's line is removed
+      // or a void invoice's line lets go of it (the invoice's states, above).
       // Unique, so the same hours or purchase is never on two lines, however often "Move onto an
       // invoice" is pressed; and a row a line points at cannot be deleted from under it.
       fk("time_entry_id", "time_entries", "Time it bills", true, { unique: true }),

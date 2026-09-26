@@ -55,7 +55,7 @@ describe("Expenses, drawn", () => {
     expect(words).toMatch(/Everything 3 .*To pass on 2 .*Passed on 0 .*Ours 1/);
   });
 
-  it("says a purchase on a voided invoice was never charged, counts it as waiting, and does not offer to pass it on", async () => {
+  it("says a purchase on a voided invoice was never charged, counts it as waiting, and passes it on again: the voided line lets go of it", async () => {
     const out = await passOn([1], TITLE);
     if (!out.ok) throw new Error(out.code);
     const invoiceId = out.value.invoices[0]!.id;
@@ -69,18 +69,23 @@ describe("Expenses, drawn", () => {
     expect(words).toContain("Invoice voided");
     expect(words).toContain("To put on an invoice $110.40 2 purchases waiting");
     expect(words).toMatch(/Everything 3 .*To pass on 2 .*Passed on 0 .*Ours 1/);
-    // "Pass on" takes only the one no line holds.
-    expect(html).toMatch(/ex-foot-amt money">\$24\.00</);
+    // "Pass on" takes both: the one no line holds, and the one the voided invoice charged nothing for.
+    expect(html).toMatch(/ex-foot-amt money">\$110\.40</);
+    expect(words).toContain("Pass on 2");
     const sheet = text(draw(<PurchaseSheet expense={useDesk.getState().rows.expenses[1]!} onClose={() => undefined} />));
-    expect(sheet).toContain("which was voided: nothing was charged for it");
+    expect(sheet).toContain("which was voided: nothing was charged for it.");
+    expect(sheet).toContain(t("expenses.tag.to-pass-on"));
     expect(sheet).not.toContain(t("expenses.sheet.takeOff"));
-    // The other one passed on and voided too: nothing Pass on can take, and the foot says why.
-    const other = await passOn([2], TITLE);
-    if (!other.ok) throw new Error(other.code);
-    await studio.world.writes.update("invoices", other.value.invoices[0]!.id, { status: "sent" });
-    await studio.world.writes.update("invoices", other.value.invoices[0]!.id, { status: "void", void_reason: "Raised in error" });
-    await refreshRows("invoices", [other.value.invoices[0]!.id]);
-    expect(text(draw(<Expenses />))).toContain("Nothing can be passed on: the rest is held by a voided invoice");
+    // Passed on again: the voided line empties its link (and nothing else), and a new line carries it.
+    const voidedLine = tableOf(studio, "invoice_lines").find((l) => l["expense_id"] === 1)!;
+    const again = await passOn([1], TITLE);
+    if (!again.ok) throw new Error(again.code);
+    expect(again.value.lines.map((l) => l.expense_id)).toEqual([1]);
+    expect(again.value.invoices[0]!.id).not.toBe(invoiceId);
+    expect(tableOf(studio, "invoice_lines").find((l) => l.id === voidedLine["id"])).toMatchObject({ document_id: invoiceId, expense_id: null, amount: voidedLine["amount"] });
+    expect(studio.writes.slice(-3).map((w) => `${w.op} ${w.table}`)).toEqual(["update invoice_lines", "insert invoices", "insert invoice_lines"]);
+    expect(studio.writes.at(-3)!.values).toEqual({ expense_id: null });
+    expect(text(draw(<Expenses />))).not.toContain("Invoice voided");
   });
 
   it("lists the purchases newest first, whose each is, and a chip for how it stands", () => {

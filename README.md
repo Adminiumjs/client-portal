@@ -22,7 +22,7 @@ rather than lorem ipsum.
 
 ## What it needs
 
-- **Adminium 0.3.3 or later.**
+- **Adminium 0.3.4 or later.**
 - **Invoices & Receipts 1.0.5 or later**, which installs with the app.
 - A database on **SQLite, Postgres or MySQL**. The app creates its own tables
   there, under names Adminium gives them.

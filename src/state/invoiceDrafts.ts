@@ -12,7 +12,11 @@
  * across every line: the same hours can be on one line only, whichever
  * computer moves them and however often. An entry is invoiced while a line
  * points at it; removing the line from a draft frees it again; once the
- * invoice is sent, its lines are locked and so is what they carry.
+ * invoice is sent, its lines are locked, and Adminium keeps the hours and the
+ * cost they carry as billed. A void invoice charged nothing: Adminium lets its
+ * lines let go of what they carried (and change nothing else), so a move takes
+ * hours or a purchase still held by a void invoice's line — it empties that
+ * line's link first, then puts it on a draft like any other.
  *
  * Each action runs under a key of its OWN, drawn when it starts: "Finish it"
  * of that action reuses its keys and finds what it saved, and nothing else
@@ -67,6 +71,15 @@ export function draftFor(clientId: Id, projectId: Id | null): Invoice | null {
   return all.find((i) => projectId !== null && i.project_id === projectId) ?? all[0] ?? null;
 }
 
+/**
+ * A refusal because a line bills the row (Adminium's `RECORD_LOCKED`, naming the line's table),
+ * as the screens word it: already invoiced.
+ */
+export function asInvoiced<T>(out: Outcome<T>): Outcome<T> {
+  if (out.ok || out.code !== "RECORD_LOCKED" || typeof out.details["linkedFrom"] !== "string") return out;
+  return { ...out, code: "ALREADY_INVOICED" };
+}
+
 /** The lines the desk holds that carry one of these entries or purchases. */
 export function linesCarrying(column: Carried, ids: readonly Id[]): InvoiceLine[] {
   const wanted = new Set(ids);
@@ -76,9 +89,21 @@ export function linesCarrying(column: Carried, ids: readonly Id[]): InvoiceLine[
   });
 }
 
-/** Read what the action decides on: the lines already carrying these, and the clients' drafts and their lines. */
+/** Whether a line is on a void invoice (as far as the desk holds it): it charged nothing, and may let go of what it carries. */
+export function onVoid(line: InvoiceLine): boolean {
+  return useDesk.getState().rows.invoices[line.document_id]?.status === "void";
+}
+
+/**
+ * Read what the action decides on: the lines already carrying these and their invoices (a void
+ * one's line lets go), and the clients' drafts and their lines.
+ */
 export async function readForDrafts(column: Carried, ids: readonly Id[], clientIds: readonly Id[]): Promise<void> {
-  if (ids.length > 0) await loadWhere("invoice_lines", { column, op: "in", value: [...ids] }, undefined, ids.length + 10);
+  if (ids.length > 0) {
+    const carrying = await loadWhere("invoice_lines", { column, op: "in", value: [...ids] }, undefined, ids.length + 10);
+    // Read afresh: the desk may still hold one as sent that was voided a moment ago, elsewhere.
+    await refreshRows("invoices", [...new Set(carrying.map((l) => l.document_id))]);
+  }
   if (clientIds.length === 0) return;
   const open = await loadWhere(
     "invoices",
@@ -142,8 +167,11 @@ async function ontoDraftsNow(column: Carried, lines: readonly DraftLine[], newTi
   } catch (error) {
     return refusalOf(error);
   }
-  // Already on a line (this desk's own earlier press included): nothing to do for those.
-  const carried = new Set(linesCarrying(column, ids).map((l) => l[column] as Id));
+  // Already on a line (this desk's own earlier press included): nothing to do for those. A void
+  // invoice's line lets go of what it carries first.
+  const holding = linesCarrying(column, ids);
+  const letGo = holding.filter(onVoid);
+  const carried = new Set(holding.filter((l) => !onVoid(l)).map((l) => l[column] as Id));
   const todo = lines.filter((l) => !carried.has(l.id));
   const skipped = lines.filter((l) => carried.has(l.id)).map((l) => l.id);
   if (todo.length === 0) return { ok: true, value: { invoices: [], lines: [], skipped } };
@@ -153,7 +181,16 @@ async function ontoDraftsNow(column: Carried, lines: readonly DraftLine[], newTi
   for (const line of todo) byClient.set(line.clientId, [...(byClient.get(line.clientId) ?? []), line]);
 
   const steps = (): Step[] => {
-    const out: Step[] = [];
+    const out: Step[] = letGo.map((held) => ({
+      name: `release:${String(held.id)}`,
+      // Only the link is emptied: Adminium refuses anything more on a void invoice's line. Emptied
+      // already (another desk, a retry) is the same answer.
+      run: async () => {
+        const row = await deskWrites().update("invoice_lines", held.id, { [column]: null });
+        upsert("invoice_lines", { ...row, id: held.id });
+        return held.id;
+      },
+    }));
     for (const [clientId, group] of byClient) {
       const projects = [...new Set(group.map((l) => l.projectId))];
       const projectId = projects.length === 1 ? (projects[0] ?? null) : null;

@@ -35,7 +35,12 @@
  *    still answers whenever the copy comes back empty;
  *  - add to a lock's exceptions (its own columns a client may still write),
  *    give a move to some roles only, tie more child tables to the state, and
- *    empty more of its own columns when a child is created.
+ *    empty more of its own columns when a child is created;
+ *  - let a locked child EMPTY some of its own columns in some of the lock's
+ *    states (`release`: a void invoice's line letting go of the time it
+ *    billed), and lock columns of the rows its own links point at
+ *    (`lockLinked`) — never a column of the child's part, whose lock is the
+ *    shape's.
  *
  * Everything else — a column's type, a rule that decides a value, a move —
  * must be exactly the part's, or the install is refused `SHAPE_MISMATCH`
@@ -196,7 +201,14 @@ export function shapeConformanceIssues(
       } else if (table.states === undefined) {
         mismatch(at('states'), `"${table.ref}" drops the shape's states`);
       } else {
-        for (const message of statesDifferences(mapStates(part.states, map), table.states)) mismatch(at('states'), message);
+        // A child's columns the app added itself: the ones its part does not declare.
+        const ownColumns = (childRef: string): ReadonlySet<string> => {
+          const child = tables.find((candidate) => candidate.ref === childRef);
+          const childPart = child?.builtOn === undefined || child.part === undefined ? undefined : shapes.get(child.builtOn)?.parts[child.part];
+          const partColumns = new Set((childPart?.columns ?? []).map((column) => column.ref));
+          return new Set((child?.columns ?? []).map((column) => column.ref).filter((ref) => !partColumns.has(ref)));
+        };
+        for (const message of statesDifferences(mapStates(part.states, map), table.states, ownColumns)) mismatch(at('states'), message);
       }
     }
   });
@@ -257,8 +269,8 @@ function mapStates(states: States, map: (ref: string) => string): States {
   };
 }
 
-/** How an app's states differ from the part's, beyond what an app may add. */
-function statesDifferences(want: States, have: States): string[] {
+/** How an app's states differ from the part's, beyond what an app may add. `ownColumns` are a child table's columns the app added. */
+function statesDifferences(want: States, have: States, ownColumns: (childRef: string) => ReadonlySet<string>): string[] {
   const out: string[] = [];
   const same = (a: unknown, b: unknown) => canonical(a) === canonical(b);
   if (want.column !== have.column || want.initial !== have.initial) out.push('the state column and the first state are the shape\'s');
@@ -285,6 +297,22 @@ function statesDifferences(want: States, have: States): string[] {
     }
     const cleared = (rule.clearOnCreate ?? []).filter((col) => !(own.clearOnCreate ?? []).includes(col));
     if (cleared.length > 0) out.push(`creating a "${ref}" row empties ${cleared.join(', ')}, as the shape says`);
+    // A release or a linked lock the shape keeps is kept as it is; one the app adds names only its own columns.
+    const added = ownColumns(ref);
+    if (rule.release !== undefined) {
+      if (!same(own.release, rule.release)) out.push(`"${ref}" is released as the shape releases it`);
+    } else if (own.release !== undefined) {
+      const theirs = own.release.columns.filter((col) => !added.has(col));
+      if (theirs.length > 0) out.push(`a "${ref}" row is released only for columns the app added, never ${theirs.join(', ')}`);
+    }
+    for (const [link, columns] of Object.entries(rule.lockLinked ?? {})) {
+      const kept = own.lockLinked?.[link] ?? [];
+      const missing = columns.filter((col) => !kept.includes(col));
+      if (missing.length > 0) out.push(`a "${ref}" row's ${link} keeps ${missing.join(', ')} as the shape does`);
+    }
+    for (const link of Object.keys(own.lockLinked ?? {})) {
+      if (rule.lockLinked?.[link] === undefined && !added.has(link)) out.push(`"${ref}.${link}" is the shape's, and locks nothing the shape does not`);
+    }
   }
   for (const name of ['lockedWhenReferencedBy', 'noDelete', 'onlyLater'] as const) {
     if (!same(want[name], have[name])) out.push(`${name} is the shape's`);

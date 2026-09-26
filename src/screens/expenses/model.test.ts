@@ -48,7 +48,7 @@ describe("Expenses at 28 July", () => {
     expect(expenses.filter((e) => inFilter("ours", e, carriers)).map((e) => e.number)).toEqual(["EX-S042"]);
   });
 
-  it("counts the print check as not passed on once INV-S2031 is voided — it waits again, but Pass on cannot take it", () => {
+  it("counts the print check as not passed on once INV-S2031 is voided — it waits again, and Pass on takes it", () => {
     const check = expenses.find((e) => e.number === "EX-S040")!;
     const invoice = carriers.get(check.id)!.invoice!;
     const after = carriersOf(lines, { ...invoices, [invoice.id]: { ...invoice, status: "void" } });
@@ -59,8 +59,8 @@ describe("Expenses at 28 July", () => {
     expect([f["passed-on"].sum, f["passed-on"].count]).toEqual(["0.00", 0]);
     expect(inFilter("to-pass-on", check, after)).toBe(true);
     expect(inFilter("passed-on", check, after)).toBe(false);
-    // The voided line still holds it: Pass on takes the five it took before, not this one.
-    expect(passable(expenses, after).map((e) => e.number)).toEqual(["EX-S046", "EX-S045", "EX-S044", "EX-S043", "EX-S041"]);
+    // The voided line lets go of it as it moves: Pass on takes it with the five it took before.
+    expect(passable(expenses, after).map((e) => e.number)).toEqual(["EX-S046", "EX-S045", "EX-S044", "EX-S043", "EX-S041", "EX-S040"]);
   });
 
   it("offers every project not done for a purchase", () => {

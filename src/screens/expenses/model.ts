@@ -10,8 +10,8 @@
  *   ours          the studio's own to carry (not marked to pass on)
  *   voided        the line carrying it is on a voided invoice: nothing was
  *                 charged, so it counts as not passed on (with the purchases
- *                 still to pass on, or the studio's own) — but the voided line
- *                 still holds it, so it cannot go on another invoice
+ *                 still to pass on, or the studio's own), and "Pass on" takes
+ *                 it again: the voided line lets go of it first
  *
  * Every sum here is for showing only: the stored costs added up exactly
  * (`sumDecimals`), never a figure that is saved.
@@ -81,11 +81,11 @@ export const inFilter = (filter: PurchaseFilter, expense: Expense, carriers: Rea
 
 /**
  * The purchases "Pass on" takes: every one marked to pass on, with a client,
- * that no line carries yet — whichever filter is on show. (One on a voided
- * invoice is still held by the voided line, so it is not among them.)
+ * that no invoice bills — whichever filter is on show. One on a voided invoice
+ * is among them: the voided line lets go of it as it moves.
  */
 export const passable = (expenses: readonly Expense[], carriers: ReadonlyMap<Id, Carrier>): Expense[] =>
-  expenses.filter((e) => standingOf(e, carriers) === "to-pass-on" && e.client_id !== null).sort(newestFirst);
+  expenses.filter((e) => pileOf(e, carriers) === "to-pass-on" && e.client_id !== null).sort(newestFirst);
 
 /** How a passed-on purchase's invoice stands: still a draft (the line can come off), or sent and locked. */
 export type CarrierState = "draft" | "locked" | "unknown";

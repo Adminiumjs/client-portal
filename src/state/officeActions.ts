@@ -17,11 +17,11 @@
  *   estimated days   `milestones.estimated_days`, which Capacity spreads and
  *                    the scoping worksheet learns from
  */
-import { newRun, SinkError } from "../data/sink.ts";
+import { newRun } from "../data/sink.ts";
 import type { Day, Expense, Id, Milestone, RunningCost, StudioEvent, StudioEventKind, Supplier, SupplierKind } from "../data/types.ts";
 import { today } from "../lib/clock.ts";
-import { deskWrites, ensureRows, loadWhere, useDesk } from "./desk.ts";
-import { linesCarrying, ontoDrafts, type OntoDrafts } from "./invoiceDrafts.ts";
+import { deskWrites, ensureRows, loadWhere, refreshRows, useDesk } from "./desk.ts";
+import { asInvoiced, linesCarrying, ontoDrafts, onVoid, type OntoDrafts } from "./invoiceDrafts.ts";
 import { attempt, attemptSteps, refusalOf, type Outcome } from "./outcome.ts";
 import { change, createOne, decimalText, insertRow, invalid, removal, textOrNull, updateRow } from "./officeWrites.ts";
 
@@ -74,7 +74,7 @@ export type PurchaseState = "passed-on" | "voided" | "to-pass-on" | "ours";
 
 export function purchaseState(expense: Expense): PurchaseState {
   const line = linesCarrying("expense_id", [expense.id])[0];
-  if (line !== undefined) return useDesk.getState().rows.invoices[line.document_id]?.status === "void" ? "voided" : "passed-on";
+  if (line !== undefined) return onVoid(line) ? "voided" : "passed-on";
   return expense.rebill ? "to-pass-on" : "ours";
 }
 
@@ -158,20 +158,14 @@ export interface PurchaseChange {
 }
 
 /**
- * Change a purchase. One already passed on keeps its cost, client and "pass
- * on" (the line says what went): take the line off the draft first.
+ * Change a purchase. One passed on keeps its cost, project, client and "pass
+ * on" while an invoice that is not void carries it (the line says what went):
+ * Adminium refuses those, whichever door the change comes through. Take the
+ * line off the draft first.
  */
 export async function editPurchase(expenseId: Id, patch: PurchaseChange): Promise<Outcome<Expense>> {
   const problem = purchaseProblem(patch);
   if (problem !== null) return problem;
-  try {
-    await loadWhere("invoice_lines", { column: "expense_id", op: "eq", value: expenseId }, undefined, 1);
-  } catch (error) {
-    return refusalOf(error);
-  }
-  const carried = linesCarrying("expense_id", [expenseId]).length > 0;
-  const touchesTheLine = patch.amount !== undefined || patch.rebill !== undefined || patch.project_id !== undefined || patch.client_id !== undefined;
-  if (carried && touchesTheLine) return refusalOf(new SinkError("passed on", "refused", 409, "ALREADY_INVOICED", patch.amount !== undefined ? "amount" : "rebill"));
   const values = {
     ...(patch.what === undefined ? {} : { what: patch.what.trim() }),
     ...(patch.amount === undefined ? {} : { amount: decimalText(patch.amount) }),
@@ -181,7 +175,7 @@ export async function editPurchase(expenseId: Id, patch: PurchaseChange): Promis
     ...(patch.supplier_id === undefined ? {} : { supplier_id: patch.supplier_id }),
     ...(patch.rebill === undefined ? {} : { rebill: patch.rebill }),
   };
-  return change("expenses", expenseId, values);
+  return asInvoiced(await change("expenses", expenseId, values));
 }
 
 /** Put a receipt on a purchase: the file, then the row names it. */
@@ -202,7 +196,8 @@ export const removePurchase = (expenseId: Id): Promise<Outcome<void>> => removal
  */
 export async function passOn(expenseIds: readonly Id[], input: { newTitle: (clientId: Id, projectId: Id | null) => string | null }): Promise<Outcome<OntoDrafts>> {
   try {
-    await ensureRows("expenses", expenseIds);
+    // Read afresh: a cost a voided invoice let go of may have changed since this page drew it, and the line bills what is stored.
+    await refreshRows("expenses", expenseIds);
   } catch (error) {
     return refusalOf(error);
   }

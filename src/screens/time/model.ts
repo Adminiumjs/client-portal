@@ -47,8 +47,8 @@ export interface TimeSums {
 /**
  * The entries an invoice bills: those a line carries, unless that line's
  * invoice was voided — a voided invoice charges nothing, so its hours count as
- * not invoiced (though the voided line still holds them: they cannot go on
- * another invoice).
+ * not invoiced, and a move takes them again (the voided line lets go of them
+ * first).
  */
 export function billedEntries(invoicedBy: ReadonlyMap<Id, Id>, invoices: Readonly<Record<Id, Pick<Invoice, "status">>>): Set<Id> {
   return new Set([...invoicedBy].filter(([, invoiceId]) => invoices[invoiceId]?.status !== "void").map(([entryId]) => entryId));

@@ -308,7 +308,30 @@ export const DEMO_RULES: DemoRules = {
       "children": {
         "invoice_lines": {
           "via": "document_id",
-          "lock": true
+          "lock": true,
+          "release": {
+            "when": [
+              "void"
+            ],
+            "columns": [
+              "time_entry_id",
+              "expense_id"
+            ]
+          },
+          "lockLinked": {
+            "time_entry_id": [
+              "hours",
+              "logged_hours",
+              "project_id",
+              "date"
+            ],
+            "expense_id": [
+              "amount",
+              "project_id",
+              "client_id",
+              "rebill"
+            ]
+          }
         },
         "payments": {
           "via": "document_id",

@@ -16,8 +16,11 @@
  *                                  passed on again, it goes on a new draft in
  *                                  one press, never refused as locked
  *   a voided invoice bills nothing  its hours and purchases say so, count as
- *                                  not invoiced, and are not offered to move
- *                                  (the voided line still holds them)
+ *                                  not invoiced, and move again in one press:
+ *                                  the voided line lets go of them (and keeps
+ *                                  everything else), and once billed again
+ *                                  Adminium keeps their hours and cost as the
+ *                                  new line bills them
  *
  * Screens open at their own addresses; nothing types an address or a password.
  */
@@ -76,7 +79,7 @@ async function deskAt(browser: Browser, view: "time" | "expenses"): Promise<Page
 
 const dialog = (page: Page) => page.locator("[role=dialog]");
 
-test("hours moved again after their draft went to another client land on their own client's draft — and a voided invoice bills them no more", async ({ browser }, info) => {
+test("hours moved again after their draft went to another client land on their own client's draft — and a voided invoice lets them go again", async ({ browser }, info) => {
   info.setTimeout(900_000);
   const projects = await stack.rows("projects");
   const vinyl = projects.find((p) => p["name"] === "Vinyl sleeve system")!;
@@ -113,21 +116,40 @@ test("hours moved again after their draft went to another client land on their o
   expect((await stack.rows("invoice_lines")).filter((l) => l["document_id"] === first.id)).toHaveLength(0);
   await page.context().close();
 
-  // The invoice is sent and voided: the hours are billed nowhere, and the page says so.
+  // Billed on a draft, the hours stay as the line bills them, whichever door is used.
+  const kept = await stack.staff.patch(`${stack.data("time_entries")}/${String(entry.id)}`, { values: { logged_hours: "9" } });
+  expect([kept.status, kept.code, String(kept.details["linkedFrom"]).endsWith("invoice_lines")]).toEqual([409, "RECORD_LOCKED", true]);
+
+  // The invoice is sent and voided: the hours are billed nowhere, the page says so, and they can move again.
   await sendAndVoid(again.id);
   page = await deskAt(browser, "time");
   await page.locator("main .filters button").filter({ hasText: "Northlight Records" }).click();
   await expect(page.locator(".time-chip--void")).toHaveCount(1);
   await expect(page.locator(".time-chip--void")).toContainText("Invoice voided");
-  await expect(page.locator(".time-foot")).toContainText("Nothing here can go on an invoice: the rest is held by a voided one");
+  await expect(page.locator(".time-foot")).toContainText("Not invoiced on Vinyl sleeve system");
+  await expect(page.locator(".time-foot button")).toHaveText("Move onto an invoice");
   await check(page, engine, "time-voided", "light");
-  // Adminium still holds the voided line: the hours cannot go on a second line.
-  const raw = await stack.staff.post(stack.data("invoice_lines"), { values: { document_id: first.id, description: "Again", qty: "3", rate: "125", time_entry_id: entry.id } });
-  expect([raw.status, raw.code]).toEqual([409, "UNIQUE_VIOLATION"]);
+  // The voided line keeps everything but the link: its figures stay as they were billed.
+  const voidedLine = (await stack.rows("invoice_lines")).find((l) => l["time_entry_id"] === entry.id)!;
+  const figures = await stack.staff.patch(`${stack.data("invoice_lines")}/${String(voidedLine.id)}`, { values: { qty: "1" } });
+  expect([figures.status, figures.code]).toEqual([409, "RECORD_LOCKED"]);
+
+  // Moved again: the voided line lets go of the hours, and they go on a new draft of Northlight's.
+  await page.locator(".time-foot button").click();
+  await dialog(page).locator(".btn--primary").click();
+  await expect(page.locator(".toasts")).toContainText("onto a draft invoice.");
+  const third = (await invoiceCarrying("time_entry_id", entry.id))!;
+  expect([third["status"], third["client_id"]]).toEqual(["draft", vinyl["client_id"]]);
+  expect(third.id).not.toBe(again.id);
+  expect(await row("invoice_lines", voidedLine.id)).toMatchObject({ document_id: again.id, time_entry_id: null });
+  await expect(page.locator(".time-chip--void")).toHaveCount(0);
+  // Billed again: kept again.
+  const keptAgain = await stack.staff.patch(`${stack.data("time_entries")}/${String(entry.id)}`, { values: { logged_hours: "9" } });
+  expect([keptAgain.status, keptAgain.code]).toEqual([409, "RECORD_LOCKED"]);
   await page.context().close();
 });
 
-test("a purchase passed on again after its draft went out with another one goes on a new draft in one press — and a voided invoice passes nothing on", async ({ browser }, info) => {
+test("a purchase passed on again after its draft went out with another one goes on a new draft in one press — and a voided invoice lets it go again", async ({ browser }, info) => {
   info.setTimeout(900_000);
   // A client with no draft of their own, and a project of theirs.
   const invoices = await stack.rows("invoices");
@@ -171,21 +193,30 @@ test("a purchase passed on again after its draft went out with another one goes 
   expect([again["status"], again["client_id"]]).toEqual(["draft", project["client_id"]]);
   await page.context().close();
 
-  // The sent invoice is voided: the courier was never charged, the page says so, and Pass on does not offer it.
+  // On the sent invoice, the courier's cost stays as it was billed.
+  const kept = await stack.staff.patch(`${stack.data("expenses")}/${String(courier.id)}`, { values: { amount: "20.00" } });
+  expect([kept.status, kept.code, kept.details["column"], String(kept.details["linkedFrom"]).endsWith("invoice_lines")]).toEqual([409, "RECORD_LOCKED", "amount", true]);
+
+  // The sent invoice is voided: the courier was never charged, the page says so, and Pass on offers it again.
   await patch("invoices", draft.id, { status: "void", void_reason: "Raised in error" });
   const after = await deskAt(browser, "expenses");
   await expect(tag(after, "Courier, proofs to the client")).toHaveText("Invoice voided");
   await expect(tag(after, "Foil blocking die")).toHaveText("Passed on");
-  // It counts with what is still to pass on (the sample's $762.90 and the $18.00 courier), but Pass on takes only the sample's five.
+  // It counts with what is still to pass on (the sample's $762.90 and the $18.00 courier), and Pass on takes all six.
   await expect(after.locator('[data-kpi="to-pass-on"]')).toContainText("$780.90");
-  await expect(after.locator(".ex-foot button")).toHaveText("Pass on 5");
+  await expect(after.locator(".ex-foot button")).toHaveText("Pass on 6");
   await tag(after, "Courier, proofs to the client").click();
   await expect(after.locator(".sheet")).toContainText("which was voided: nothing was charged for it");
   await check(after, engine, "expenses-sheet-voided", "light");
+  // Passed on from its sheet: the voided line lets go of it, and it joins the die on the client's draft.
+  await after.locator(".sheet .ex-sh-standing .btn--primary").click();
+  await expect(tag(after, "Courier, proofs to the client")).toHaveText("Passed on");
+  const rebilled = (await invoiceCarrying("expense_id", courier.id))!;
+  expect(rebilled.id).toBe(again.id);
+  const voidedLine = (await stack.rows("invoice_lines")).find((l) => l["document_id"] === draft.id && l["description"] === "Courier, proofs to the client")!;
+  expect(voidedLine["expense_id"]).toBeNull();
   await after.keyboard.press("Escape");
+  await expect(after.locator(".ex-foot button")).toHaveText("Pass on 5");
   await check(after, engine, "expenses-voided", "light");
-  // Adminium still holds the voided line: the courier cannot go on a second line.
-  const raw = await stack.staff.post(stack.data("invoice_lines"), { values: { document_id: again.id, description: "Again", qty: "1", rate: "18", expense_id: courier.id } });
-  expect([raw.status, raw.code]).toEqual([409, "UNIQUE_VIOLATION"]);
   await after.context().close();
 });

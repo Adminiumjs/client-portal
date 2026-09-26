@@ -24,7 +24,11 @@
  *   },
  *   "lock": { "when": ["sent", "void"], "except": ["due_on", "ladder"] },
  *   "children": {
- *     "invoice_lines": { "via": "document_id", "lock": true },
+ *     "invoice_lines": {
+ *       "via": "document_id", "lock": true,
+ *       "release": { "when": ["void"], "columns": ["time_entry_id"] },
+ *       "lockLinked": { "time_entry_id": ["hours", "date"] }
+ *     },
  *     "payments": { "via": "document_id", "parentIn": ["sent"], "clearOnCreate": ["client_paid_at"] }
  *   },
  *   "noDelete": { "when": "numbered" },
@@ -42,7 +46,14 @@
  *   writes while the row is locked; `parentIn` allows them only while the row
  *   is in those states (payments on a sent invoice); `clearOnCreate` empties
  *   columns of this row when one of them is created (a recorded payment
- *   clears the client's "I've sent it").
+ *   clears the client's "I've sent it"). `release` opens a locked child a
+ *   little while its parent is in some of the lock's states: a change that
+ *   only EMPTIES the listed columns (a void invoice's line letting go of the
+ *   time it billed, so the time can be billed again), and only in a state no
+ *   move leaves. `lockLinked` keeps the
+ *   listed columns of the row a child's link points at from changing while
+ *   the child points at it (the hours of time on an invoice) — unless the
+ *   parent is in a state that releases that link.
  * - `lockedWhenReferencedBy`: this row locks once a row of another table in
  *   one of the states points at it (a terms version once a proposal naming it
  *   is sent).
@@ -105,10 +116,18 @@ export const stateChildSchema = z
     lock: z.literal(true).optional(),
     parentIn: z.array(stateName).min(1).max(16).optional(),
     clearOnCreate: z.array(refSchema).min(1).max(8).optional(),
+    /** While this row is in one of `when`, a locked child may still EMPTY these columns of its own, and change nothing else. */
+    release: z.object({ when: z.array(stateName).min(1).max(16), columns: z.array(refSchema).min(1).max(8) }).strict().optional(),
+    /** A child's link column → the columns of the row it points at that stay as they are while it points there. */
+    lockLinked: z.record(refSchema, z.array(refSchema).min(1).max(16)).optional(),
   })
   .strict()
   .refine((c) => c.lock === undefined || c.parentIn === undefined, {
     message: 'a child is locked with its parent, or writable only in some of its states — not both',
+  })
+  .refine((c) => c.release === undefined || c.lock === true, { message: 'a child is released only from its parent\'s lock (lock: true)' })
+  .refine((c) => c.lockLinked === undefined || (Object.keys(c.lockLinked).length >= 1 && Object.keys(c.lockLinked).length <= 8), {
+    message: 'lockLinked names 1 to 8 link columns',
   });
 export type StateChild = z.infer<typeof stateChildSchema>;
 
@@ -217,8 +236,45 @@ export function statesIssues<C extends ColumnShape>(
       if (found === undefined) out.push({ path: here('clearOnCreate'), message: `"${table}" has no column "${ref}"` });
       else if (found.nullable !== true) out.push({ path: here('clearOnCreate'), message: `"${table}.${ref}" is not nullable, so it cannot be emptied` });
     }
-    if (rule.lock === undefined && rule.parentIn === undefined && rule.clearOnCreate === undefined) {
-      out.push({ path: here(), message: 'a child says lock, parentIn or clearOnCreate' });
+    if (rule.release !== undefined) {
+      rule.release.when.forEach((value, i) => {
+        known(value, here('release', 'when', i));
+        if (states.lock !== undefined && !states.lock.when.includes(value)) {
+          out.push({ path: here('release', 'when', i), message: `"${value}" is not a state the lock holds, so there is nothing to release` });
+        }
+        // A released link stops locking what it points at: a row that could move on from here would come back billing what that row no longer says.
+        if ((states.moves[value] ?? []).length > 0) {
+          out.push({ path: here('release', 'when', i), message: `"${value}" has moves out of it, so a line released there could come back billing a changed row; release only in a final state` });
+        }
+      });
+      for (const ref of rule.release.columns) {
+        const found = index.column(child, ref);
+        if (found === undefined) out.push({ path: here('release', 'columns'), message: `"${child}" has no column "${ref}"` });
+        else if (ref === rule.via) out.push({ path: here('release', 'columns'), message: `"${child}.${ref}" ties the row to this one, and is never released` });
+        else if (found.role === 'pk') out.push({ path: here('release', 'columns'), message: `"${child}.${ref}" is the key, and is never emptied` });
+        else if (found.nullable !== true) out.push({ path: here('release', 'columns'), message: `"${child}.${ref}" is not nullable, so it cannot be emptied` });
+      }
+    }
+    for (const [link, columns] of Object.entries(rule.lockLinked ?? {})) {
+      const found = index.column(child, link);
+      if (found === undefined) {
+        out.push({ path: here('lockLinked', link), message: `"${child}" has no column "${link}"` });
+        continue;
+      }
+      if (found.type !== 'fk' || found.references === undefined || index.table(found.references) === undefined) {
+        out.push({ path: here('lockLinked', link), message: `"${child}.${link}" does not point at a table of this manifest` });
+        continue;
+      }
+      if (link === rule.via) out.push({ path: here('lockLinked', link), message: `"${child}.${link}" points at this row, whose own lock says what stays open` });
+      const target = found.references;
+      for (const ref of columns) {
+        const column = index.column(target, ref);
+        if (column === undefined) out.push({ path: here('lockLinked', link), message: `"${target}" has no column "${ref}"` });
+        else if (column.role === 'pk') out.push({ path: here('lockLinked', link), message: `"${target}.${ref}" is the key, which never changes` });
+      }
+    }
+    if (rule.lock === undefined && rule.parentIn === undefined && rule.clearOnCreate === undefined && rule.lockLinked === undefined) {
+      out.push({ path: here(), message: 'a child says lock, parentIn, clearOnCreate or lockLinked' });
     }
   }
   (states.lockedWhenReferencedBy ?? []).forEach((ref, r) => {

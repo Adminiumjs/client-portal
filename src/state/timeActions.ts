@@ -20,15 +20,17 @@
  *                       (`invoiceDrafts.ts`); the line is the record that the
  *                       hours are invoiced
  *
- * An entry that is on an invoice is not edited here: its hours are what the
- * line says. Take the line off the draft first (it frees the entry), or leave
- * it — a sent invoice's lines are locked.
+ * An entry on an invoice keeps its hours, its day and its project: Adminium
+ * refuses a change to them while a line of an invoice that is not void carries
+ * it, whichever door the change comes through. Take the line off the draft
+ * first (it frees the entry), or leave it — a sent invoice's lines are locked.
+ * Its note and milestone are the studio's own, and still change.
  */
 import { SinkError } from "../data/sink.ts";
 import type { Day, Id, Milestone, TimeEntry } from "../data/types.ts";
 import { today } from "../lib/clock.ts";
 import { deskWrites, drop, ensureRows, loadWhere, refreshRows, rowsOf, upsert, useDesk } from "./desk.ts";
-import { linesCarrying, ontoDrafts, type OntoDrafts } from "./invoiceDrafts.ts";
+import { asInvoiced, linesCarrying, ontoDrafts, type OntoDrafts } from "./invoiceDrafts.ts";
 import { attempt, refusalOf, type Outcome } from "./outcome.ts";
 import { createOne, decimalText, invalid } from "./officeWrites.ts";
 
@@ -149,20 +151,14 @@ export interface TimeChange {
   project_id?: Id;
 }
 
-/** Change an entry. One on an invoice is refused here: its hours are the line's now. */
+/** Change an entry. Hours, a day or a project an invoice bills are refused by Adminium: they are the line's now. */
 export async function editTime(entryId: Id, change: TimeChange): Promise<Outcome<TimeEntry>> {
   if (change.hours !== undefined) {
     const problem = hoursProblem(change.hours);
     if (problem !== null) return invalid(problem, "hours");
   }
   if (change.note !== undefined && change.note.trim() === "") return invalid("NOTE_REQUIRED", "note");
-  try {
-    await loadWhere("invoice_lines", { column: "time_entry_id", op: "eq", value: entryId }, undefined, 1);
-  } catch (error) {
-    return refusalOf(error);
-  }
-  if (linesCarrying("time_entry_id", [entryId]).length > 0) return refusalOf(new SinkError("on an invoice", "refused", 409, "ALREADY_INVOICED", "hours"));
-  return attempt(async () => {
+  const out = await attempt(async () => {
     const patch = {
       // The typed hours: Adminium's `hours` follows them, a stopped clock's too.
       ...(change.hours === undefined ? {} : { logged_hours: decimalText(change.hours) }),
@@ -175,6 +171,7 @@ export async function editTime(entryId: Id, change: TimeChange): Promise<Outcome
     upsert("time_entries", { ...row, id: entryId });
     return useDesk.getState().rows.time_entries[entryId]!;
   });
+  return asInvoiced(out);
 }
 
 /**
@@ -292,7 +289,8 @@ export async function moveTimeOntoInvoice(entryIds: readonly Id[], input: MoveTi
   const rate = decimalText(input.rate);
   if (rate === null || !/^\d+(\.\d{1,4})?$/.test(rate)) return invalid("RATE_NOT_A_NUMBER", "rate");
   try {
-    await ensureRows("time_entries", entryIds);
+    // Read afresh: hours a voided invoice let go of may have changed since this page drew them, and the line bills what is stored.
+    await refreshRows("time_entries", entryIds);
   } catch (error) {
     return refusalOf(error);
   }
