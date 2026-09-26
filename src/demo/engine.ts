@@ -36,7 +36,7 @@
  * DEMO BUILD ONLY — nothing in a real build imports it.
  */
 import { COLUMNS, RULES, currencyScale, workOut, type Formula } from "../data/sampleRows.ts";
-import { TABLE_REFS, type Id, type TableRef } from "../data/types.ts";
+import { COLUMN_KINDS, TABLE_REFS, type Id, type TableRef } from "../data/types.ts";
 import { addDays, venueDay } from "../data/venueTime.ts";
 import { atPlaces, fromUnits, toUnits } from "./decimal.ts";
 import { fingerprint, type HashOf } from "./fingerprint.ts";
@@ -132,6 +132,27 @@ export function spellDecimals(ref: string, row: Record<string, unknown>, currenc
       continue;
     }
     row[column] = atPlaces(value, placesOf(ref, column, row, currency)!) ?? value;
+  }
+}
+
+/** A table's date columns (`YYYY-MM-DD`), by the manifest. */
+const DATE_COLUMNS: Partial<Record<TableRef, string[]>> = Object.fromEntries(
+  Object.entries(COLUMN_KINDS).map(([ref, kinds]) => [ref, Object.entries(kinds as Record<string, string>).filter(([, kind]) => kind === "day").map(([column]) => column)]),
+);
+
+/**
+ * Every date of a row as the day it names, `YYYY-MM-DD`, as Adminium hands a
+ * date column out on every engine: a date keeps no time, so a value written
+ * with one (`2026-08-14T00:00:00.000Z`, a Date) is kept as its day, and read
+ * back as that day by a page in any zone.
+ */
+export function spellDates(ref: string, row: Record<string, unknown>): void {
+  for (const column of DATE_COLUMNS[ref as TableRef] ?? []) {
+    const value = row[column];
+    if (value === null || value === undefined) continue;
+    const text = value instanceof Date ? (Number.isNaN(value.getTime()) ? "" : value.toISOString()) : String(value);
+    const day = /^(\d{4}-\d{2}-\d{2})(?:$|[T ])/.exec(text.trim())?.[1];
+    row[column] = day ?? (text.trim() === "" ? null : value);
   }
 }
 
@@ -662,11 +683,13 @@ export function createEngine(opts: EngineOptions): Engine {
       delete values["id"];
       if (!history) knownColumns(ref, values);
       normalise(ref, values);
+      spellDates(ref, values);
       const rule = STATES[ref];
       if (rule !== undefined && !history && !empty(values[rule.column]) && String(values[rule.column]) !== rule.initial) {
         refuse(409, "STATE_MOVE_REFUSED", `A new ${ref} row starts as ${rule.initial}.`, { column: rule.column, from: null, to: String(values[rule.column]) });
       }
       const row = filled(ref, values, history);
+      spellDates(ref, row);
       const parents = judgeParents(ref, { now: row, was: null }, writer);
       if (!history) {
         // A create's stamps read the row as it is filled: its first state is in it.
@@ -719,6 +742,7 @@ export function createEngine(opts: EngineOptions): Engine {
       if (!history) knownColumns(ref, values);
       if (!history) for (const column of WORKED_OUT[ref] ?? []) delete values[column];
       normalise(ref, values);
+      spellDates(ref, values);
       if (!history) opts.before?.(ref, stored, values, writer);
       const changed = Object.keys(values).filter((column) => !sameValue(values[column], stored[column]));
       if (changed.length === 0) return row;
@@ -795,6 +819,7 @@ export function createEngine(opts: EngineOptions): Engine {
         const row = filled(ref, given, true);
         number(ref, row, true);
         spellDecimals(ref, row, opts.currency);
+        spellDates(ref, row);
         rows[ref].push(row);
       }
     }

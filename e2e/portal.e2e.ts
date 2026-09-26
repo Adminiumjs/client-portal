@@ -34,6 +34,7 @@ import { COPY_DENY_LIST } from "../src/demo/denyList.ts";
 import { DEMO_MESSAGES } from "../src/demo/strings.ts";
 import { DEMO_CURRENCY } from "../src/demo/sample.ts";
 import { DEMO_START, DEMO_ZONE } from "../src/lib/clock.ts";
+import { dayLabel } from "../src/lib/dates.ts";
 import { Caller, ok, solve, until, type Engine } from "../src/contract/harness.ts";
 import { check, newContext, settle, SHOTS, SWEEPS, VARIANTS, type Variant } from "./browser.ts";
 import { Desk, DESK, deskStops, screenOf } from "./desk.ts";
@@ -334,6 +335,39 @@ test("every client page and dead end — light, dark, Arabic, phone — signed i
     await fresh.goto(link);
     await expect(screenOf(fresh, "client-expired")).toBeVisible({ timeout: 30_000 });
   });
+});
+
+test("the day an invoice falls due is the same day on the desk and on a client's page, in a browser east and west of UTC", async ({ browser }, info) => {
+  info.setTimeout(600_000);
+  const invoice = byNumber(await stack.rows("invoices"), "INV-S2039");
+  const due = String(invoice["due_on"]);
+  expect(due).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  const words = dayLabel(due, "en-US", "long");
+  // Fourteen hours ahead of UTC, and eleven behind: a day read through either zone would land on another.
+  for (const zone of ["Pacific/Kiritimati", "Pacific/Pago_Pago"]) {
+    await test.step(zone, async () => {
+      const deskContext = await newContext(browser, stack.server.base, "light", stack.staff.cookies, zone);
+      const deskPage = await deskContext.newPage();
+      await deskPage.goto(DESK);
+      const desk = new Desk(deskPage, "light");
+      await desk.nav("invoices");
+      await desk.row("INV-S2039", "invoice");
+      await expect(deskPage.locator(`main time[datetime="${due}"]`).first()).toHaveText(words);
+      await deskContext.close();
+
+      const context = await newContext(browser, stack.server.base, "light", undefined, zone);
+      const page = await context.newPage();
+      await page.goto(PORTAL);
+      await expect(screenOf(page, "client-find")).toBeVisible();
+      const link = await askForLink(page, AMARA.email);
+      await page.goto(`${link}&to=invoices/${String(invoice.id)}`);
+      await expect(screenOf(page, "client-link")).toBeVisible();
+      await page.locator("[data-screen=client-link] button").first().click();
+      await expect(page.locator("[data-screen=client-invoice][aria-labelledby]")).toBeVisible({ timeout: 30_000 });
+      await expect(page.locator("main")).toContainText(words);
+      await context.close();
+    });
+  }
 });
 
 test("accept and sign stores the name, the email, the terms version and a fingerprint that works out again; an out-of-date proposal can't be accepted", async ({ browser }, info) => {

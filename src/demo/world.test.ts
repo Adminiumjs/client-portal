@@ -294,3 +294,22 @@ describe("the sample in the visitor's language", () => {
     expect(figures(world).outstanding).toEqual({ amount: 6937.5, invoices: 4 });
   });
 });
+
+describe("a date, as Adminium hands one out on every engine", () => {
+  it("keeps the day a write names and hands it back as `YYYY-MM-DD`, whatever time was written with it", async () => {
+    const world = fresh();
+    const draft = world.rows.invoices.find((i) => i["status"] === "draft")!;
+    await world.writes.update("invoices", draft.id, { due_on: "2026-09-14T00:00:00.000Z" });
+    expect(world.rows.invoices.find((i) => i.id === draft.id)!["due_on"]).toBe("2026-09-14");
+    await world.writes.update("invoices", draft.id, { due_on: new Date(Date.UTC(2026, 8, 21)) });
+    expect(world.rows.invoices.find((i) => i.id === draft.id)!["due_on"]).toBe("2026-09-21");
+    // Every date the sample brought in is a day already.
+    for (const ref of ["invoices", "payments", "milestones", "projects", "time_entries", "expenses", "events", "proposals"] as TableRef[]) {
+      for (const row of world.rows[ref]) {
+        for (const [column, value] of Object.entries(row)) {
+          if (/_on$|^date$|^to_date$|_until$/.test(column) && value !== null) expect([ref, column, value]).toEqual([ref, column, expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/)]);
+        }
+      }
+    }
+  });
+});

@@ -90,14 +90,15 @@ export function setServerZone(zone: string | null): void {
 }
 
 /**
- * The calendar day a DATE column's value names. A driver that reads a date
- * as the server's midnight sends that instant (`2026-07-27T22:00:00.000Z` for
- * the 28th in Berlin), so it is read back on the server's calendar.
+ * The calendar day a DATE column's value names: the day it spells. Adminium
+ * hands a date out as `YYYY-MM-DD` on every engine, and a day has no clock, so
+ * it is never read through a zone — the studio's, the server's or this
+ * device's. The desk and a client's page, in any zone, show the same day. A
+ * value that goes on past its day (a time written after it) names the day it
+ * starts with.
  */
 export function dateOf(value: string): string | null {
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
-  const ms = Date.parse(value);
-  return Number.isFinite(ms) ? venueDay(ms, serverZone ?? "UTC") : null;
+  return /^(\d{4}-\d{2}-\d{2})(?:$|[T ])/.exec(value)?.[1] ?? null;
 }
 
 const WALL = /^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})(?::(\d{2})(?:\.(\d{1,3})\d*)?)?$/;

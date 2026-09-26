@@ -4,7 +4,7 @@
  * The three databases answer the same column three ways: a decimal is
  * `"1950.0000"`, `1950` or `"1950.00"`; a yes/no is `true`, `1` or `"t"`; a
  * time is an ISO instant or a bare wall time on the server's clock (SQLite and
- * MySQL keep no zone); a date is `2026-07-28` or the instant of its midnight.
+ * MySQL keep no zone); a date is `2026-07-28`.
  * Every screen assumes one spelling, so every row that arrives — through the
  * studio's session, the clients' key or the demo — goes through `normalise`
  * first:
@@ -14,7 +14,7 @@
  *             a number becomes its plain string). Never parsed to a float
  *             and back: `lib/money.ts` formats it for display, nothing else
  *   bool      true / false
- *   day       "YYYY-MM-DD" on the studio's calendar
+ *   day       "YYYY-MM-DD", the day the server spells, never moved by a zone
  *   instant   an ISO string in UTC
  *
  * The kinds come from the manifest, through the generated `COLUMN_KINDS`.

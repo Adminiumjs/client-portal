@@ -22,14 +22,14 @@ export const SHOTS = process.env["E2E_SHOTS"] ?? join(process.cwd(), "e2e-result
 export const DESKTOP = { width: 1280, height: 900 };
 export const PHONE = { width: 390, height: 844 };
 
-/** How a variant is set on a fresh browser context: its language, its colour scheme, its width. */
-export function contextOptions(variant: Variant) {
+/** How a variant is set on a fresh browser context: its language, its colour scheme, its width, its zone. */
+export function contextOptions(variant: Variant, timezoneId = "America/New_York") {
   return {
     locale: variant === "arabic" ? "ar-EG" : "en-US",
     colorScheme: variant === "dark" ? ("dark" as const) : ("light" as const),
     viewport: variant === "phone" ? PHONE : DESKTOP,
     ...(variant === "phone" ? { isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : {}),
-    timezoneId: "America/New_York",
+    timezoneId,
   };
 }
 
@@ -49,9 +49,9 @@ export const CLOCK_SCRIPT = `(() => {
   globalThis.Date = PinnedDate;
 })();`;
 
-/** A browser context for a variant, its clock pinned, carrying the staff session when given one. */
-export async function newContext(browser: Browser, base: string, variant: Variant, cookies?: string): Promise<BrowserContext> {
-  const context = await browser.newContext({ ...contextOptions(variant), baseURL: base });
+/** A browser context for a variant, its clock pinned, carrying the staff session when given one, in a zone when given one. */
+export async function newContext(browser: Browser, base: string, variant: Variant, cookies?: string, timezoneId?: string): Promise<BrowserContext> {
+  const context = await browser.newContext({ ...contextOptions(variant, timezoneId), baseURL: base });
   await context.addInitScript(CLOCK_SCRIPT);
   if (cookies !== undefined && cookies !== "") {
     await context.addCookies(
