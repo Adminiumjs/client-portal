@@ -83,6 +83,23 @@ describe("every word a person reads is in all eight languages", () => {
       for (const tag of LOCALES) expect(vars(template.locales[tag]), `${template.key} ${tag}`).toEqual(english);
     }
   });
+
+  it("asks of each column only a form Adminium fills for its type", () => {
+    // Adminium's email guide: a time also reads as `.date`, `.time`, `.day_month` and `.relative_day`; a date
+    // (already written as its day) as `.day_month` and `.days_since`. A form nothing fills stops the email at
+    // send — the invoice, its receipt, a reminder — marked failed, and the client is sent nothing.
+    const FORMS: Record<string, string[]> = { timestamptz: ["date", "time", "day_month", "relative_day"], date: ["day_month", "days_since"] };
+    const links = new Map(table("messages").columns.filter((c) => c["type"] === "fk").map((c) => [c.ref.replace(/_id$/, ""), String(c["references"])]));
+    const wrong: string[] = [];
+    for (const template of manifest["emailTemplates"] as { key: string; locales: Record<string, unknown> }[]) {
+      for (const [, link, name, form] of JSON.stringify(template.locales).matchAll(/\{\{([a-z_]+)\.([a-z_]+)\.([a-z_]+)\}\}/g)) {
+        const target = links.get(link!);
+        const type = target === undefined ? undefined : String(column(target, name!)?.["type"]);
+        if (type === undefined || !(FORMS[type] ?? []).includes(form!)) wrong.push(`${template.key}: {{${link!}.${name!}.${form!}}} on a ${type ?? "missing"} column`);
+      }
+    }
+    expect([...new Set(wrong)]).toEqual([]);
+  });
 });
 
 describe("the rules a studio depends on are declared on the tables they guard", () => {

@@ -24,9 +24,9 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
     },
     "proposal-reminder": {
       name: "Erinnerung an ein Angebot",
-      subject: "{{proposal.number}} gilt bis {{proposal.valid_until.date}}",
+      subject: "{{proposal.number}} gilt bis {{proposal.valid_until}}",
       paras: [
-        "Eine kurze Nachricht, falls unser Angebot für {{proposal.title}} untergegangen ist. Es gilt bis {{proposal.valid_until.date}}.",
+        "Eine kurze Nachricht, falls unser Angebot für {{proposal.title}} untergegangen ist. Es gilt bis {{proposal.valid_until}}.",
         "Nehmen Sie es im Portal an und unterschreiben Sie, oder sagen Sie uns, was es für Sie passend machen würde.",
       ],
       button: "{{proposal.number}} lesen",
@@ -65,9 +65,9 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
     "invoice-sent": {
       name: "Rechnung gesendet",
       subject: "{{invoice.number}} von {{practice.name}} — {{invoice.total}}",
-      preheader: "Fällig am {{invoice.due_on.date}} · {{invoice.total}}",
+      preheader: "Fällig am {{invoice.due_on}} · {{invoice.total}}",
       paras: ["Hier ist {{invoice.number}} — {{invoice.title}}."],
-      list: ["{{invoice.number}} · fällig am {{invoice.due_on.date}} · {{invoice.total}}"],
+      list: ["{{invoice.number}} · fällig am {{invoice.due_on}} · {{invoice.total}}"],
       box: { label: "So bezahlen Sie", value: "{{addOn.invoices.payment_instructions}}" },
       reference: "Verwendungszweck: {{invoice.number}}",
       button: "{{invoice.number}} ansehen",
@@ -76,7 +76,7 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
       name: "Erste Erinnerung",
       subject: "{{invoice.number}} — falls es untergegangen ist",
       paras: [
-        "Kein Grund zur Sorge — {{invoice.number}} war am {{invoice.due_on.date}} fällig, und ich glaube, die Zahlung ist noch nicht eingegangen. Wenn sie schon in Ihrem Zahlungslauf ist, ignorieren Sie diese Nachricht einfach.",
+        "Kein Grund zur Sorge — {{invoice.number}} war am {{invoice.due_on}} fällig, und ich glaube, die Zahlung ist noch nicht eingegangen. Wenn sie schon in Ihrem Zahlungslauf ist, ignorieren Sie diese Nachricht einfach.",
         "{{invoice.balance}} für {{invoice.title}}.",
       ],
       button: "{{invoice.number}} ansehen",
@@ -102,8 +102,8 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
     "payment-receipt": {
       name: "Quittung",
       subject: "Vielen Dank — wir haben {{payment.amount}} erhalten",
-      paras: ["Vielen Dank — wir haben am {{payment.paid_on.date}} {{payment.amount}} für {{invoice.number}} erhalten."],
-      list: ["{{payment.number}} · für {{invoice.number}} · {{payment.amount}}", "Restbetrag · fällig am {{invoice.due_on.date}} · {{invoice.balance}}"],
+      paras: ["Vielen Dank — wir haben am {{payment.paid_on}} {{payment.amount}} für {{invoice.number}} erhalten."],
+      list: ["{{payment.number}} · für {{invoice.number}} · {{payment.amount}}", "Restbetrag · fällig am {{invoice.due_on}} · {{invoice.balance}}"],
       button: "Quittung ansehen",
     },
     "accepted-and-signed": {
@@ -124,7 +124,7 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
       name: "Neuer Preis angefragt",
       subject: "{{client.contact_name}} fragt einen neuen Preis für {{proposal.number}} an",
       lead: "{{proposal.number}} — {{proposal.title}}",
-      paras: ["Es galt bis {{proposal.valid_until.date}}. {{client.contact_name}} von {{client.company}} hätte gern einen neuen Preis dafür."],
+      paras: ["Es galt bis {{proposal.valid_until}}. {{client.contact_name}} von {{client.company}} hätte gern einen neuen Preis dafür."],
       button: "{{proposal.number}} öffnen",
     },
     "changes-requested": {
@@ -138,7 +138,7 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
       name: "Freigegeben",
       subject: "{{client.contact_name}} hat {{deliverable.title}} freigegeben",
       lead: "{{project.number}} — {{project.name}}",
-      paras: ["{{client.contact_name}} hat {{deliverable.title}} am {{deliverable.approved_on.date}} im Portal freigegeben."],
+      paras: ["{{client.contact_name}} hat {{deliverable.title}} am {{deliverable.approved_on}} im Portal freigegeben."],
       button: "Projekt öffnen",
     },
     "new-note": {
@@ -153,7 +153,7 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
       subject: "{{client.contact_name}} meldet eine Zahlung für {{invoice.number}}",
       lead: "{{invoice.number}} — {{invoice.title}}",
       paras: [
-        "{{client.contact_name}} hat nach eigener Angabe am {{invoice.client_paid_on.date}} {{invoice.client_paid_amount}} überwiesen. Erfasst wird nichts, bis einer von uns das Konto prüft und die Zahlung einträgt.",
+        "{{client.contact_name}} hat nach eigener Angabe am {{invoice.client_paid_on}} {{invoice.client_paid_amount}} überwiesen. Erfasst wird nichts, bis einer von uns das Konto prüft und die Zahlung einträgt.",
         "{{invoice.client_paid_note}}",
       ],
       button: "Zahlung erfassen",
@@ -189,9 +189,9 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
     },
     "proposal-reminder": {
       name: "Rappel de proposition",
-      subject: "{{proposal.number}} est valable jusqu’au {{proposal.valid_until.date}}",
+      subject: "{{proposal.number}} est valable jusqu’au {{proposal.valid_until}}",
       paras: [
-        "Un petit mot au cas où notre proposition pour {{proposal.title}} serait passée inaperçue. Elle est valable jusqu’au {{proposal.valid_until.date}}.",
+        "Un petit mot au cas où notre proposition pour {{proposal.title}} serait passée inaperçue. Elle est valable jusqu’au {{proposal.valid_until}}.",
         "Acceptez-la et signez-la dans le portail, ou dites-nous ce qui la rendrait possible.",
       ],
       button: "Lire {{proposal.number}}",
@@ -230,9 +230,9 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
     "invoice-sent": {
       name: "Facture envoyée",
       subject: "{{invoice.number}} de {{practice.name}} — {{invoice.total}}",
-      preheader: "Échéance le {{invoice.due_on.date}} · {{invoice.total}}",
+      preheader: "Échéance le {{invoice.due_on}} · {{invoice.total}}",
       paras: ["Voici {{invoice.number}} — {{invoice.title}}."],
-      list: ["{{invoice.number}} · échéance le {{invoice.due_on.date}} · {{invoice.total}}"],
+      list: ["{{invoice.number}} · échéance le {{invoice.due_on}} · {{invoice.total}}"],
       box: { label: "Comment payer", value: "{{addOn.invoices.payment_instructions}}" },
       reference: "Référence : {{invoice.number}}",
       button: "Voir {{invoice.number}}",
@@ -241,7 +241,7 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
       name: "Premier rappel",
       subject: "{{invoice.number}} — au cas où elle vous aurait échappé",
       paras: [
-        "Rien d’alarmant — {{invoice.number}} était due le {{invoice.due_on.date}} et je ne crois pas que le paiement soit arrivé. S’il est déjà dans votre prochain virement, ignorez simplement ce message.",
+        "Rien d’alarmant — {{invoice.number}} était due le {{invoice.due_on}} et je ne crois pas que le paiement soit arrivé. S’il est déjà dans votre prochain virement, ignorez simplement ce message.",
         "{{invoice.balance}} pour {{invoice.title}}.",
       ],
       button: "Voir {{invoice.number}}",
@@ -267,8 +267,8 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
     "payment-receipt": {
       name: "Reçu",
       subject: "Merci — nous avons reçu {{payment.amount}}",
-      paras: ["Merci — nous avons reçu {{payment.amount}} pour {{invoice.number}} le {{payment.paid_on.date}}."],
-      list: ["{{payment.number}} · pour {{invoice.number}} · {{payment.amount}}", "Reste dû · échéance le {{invoice.due_on.date}} · {{invoice.balance}}"],
+      paras: ["Merci — nous avons reçu {{payment.amount}} pour {{invoice.number}} le {{payment.paid_on}}."],
+      list: ["{{payment.number}} · pour {{invoice.number}} · {{payment.amount}}", "Reste dû · échéance le {{invoice.due_on}} · {{invoice.balance}}"],
       button: "Voir le reçu",
     },
     "accepted-and-signed": {
@@ -289,7 +289,7 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
       name: "Nouveau prix demandé",
       subject: "{{client.contact_name}} demande un nouveau prix pour {{proposal.number}}",
       lead: "{{proposal.number}} — {{proposal.title}}",
-      paras: ["Elle était valable jusqu’au {{proposal.valid_until.date}}. {{client.contact_name}} chez {{client.company}} aimerait un nouveau prix."],
+      paras: ["Elle était valable jusqu’au {{proposal.valid_until}}. {{client.contact_name}} chez {{client.company}} aimerait un nouveau prix."],
       button: "Ouvrir {{proposal.number}}",
     },
     "changes-requested": {
@@ -303,7 +303,7 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
       name: "Validé",
       subject: "{{client.contact_name}} a validé {{deliverable.title}}",
       lead: "{{project.number}} — {{project.name}}",
-      paras: ["{{client.contact_name}} a validé {{deliverable.title}} dans le portail le {{deliverable.approved_on.date}}."],
+      paras: ["{{client.contact_name}} a validé {{deliverable.title}} dans le portail le {{deliverable.approved_on}}."],
       button: "Ouvrir le projet",
     },
     "new-note": {
@@ -318,7 +318,7 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
       subject: "{{client.contact_name}} dit avoir payé {{invoice.number}}",
       lead: "{{invoice.number}} — {{invoice.title}}",
       paras: [
-        "{{client.contact_name}} dit avoir envoyé {{invoice.client_paid_amount}} le {{invoice.client_paid_on.date}}. Rien n’est enregistré tant que l’un de nous n’a pas vérifié le compte et saisi le paiement.",
+        "{{client.contact_name}} dit avoir envoyé {{invoice.client_paid_amount}} le {{invoice.client_paid_on}}. Rien n’est enregistré tant que l’un de nous n’a pas vérifié le compte et saisi le paiement.",
         "{{invoice.client_paid_note}}",
       ],
       button: "Enregistrer le paiement",
@@ -354,9 +354,9 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
     },
     "proposal-reminder": {
       name: "Påmindelse om tilbud",
-      subject: "{{proposal.number}} gælder til {{proposal.valid_until.date}}",
+      subject: "{{proposal.number}} gælder til {{proposal.valid_until}}",
       paras: [
-        "En kort besked, hvis vores tilbud på {{proposal.title}} er blevet væk i mængden. Det gælder til {{proposal.valid_until.date}}.",
+        "En kort besked, hvis vores tilbud på {{proposal.title}} er blevet væk i mængden. Det gælder til {{proposal.valid_until}}.",
         "Accepter og underskriv det i portalen, eller fortæl os, hvad der skal til for at det passer.",
       ],
       button: "Læs {{proposal.number}}",
@@ -395,9 +395,9 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
     "invoice-sent": {
       name: "Faktura sendt",
       subject: "{{invoice.number}} fra {{practice.name}} — {{invoice.total}}",
-      preheader: "Forfalder {{invoice.due_on.date}} · {{invoice.total}}",
+      preheader: "Forfalder {{invoice.due_on}} · {{invoice.total}}",
       paras: ["Her er {{invoice.number}} — {{invoice.title}}."],
-      list: ["{{invoice.number}} · forfalder {{invoice.due_on.date}} · {{invoice.total}}"],
+      list: ["{{invoice.number}} · forfalder {{invoice.due_on}} · {{invoice.total}}"],
       box: { label: "Sådan betaler du", value: "{{addOn.invoices.payment_instructions}}" },
       reference: "Reference: {{invoice.number}}",
       button: "Se {{invoice.number}}",
@@ -406,7 +406,7 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
       name: "Første påmindelse",
       subject: "{{invoice.number}} — hvis den er smuttet",
       paras: [
-        "Ingen grund til bekymring — {{invoice.number}} forfaldt {{invoice.due_on.date}}, og jeg tror ikke, betalingen er kommet endnu. Hvis den allerede ligger i jeres betalingskørsel, så se bort fra denne besked.",
+        "Ingen grund til bekymring — {{invoice.number}} forfaldt {{invoice.due_on}}, og jeg tror ikke, betalingen er kommet endnu. Hvis den allerede ligger i jeres betalingskørsel, så se bort fra denne besked.",
         "{{invoice.balance}} for {{invoice.title}}.",
       ],
       button: "Se {{invoice.number}}",
@@ -432,8 +432,8 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
     "payment-receipt": {
       name: "Kvittering",
       subject: "Tak — vi har modtaget {{payment.amount}}",
-      paras: ["Tak — vi modtog {{payment.amount}} for {{invoice.number}} den {{payment.paid_on.date}}."],
-      list: ["{{payment.number}} · for {{invoice.number}} · {{payment.amount}}", "Restbeløb · forfalder {{invoice.due_on.date}} · {{invoice.balance}}"],
+      paras: ["Tak — vi modtog {{payment.amount}} for {{invoice.number}} den {{payment.paid_on}}."],
+      list: ["{{payment.number}} · for {{invoice.number}} · {{payment.amount}}", "Restbeløb · forfalder {{invoice.due_on}} · {{invoice.balance}}"],
       button: "Se kvitteringen",
     },
     "accepted-and-signed": {
@@ -454,7 +454,7 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
       name: "Bedt om en ny pris",
       subject: "{{client.contact_name}} beder om en ny pris på {{proposal.number}}",
       lead: "{{proposal.number}} — {{proposal.title}}",
-      paras: ["Det gjaldt til {{proposal.valid_until.date}}. {{client.contact_name}} hos {{client.company}} vil gerne have en ny pris."],
+      paras: ["Det gjaldt til {{proposal.valid_until}}. {{client.contact_name}} hos {{client.company}} vil gerne have en ny pris."],
       button: "Åbn {{proposal.number}}",
     },
     "changes-requested": {
@@ -468,7 +468,7 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
       name: "Godkendt",
       subject: "{{client.contact_name}} har godkendt {{deliverable.title}}",
       lead: "{{project.number}} — {{project.name}}",
-      paras: ["{{client.contact_name}} godkendte {{deliverable.title}} i portalen den {{deliverable.approved_on.date}}."],
+      paras: ["{{client.contact_name}} godkendte {{deliverable.title}} i portalen den {{deliverable.approved_on}}."],
       button: "Åbn projektet",
     },
     "new-note": {
@@ -483,7 +483,7 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
       subject: "{{client.contact_name}} siger, at {{invoice.number}} er betalt",
       lead: "{{invoice.number}} — {{invoice.title}}",
       paras: [
-        "{{client.contact_name}} siger, at de sendte {{invoice.client_paid_amount}} den {{invoice.client_paid_on.date}}. Intet registreres, før en af os har tjekket banken og registreret betalingen.",
+        "{{client.contact_name}} siger, at de sendte {{invoice.client_paid_amount}} den {{invoice.client_paid_on}}. Intet registreres, før en af os har tjekket banken og registreret betalingen.",
         "{{invoice.client_paid_note}}",
       ],
       button: "Registrer betalingen",
@@ -519,9 +519,9 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
     },
     "proposal-reminder": {
       name: "Připomínka nabídky",
-      subject: "{{proposal.number}} platí do {{proposal.valid_until.date}}",
+      subject: "{{proposal.number}} platí do {{proposal.valid_until}}",
       paras: [
-        "Jen krátce připomínáme, kdyby vám naše nabídka na {{proposal.title}} zapadla. Platí do {{proposal.valid_until.date}}.",
+        "Jen krátce připomínáme, kdyby vám naše nabídka na {{proposal.title}} zapadla. Platí do {{proposal.valid_until}}.",
         "Přijměte ji a podepište v portálu, nebo nám napište, co byste na ní potřebovali změnit.",
       ],
       button: "Přečíst {{proposal.number}}",
@@ -560,9 +560,9 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
     "invoice-sent": {
       name: "Faktura odeslána",
       subject: "{{invoice.number}} od {{practice.name}} — {{invoice.total}}",
-      preheader: "Splatnost {{invoice.due_on.date}} · {{invoice.total}}",
+      preheader: "Splatnost {{invoice.due_on}} · {{invoice.total}}",
       paras: ["Posíláme {{invoice.number}} — {{invoice.title}}."],
-      list: ["{{invoice.number}} · splatná {{invoice.due_on.date}} · {{invoice.total}}"],
+      list: ["{{invoice.number}} · splatná {{invoice.due_on}} · {{invoice.total}}"],
       box: { label: "Jak zaplatit", value: "{{addOn.invoices.payment_instructions}}" },
       reference: "Variabilní symbol: {{invoice.number}}",
       button: "Zobrazit {{invoice.number}}",
@@ -571,7 +571,7 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
       name: "První připomínka",
       subject: "{{invoice.number}} — kdyby vám unikla",
       paras: [
-        "Nic vážného — {{invoice.number}} byla splatná {{invoice.due_on.date}} a myslím, že platba ještě nedorazila. Pokud už je v příštím platebním běhu, tuto zprávu klidně ignorujte.",
+        "Nic vážného — {{invoice.number}} byla splatná {{invoice.due_on}} a myslím, že platba ještě nedorazila. Pokud už je v příštím platebním běhu, tuto zprávu klidně ignorujte.",
         "{{invoice.balance}} za {{invoice.title}}.",
       ],
       button: "Zobrazit {{invoice.number}}",
@@ -597,8 +597,8 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
     "payment-receipt": {
       name: "Potvrzení o platbě",
       subject: "Děkujeme — obdrželi jsme {{payment.amount}}",
-      paras: ["Děkujeme — dne {{payment.paid_on.date}} jsme obdrželi {{payment.amount}} na {{invoice.number}}."],
-      list: ["{{payment.number}} · na {{invoice.number}} · {{payment.amount}}", "Zbývá · splatnost {{invoice.due_on.date}} · {{invoice.balance}}"],
+      paras: ["Děkujeme — dne {{payment.paid_on}} jsme obdrželi {{payment.amount}} na {{invoice.number}}."],
+      list: ["{{payment.number}} · na {{invoice.number}} · {{payment.amount}}", "Zbývá · splatnost {{invoice.due_on}} · {{invoice.balance}}"],
       button: "Zobrazit potvrzení",
     },
     "accepted-and-signed": {
@@ -619,7 +619,7 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
       name: "Žádost o novou cenu",
       subject: "{{client.contact_name}} žádá novou cenu za {{proposal.number}}",
       lead: "{{proposal.number}} — {{proposal.title}}",
-      paras: ["Platila do {{proposal.valid_until.date}}. {{client.contact_name}} z {{client.company}} by rád(a) novou cenu."],
+      paras: ["Platila do {{proposal.valid_until}}. {{client.contact_name}} z {{client.company}} by rád(a) novou cenu."],
       button: "Otevřít {{proposal.number}}",
     },
     "changes-requested": {
@@ -633,7 +633,7 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
       name: "Schváleno",
       subject: "{{client.contact_name}} schválil(a) {{deliverable.title}}",
       lead: "{{project.number}} — {{project.name}}",
-      paras: ["{{client.contact_name}} schválil(a) {{deliverable.title}} v portálu dne {{deliverable.approved_on.date}}."],
+      paras: ["{{client.contact_name}} schválil(a) {{deliverable.title}} v portálu dne {{deliverable.approved_on}}."],
       button: "Otevřít projekt",
     },
     "new-note": {
@@ -648,7 +648,7 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
       subject: "{{client.contact_name}} uvádí, že zaplatil(a) {{invoice.number}}",
       lead: "{{invoice.number}} — {{invoice.title}}",
       paras: [
-        "{{client.contact_name}} uvádí, že dne {{invoice.client_paid_on.date}} odeslal(a) {{invoice.client_paid_amount}}. Nic se nezaznamená, dokud jeden z nás nezkontroluje účet a platbu nezapíše.",
+        "{{client.contact_name}} uvádí, že dne {{invoice.client_paid_on}} odeslal(a) {{invoice.client_paid_amount}}. Nic se nezaznamená, dokud jeden z nás nezkontroluje účet a platbu nezapíše.",
         "{{invoice.client_paid_note}}",
       ],
       button: "Zaznamenat platbu",
@@ -684,9 +684,9 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
     },
     "proposal-reminder": {
       name: "تذكير بالعرض",
-      subject: "{{proposal.number}} صالح حتى {{proposal.valid_until.date}}",
+      subject: "{{proposal.number}} صالح حتى {{proposal.valid_until}}",
       paras: [
-        "رسالة قصيرة في حال ضاع عرضنا لـ {{proposal.title}} بين الرسائل. هو صالح حتى {{proposal.valid_until.date}}.",
+        "رسالة قصيرة في حال ضاع عرضنا لـ {{proposal.title}} بين الرسائل. هو صالح حتى {{proposal.valid_until}}.",
         "اقبله ووقّعه في البوابة، أو أخبرنا بما يجعله مناسبًا لك.",
       ],
       button: "اقرأ {{proposal.number}}",
@@ -720,9 +720,9 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
     "invoice-sent": {
       name: "أُرسلت الفاتورة",
       subject: "{{invoice.number}} من {{practice.name}} — {{invoice.total}}",
-      preheader: "تستحق في {{invoice.due_on.date}} · {{invoice.total}}",
+      preheader: "تستحق في {{invoice.due_on}} · {{invoice.total}}",
       paras: ["إليك {{invoice.number}} — {{invoice.title}}."],
-      list: ["{{invoice.number}} · تستحق في {{invoice.due_on.date}} · {{invoice.total}}"],
+      list: ["{{invoice.number}} · تستحق في {{invoice.due_on}} · {{invoice.total}}"],
       box: { label: "طريقة الدفع", value: "{{addOn.invoices.payment_instructions}}" },
       reference: "المرجع: {{invoice.number}}",
       button: "اعرض {{invoice.number}}",
@@ -731,7 +731,7 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
       name: "التذكير الأول",
       subject: "{{invoice.number}} — تحسّبًا لأنها فاتتك",
       paras: [
-        "لا داعي للقلق — استحقّت {{invoice.number}} في {{invoice.due_on.date}} ولا أظن أن الدفعة وصلت بعد. إن كانت ضمن دفعاتك القادمة فتجاهل هذه الرسالة تمامًا.",
+        "لا داعي للقلق — استحقّت {{invoice.number}} في {{invoice.due_on}} ولا أظن أن الدفعة وصلت بعد. إن كانت ضمن دفعاتك القادمة فتجاهل هذه الرسالة تمامًا.",
         "{{invoice.balance}} عن {{invoice.title}}.",
       ],
       button: "اعرض {{invoice.number}}",
@@ -757,8 +757,8 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
     "payment-receipt": {
       name: "الإيصال",
       subject: "شكرًا — استلمنا {{payment.amount}}",
-      paras: ["شكرًا — استلمنا {{payment.amount}} عن {{invoice.number}} في {{payment.paid_on.date}}."],
-      list: ["{{payment.number}} · عن {{invoice.number}} · {{payment.amount}}", "المتبقي · يستحق في {{invoice.due_on.date}} · {{invoice.balance}}"],
+      paras: ["شكرًا — استلمنا {{payment.amount}} عن {{invoice.number}} في {{payment.paid_on}}."],
+      list: ["{{payment.number}} · عن {{invoice.number}} · {{payment.amount}}", "المتبقي · يستحق في {{invoice.due_on}} · {{invoice.balance}}"],
       button: "اعرض الإيصال",
     },
     "accepted-and-signed": {
@@ -779,7 +779,7 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
       name: "طُلب سعر جديد",
       subject: "{{client.contact_name}} يطلب سعرًا جديدًا لـ {{proposal.number}}",
       lead: "{{proposal.number}} — {{proposal.title}}",
-      paras: ["كان صالحًا حتى {{proposal.valid_until.date}}. يودّ {{client.contact_name}} من {{client.company}} سعرًا جديدًا له."],
+      paras: ["كان صالحًا حتى {{proposal.valid_until}}. يودّ {{client.contact_name}} من {{client.company}} سعرًا جديدًا له."],
       button: "افتح {{proposal.number}}",
     },
     "changes-requested": {
@@ -793,7 +793,7 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
       name: "معتمد",
       subject: "{{client.contact_name}} اعتمد {{deliverable.title}}",
       lead: "{{project.number}} — {{project.name}}",
-      paras: ["اعتمد {{client.contact_name}} {{deliverable.title}} في البوابة في {{deliverable.approved_on.date}}."],
+      paras: ["اعتمد {{client.contact_name}} {{deliverable.title}} في البوابة في {{deliverable.approved_on}}."],
       button: "افتح المشروع",
     },
     "new-note": {
@@ -808,7 +808,7 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
       subject: "{{client.contact_name}} يقول إنه دفع {{invoice.number}}",
       lead: "{{invoice.number}} — {{invoice.title}}",
       paras: [
-        "يقول {{client.contact_name}} إنه أرسل {{invoice.client_paid_amount}} في {{invoice.client_paid_on.date}}. لا يُسجَّل شيء حتى يتحقق أحدنا من الحساب ويسجّل الدفعة.",
+        "يقول {{client.contact_name}} إنه أرسل {{invoice.client_paid_amount}} في {{invoice.client_paid_on}}. لا يُسجَّل شيء حتى يتحقق أحدنا من الحساب ويسجّل الدفعة.",
         "{{invoice.client_paid_note}}",
       ],
       button: "سجّل الدفعة",
@@ -844,8 +844,8 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
     },
     "proposal-reminder": {
       name: "提案提醒",
-      subject: "{{proposal.number}} 有效期至 {{proposal.valid_until.date}}",
-      paras: ["简单提醒一下，以防我们为 {{proposal.title}} 准备的提案被埋没了。它的有效期至 {{proposal.valid_until.date}}。", "请在门户中接受并签署，或告诉我们怎样才合适。"],
+      subject: "{{proposal.number}} 有效期至 {{proposal.valid_until}}",
+      paras: ["简单提醒一下，以防我们为 {{proposal.title}} 准备的提案被埋没了。它的有效期至 {{proposal.valid_until}}。", "请在门户中接受并签署，或告诉我们怎样才合适。"],
       button: "阅读 {{proposal.number}}",
     },
     "new-work": {
@@ -874,9 +874,9 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
     "invoice-sent": {
       name: "发票已发送",
       subject: "来自 {{practice.name}} 的 {{invoice.number}} — {{invoice.total}}",
-      preheader: "{{invoice.due_on.date}} 到期 · {{invoice.total}}",
+      preheader: "{{invoice.due_on}} 到期 · {{invoice.total}}",
       paras: ["这是 {{invoice.number}} — {{invoice.title}}。"],
-      list: ["{{invoice.number}} · {{invoice.due_on.date}} 到期 · {{invoice.total}}"],
+      list: ["{{invoice.number}} · {{invoice.due_on}} 到期 · {{invoice.total}}"],
       box: { label: "付款方式", value: "{{addOn.invoices.payment_instructions}}" },
       reference: "付款备注：{{invoice.number}}",
       button: "查看 {{invoice.number}}",
@@ -884,7 +884,7 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
     "invoice-rung-1": {
       name: "第一次提醒",
       subject: "{{invoice.number}} — 以防您遗漏",
-      paras: ["不必紧张 — {{invoice.number}} 已于 {{invoice.due_on.date}} 到期，我想款项还没有到账。如果已经在您的付款计划中，请忽略这封邮件。", "{{invoice.title}} 尚欠 {{invoice.balance}}。"],
+      paras: ["不必紧张 — {{invoice.number}} 已于 {{invoice.due_on}} 到期，我想款项还没有到账。如果已经在您的付款计划中，请忽略这封邮件。", "{{invoice.title}} 尚欠 {{invoice.balance}}。"],
       button: "查看 {{invoice.number}}",
     },
     "invoice-rung-2": {
@@ -905,8 +905,8 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
     "payment-receipt": {
       name: "收据",
       subject: "谢谢 — 我们已收到 {{payment.amount}}",
-      paras: ["谢谢 — 我们已于 {{payment.paid_on.date}} 收到 {{invoice.number}} 的 {{payment.amount}}。"],
-      list: ["{{payment.number}} · 用于 {{invoice.number}} · {{payment.amount}}", "剩余金额 · {{invoice.due_on.date}} 到期 · {{invoice.balance}}"],
+      paras: ["谢谢 — 我们已于 {{payment.paid_on}} 收到 {{invoice.number}} 的 {{payment.amount}}。"],
+      list: ["{{payment.number}} · 用于 {{invoice.number}} · {{payment.amount}}", "剩余金额 · {{invoice.due_on}} 到期 · {{invoice.balance}}"],
       button: "查看收据",
     },
     "accepted-and-signed": {
@@ -927,7 +927,7 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
       name: "已请求新报价",
       subject: "{{client.contact_name}} 请求为 {{proposal.number}} 重新报价",
       lead: "{{proposal.number}} — {{proposal.title}}",
-      paras: ["它的有效期至 {{proposal.valid_until.date}}。{{client.company}} 的 {{client.contact_name}} 希望得到新的报价。"],
+      paras: ["它的有效期至 {{proposal.valid_until}}。{{client.company}} 的 {{client.contact_name}} 希望得到新的报价。"],
       button: "打开 {{proposal.number}}",
     },
     "changes-requested": {
@@ -941,7 +941,7 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
       name: "已批准",
       subject: "{{client.contact_name}} 批准了 {{deliverable.title}}",
       lead: "{{project.number}} — {{project.name}}",
-      paras: ["{{client.contact_name}} 于 {{deliverable.approved_on.date}} 在门户中批准了 {{deliverable.title}}。"],
+      paras: ["{{client.contact_name}} 于 {{deliverable.approved_on}} 在门户中批准了 {{deliverable.title}}。"],
       button: "打开项目",
     },
     "new-note": {
@@ -955,7 +955,7 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
       name: "客户称已付款",
       subject: "{{client.contact_name}} 称已支付 {{invoice.number}}",
       lead: "{{invoice.number}} — {{invoice.title}}",
-      paras: ["{{client.contact_name}} 称已于 {{invoice.client_paid_on.date}} 汇出 {{invoice.client_paid_amount}}。在我们有人核对银行并记录之前，不会记录任何付款。", "{{invoice.client_paid_note}}"],
+      paras: ["{{client.contact_name}} 称已于 {{invoice.client_paid_on}} 汇出 {{invoice.client_paid_amount}}。在我们有人核对银行并记录之前，不会记录任何付款。", "{{invoice.client_paid_note}}"],
       button: "记录付款",
     },
     "brief-sent": {
@@ -989,8 +989,8 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
     },
     "proposal-reminder": {
       name: "提案提醒",
-      subject: "{{proposal.number}} 有效期至 {{proposal.valid_until.date}}",
-      paras: ["簡單提醒一下，以免我們為 {{proposal.title}} 準備的提案被淹沒了。它的有效期至 {{proposal.valid_until.date}}。", "請在入口網站接受並簽署，或告訴我們怎樣才合適。"],
+      subject: "{{proposal.number}} 有效期至 {{proposal.valid_until}}",
+      paras: ["簡單提醒一下，以免我們為 {{proposal.title}} 準備的提案被淹沒了。它的有效期至 {{proposal.valid_until}}。", "請在入口網站接受並簽署，或告訴我們怎樣才合適。"],
       button: "閱讀 {{proposal.number}}",
     },
     "new-work": {
@@ -1019,9 +1019,9 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
     "invoice-sent": {
       name: "發票已送出",
       subject: "來自 {{practice.name}} 的 {{invoice.number}} — {{invoice.total}}",
-      preheader: "{{invoice.due_on.date}} 到期 · {{invoice.total}}",
+      preheader: "{{invoice.due_on}} 到期 · {{invoice.total}}",
       paras: ["這是 {{invoice.number}} — {{invoice.title}}。"],
-      list: ["{{invoice.number}} · {{invoice.due_on.date}} 到期 · {{invoice.total}}"],
+      list: ["{{invoice.number}} · {{invoice.due_on}} 到期 · {{invoice.total}}"],
       box: { label: "付款方式", value: "{{addOn.invoices.payment_instructions}}" },
       reference: "付款備註：{{invoice.number}}",
       button: "查看 {{invoice.number}}",
@@ -1029,7 +1029,7 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
     "invoice-rung-1": {
       name: "第一次提醒",
       subject: "{{invoice.number}} — 以免您遺漏",
-      paras: ["不必緊張 — {{invoice.number}} 已於 {{invoice.due_on.date}} 到期，我想款項還沒有入帳。如果已經在您的付款排程中，請忽略這封郵件。", "{{invoice.title}} 尚欠 {{invoice.balance}}。"],
+      paras: ["不必緊張 — {{invoice.number}} 已於 {{invoice.due_on}} 到期，我想款項還沒有入帳。如果已經在您的付款排程中，請忽略這封郵件。", "{{invoice.title}} 尚欠 {{invoice.balance}}。"],
       button: "查看 {{invoice.number}}",
     },
     "invoice-rung-2": {
@@ -1050,8 +1050,8 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
     "payment-receipt": {
       name: "收據",
       subject: "謝謝 — 我們已收到 {{payment.amount}}",
-      paras: ["謝謝 — 我們已於 {{payment.paid_on.date}} 收到 {{invoice.number}} 的 {{payment.amount}}。"],
-      list: ["{{payment.number}} · 用於 {{invoice.number}} · {{payment.amount}}", "剩餘金額 · {{invoice.due_on.date}} 到期 · {{invoice.balance}}"],
+      paras: ["謝謝 — 我們已於 {{payment.paid_on}} 收到 {{invoice.number}} 的 {{payment.amount}}。"],
+      list: ["{{payment.number}} · 用於 {{invoice.number}} · {{payment.amount}}", "剩餘金額 · {{invoice.due_on}} 到期 · {{invoice.balance}}"],
       button: "查看收據",
     },
     "accepted-and-signed": {
@@ -1072,7 +1072,7 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
       name: "已請求新報價",
       subject: "{{client.contact_name}} 請求為 {{proposal.number}} 重新報價",
       lead: "{{proposal.number}} — {{proposal.title}}",
-      paras: ["它的有效期至 {{proposal.valid_until.date}}。{{client.company}} 的 {{client.contact_name}} 希望得到新的報價。"],
+      paras: ["它的有效期至 {{proposal.valid_until}}。{{client.company}} 的 {{client.contact_name}} 希望得到新的報價。"],
       button: "開啟 {{proposal.number}}",
     },
     "changes-requested": {
@@ -1086,7 +1086,7 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
       name: "已核准",
       subject: "{{client.contact_name}} 核准了 {{deliverable.title}}",
       lead: "{{project.number}} — {{project.name}}",
-      paras: ["{{client.contact_name}} 於 {{deliverable.approved_on.date}} 在入口網站核准了 {{deliverable.title}}。"],
+      paras: ["{{client.contact_name}} 於 {{deliverable.approved_on}} 在入口網站核准了 {{deliverable.title}}。"],
       button: "開啟專案",
     },
     "new-note": {
@@ -1100,7 +1100,7 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
       name: "客戶稱已付款",
       subject: "{{client.contact_name}} 稱已支付 {{invoice.number}}",
       lead: "{{invoice.number}} — {{invoice.title}}",
-      paras: ["{{client.contact_name}} 稱已於 {{invoice.client_paid_on.date}} 匯出 {{invoice.client_paid_amount}}。在我們有人核對銀行並記錄之前，不會記錄任何付款。", "{{invoice.client_paid_note}}"],
+      paras: ["{{client.contact_name}} 稱已於 {{invoice.client_paid_on}} 匯出 {{invoice.client_paid_amount}}。在我們有人核對銀行並記錄之前，不會記錄任何付款。", "{{invoice.client_paid_note}}"],
       button: "記錄付款",
     },
     "brief-sent": {

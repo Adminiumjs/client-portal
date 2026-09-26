@@ -184,7 +184,7 @@ export function valuesFor(picked: Picked, ctx: SampleContext): Record<string, st
     v["proposal.number"] = proposal.number ?? "";
     v["proposal.title"] = proposal.title;
     v["proposal.total"] = money(proposal.total, proposal.currency);
-    v["proposal.valid_until.date"] = day(proposal.valid_until);
+    v["proposal.valid_until"] = day(proposal.valid_until);
     v["proposal.decline_note"] = proposal.decline_note ?? "";
   }
   if (invoice !== undefined) {
@@ -193,16 +193,16 @@ export function valuesFor(picked: Picked, ctx: SampleContext): Record<string, st
     v["invoice.title"] = invoice.title ?? "";
     v["invoice.total"] = money(invoice.total, invoice.currency);
     v["invoice.balance"] = money(invoice.balance, invoice.currency);
-    v["invoice.due_on.date"] = day(invoice.due_on);
+    v["invoice.due_on"] = day(invoice.due_on);
     v["invoice.due_on.days_since"] = said(Math.max(0, invoice.due_on === null ? 0 : daysLate(invoice.due_on, ctx.today)));
     v["invoice.client_paid_amount"] = money(invoice.client_paid_amount ?? invoice.balance, invoice.currency);
-    v["invoice.client_paid_on.date"] = day(invoice.client_paid_on ?? ctx.today);
+    v["invoice.client_paid_on"] = day(invoice.client_paid_on ?? ctx.today);
     v["invoice.client_paid_note"] = invoice.client_paid_note ?? "";
   }
   if (payment !== undefined) {
     v["payment.number"] = payment.number ?? "";
     v["payment.amount"] = money(payment.amount, payment.currency ?? invoice?.currency);
-    v["payment.paid_on.date"] = day(payment.paid_on);
+    v["payment.paid_on"] = day(payment.paid_on);
   }
   if (project !== undefined) {
     v["project.id"] = String(project.id);
@@ -214,7 +214,7 @@ export function valuesFor(picked: Picked, ctx: SampleContext): Record<string, st
   if (deliverable !== undefined) {
     v["deliverable.title"] = deliverable.title;
     v["deliverable.review_note"] = deliverable.review_note ?? "";
-    v["deliverable.approved_on.date"] = day(deliverable.approved_on ?? ctx.today);
+    v["deliverable.approved_on"] = day(deliverable.approved_on ?? ctx.today);
   }
   if (enquiry !== undefined) {
     v["enquiry.name"] = enquiry.name;
