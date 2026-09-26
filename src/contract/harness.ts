@@ -593,3 +593,72 @@ export async function rawTables(engine: Engine, port: number, database: string, 
   }
   return out;
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+// ADDED FOR THE ACCEPTANCE CONTRACT (`acceptance.test.ts`) — additive only:
+// nothing above this line reads anything below it.
+// ════════════════════════════════════════════════════════════════════════════
+
+/**
+ * A second database beside the studio's, made fresh on the same engine and
+ * filled by `statements` (the engine's own SQL), for a second connection to
+ * point at. Answers the DSN a connection is made with.
+ */
+export async function otherDatabase(engine: Engine, port: number, name: string, statements: string[]): Promise<string> {
+  if (!/^[A-Za-z0-9_]+$/.test(name)) throw new Error(`not a plain name: ${name}`);
+  if (engine === "sqlite") {
+    type Db = { exec(sql: string): void; close(): void };
+    const Database = driver("better-sqlite3") as new (file: string) => Db;
+    const file = join(tmpdir(), `${name}-${String(port)}.db`);
+    writeFileSync(file, "");
+    const db = new Database(file);
+    try {
+      for (const statement of statements) db.exec(statement);
+    } finally {
+      db.close();
+    }
+    return `sqlite:${file}`;
+  }
+  if (engine === "postgres") {
+    type Client = { connect(): Promise<void>; query(sql: string): Promise<unknown>; end(): Promise<void> };
+    const pg = driver("pg") as { Client: new (options: { connectionString: string }) => Client };
+    const base = process.env["TEST_POSTGRES_URL"] ?? "";
+    const admin = new pg.Client({ connectionString: base });
+    await admin.connect();
+    try {
+      await admin.query(`DROP DATABASE IF EXISTS ${name} WITH (FORCE)`);
+      await admin.query(`CREATE DATABASE ${name}`);
+    } finally {
+      await admin.end();
+    }
+    const url = new URL(base);
+    url.pathname = `/${name}`;
+    const client = new pg.Client({ connectionString: url.toString() });
+    await client.connect();
+    try {
+      for (const statement of statements) await client.query(statement);
+    } finally {
+      await client.end();
+    }
+    return url.toString();
+  }
+  type Connection = { query(sql: string): Promise<unknown>; end(): Promise<void> };
+  const mysql = driver("mysql2/promise") as { createConnection(uri: string): Promise<Connection> };
+  const base = process.env["TEST_MYSQL_URL"] ?? "";
+  const admin = await mysql.createConnection(base);
+  try {
+    await admin.query(`DROP DATABASE IF EXISTS \`${name}\``);
+    await admin.query(`CREATE DATABASE \`${name}\``);
+  } finally {
+    await admin.end();
+  }
+  const url = new URL(base);
+  url.pathname = `/${name}`;
+  const connection = await mysql.createConnection(url.toString());
+  try {
+    for (const statement of statements) await connection.query(statement);
+  } finally {
+    await connection.end();
+  }
+  return url.toString();
+}
