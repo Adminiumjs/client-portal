@@ -106,6 +106,10 @@ function build(outDir: string, env: Record<string, string>, extra: string[] = []
       // measure their machine instead of the code.
       env: {
         ...process.env,
+        // vitest runs with NODE_ENV=test, and Vite keeps a NODE_ENV it inherits:
+        // the build then bundles React's DEVELOPMENT build (absolute /Users/…
+        // paths and all) and this gate measures bytes that never ship.
+        NODE_ENV: "production",
         VITE_ADMINIUM_SURFACE_SIDE: "",
         VITE_ADMINIUM_API_BASE_URL: "",
         VITE_ADMINIUM_PUBLISHABLE_KEY: "",
