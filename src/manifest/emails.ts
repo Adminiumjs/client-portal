@@ -60,9 +60,9 @@ export const EMAIL_EN: EmailWords = {
   },
   "proposal-reminder": {
     name: "Proposal reminder",
-    subject: "{{proposal.number}} holds until {{proposal.valid_until.date}}",
+    subject: "{{proposal.number}} holds until {{proposal.valid_until}}",
     paras: [
-      "A short note in case our proposal for {{proposal.title}} got buried. It holds until {{proposal.valid_until.date}}.",
+      "A short note in case our proposal for {{proposal.title}} got buried. It holds until {{proposal.valid_until}}.",
       "Accept and sign it in the portal, or tell us what would make it work.",
     ],
     button: "Read {{proposal.number}}",
@@ -101,9 +101,9 @@ export const EMAIL_EN: EmailWords = {
   "invoice-sent": {
     name: "Invoice sent",
     subject: "{{invoice.number}} from {{practice.name}} — {{invoice.total}}",
-    preheader: "Due {{invoice.due_on.date}} · {{invoice.total}}",
+    preheader: "Due {{invoice.due_on}} · {{invoice.total}}",
     paras: ["Here is {{invoice.number}} — {{invoice.title}}."],
-    list: ["{{invoice.number}} · due {{invoice.due_on.date}} · {{invoice.total}}"],
+    list: ["{{invoice.number}} · due {{invoice.due_on}} · {{invoice.total}}"],
     box: { label: "How to pay", value: "{{addOn.invoices.payment_instructions}}" },
     reference: "Reference: {{invoice.number}}",
     button: "View {{invoice.number}}",
@@ -112,7 +112,7 @@ export const EMAIL_EN: EmailWords = {
     name: "First reminder",
     subject: "{{invoice.number}} — in case it slipped",
     paras: [
-      "No alarm at all — {{invoice.number}} came due on {{invoice.due_on.date}} and I do not think it has landed yet. If it is already in your payment run, ignore me entirely.",
+      "No alarm at all — {{invoice.number}} came due on {{invoice.due_on}} and I do not think it has landed yet. If it is already in your payment run, ignore me entirely.",
       "{{invoice.balance}} on {{invoice.title}}.",
     ],
     button: "View {{invoice.number}}",
@@ -138,8 +138,8 @@ export const EMAIL_EN: EmailWords = {
   "payment-receipt": {
     name: "Receipt",
     subject: "Thank you — we received {{payment.amount}}",
-    paras: ["Thank you — we received {{payment.amount}} against {{invoice.number}} on {{payment.paid_on.date}}."],
-    list: ["{{payment.number}} · for {{invoice.number}} · {{payment.amount}}", "Balance left · due {{invoice.due_on.date}} · {{invoice.balance}}"],
+    paras: ["Thank you — we received {{payment.amount}} against {{invoice.number}} on {{payment.paid_on}}."],
+    list: ["{{payment.number}} · for {{invoice.number}} · {{payment.amount}}", "Balance left · due {{invoice.due_on}} · {{invoice.balance}}"],
     button: "View the receipt",
   },
   "accepted-and-signed": {
@@ -160,7 +160,7 @@ export const EMAIL_EN: EmailWords = {
     name: "Asked for a new price",
     subject: "{{client.contact_name}} asked for a new price on {{proposal.number}}",
     lead: "{{proposal.number}} — {{proposal.title}}",
-    paras: ["It held until {{proposal.valid_until.date}}. {{client.contact_name}} at {{client.company}} would like a new price for it."],
+    paras: ["It held until {{proposal.valid_until}}. {{client.contact_name}} at {{client.company}} would like a new price for it."],
     button: "Open {{proposal.number}}",
   },
   "changes-requested": {
@@ -174,7 +174,7 @@ export const EMAIL_EN: EmailWords = {
     name: "Approved",
     subject: "{{client.contact_name}} approved {{deliverable.title}}",
     lead: "{{project.number}} — {{project.name}}",
-    paras: ["{{client.contact_name}} approved {{deliverable.title}} in the portal on {{deliverable.approved_on.date}}."],
+    paras: ["{{client.contact_name}} approved {{deliverable.title}} in the portal on {{deliverable.approved_on}}."],
     button: "Open the project",
   },
   "new-note": {
@@ -189,7 +189,7 @@ export const EMAIL_EN: EmailWords = {
     subject: "{{client.contact_name}} says they paid {{invoice.number}}",
     lead: "{{invoice.number}} — {{invoice.title}}",
     paras: [
-      "{{client.contact_name}} says they sent {{invoice.client_paid_amount}} on {{invoice.client_paid_on.date}}. Nothing is recorded until one of us checks the bank and records it.",
+      "{{client.contact_name}} says they sent {{invoice.client_paid_amount}} on {{invoice.client_paid_on}}. Nothing is recorded until one of us checks the bank and records it.",
       "{{invoice.client_paid_note}}",
     ],
     button: "Record the payment",

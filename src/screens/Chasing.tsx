@@ -262,7 +262,7 @@ function InvoiceLadderPanel({ inv, manager, messages, at, zone, day, clients, pr
     "invoice.title": inv.title ?? "",
     "invoice.balance": money(inv.balance, inv.currency),
     "invoice.total": money(inv.total, inv.currency),
-    "invoice.due_on.date": dayLabel(inv.due_on, tag, "long"),
+    "invoice.due_on": dayLabel(inv.due_on, tag, "long"),
     "invoice.due_on.days_since": paramFormatter(tag)(Math.max(0, late)),
     "project.name": project?.name ?? t("chasing.theWork"),
     "project.number": project?.number ?? "",
