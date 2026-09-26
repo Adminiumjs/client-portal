@@ -165,7 +165,7 @@ describe.skipIf(why !== null)(`the contract with a built Adminium${why === null 
         ok(await staff.patch(`/api/v1/connections/${connectionId}`, { timezone: DEMO_ZONE, currency: DEMO_CURRENCY }));
         const values = Object.fromEntries(Object.entries(DEMO_SETTINGS).map(([name, value]) => [name.slice("invoices.".length), value]));
         ok(await staff.put("/api/v1/add-ons/invoices/settings", { values }));
-        // The server's own clock, which a driver reads a date at (as the staff side learns it).
+        // The server's own clock, which a time kept with no zone is read on (as the staff side learns it).
         const surface = ok(await staff.get<{ serverTimezone: string | null }>("/apps/clients/staff/surface-config.json"));
         setServerZone(surface.serverTimezone);
         // Every rule the manifest asks for is kept, both browser keys are made, and the outbox is on.
@@ -392,7 +392,8 @@ describe.skipIf(why !== null)(`the contract with a built Adminium${why === null 
 
       it("keeps billed hours and costs as billed, and bills what a voided invoice let go of again, through the desk's own code", async () => {
         // The refusal names the lines' table as Adminium's schema knows it (`<schema>.<table>`).
-        const byLines = (from: unknown) => String(from).endsWith(`.${real["invoice_lines"]!}`);
+        // A refusal names the lines' table by its own name, never with a schema in front.
+        const byLines = (from: unknown) => from === real["invoice_lines"];
         const entries = (await rows("time_entries")).filter((e) => String(e["note"]).endsWith(", contract run"));
         const ids = entries.map((e) => e.id).sort((a, b) => a - b);
         expect(ids).toHaveLength(2);

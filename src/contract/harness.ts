@@ -178,6 +178,8 @@ export function appBundle(options: { built?: boolean } = {}): Bundle & { key: st
 export interface Server {
   base: string;
   sink: string;
+  /** The server's clock now (epoch ms): where a server started again on the same data picks it up. */
+  now(): number;
   /** What the server has said so far (its log), for a failure to show. */
   log(): string;
   /** Move the server's clock on by `ms` at once (a night passing over a running clock); resolves once it has moved. */
@@ -192,15 +194,32 @@ export interface Server {
  */
 export const PORTS_PER_ENGINE = 3;
 
+export interface BootOptions {
+  /** The Postgres/MySQL database the run owns (dropped and made again at boot, but by a kept studio's first boot only). */
+  database?: string;
+  /** The built Adminium checkout to run (default `ADMINIUM_REPO`). */
+  adminium?: string;
+  /**
+   * A studio kept between boots (`studio-server.mjs`): its data directory,
+   * secret and source database, made on the first boot in this directory and
+   * served again by every later one — of this checkout or another.
+   */
+  keep?: string;
+  /** The server's NODE_OPTIONS in place of this process's own (the clock's preload is always added). */
+  nodeOptions?: string;
+}
+
 /**
  * Boot the built Adminium on one engine, its clock starting at `now`; resolves once it serves.
- * `database` names the Postgres/MySQL database the run owns (dropped and made again at boot).
  */
-export async function boot(engine: Engine, port: number, now: number, options: { database?: string } = {}): Promise<Server> {
+export async function boot(engine: Engine, port: number, now: number, options: BootOptions = {}): Promise<Server> {
   const clockFile = join(tmpdir(), `cp-contract-clock-${String(port)}`);
   writeFileSync(clockFile, "");
+  const checkout = options.adminium ?? ADMINIUM_REPO;
+  const inherited = options.nodeOptions ?? process.env["NODE_OPTIONS"] ?? "";
   const env: NodeJS.ProcessEnv = {
     ...process.env,
+    ...(options.keep === undefined ? {} : { STUDIO_ADMINIUM: checkout, STUDIO_DIR: options.keep }),
     E2E_ENGINE: engine,
     E2E_PORT: String(port),
     E2E_SMTP_PORT: String(port + 1),
@@ -210,9 +229,12 @@ export async function boot(engine: Engine, port: number, now: number, options: {
     E2E_DATABASE: options.database ?? `cp_contract_${engine}${process.env["CONTRACT_DB_SUFFIX"] ?? ""}`,
     CONTRACT_NOW: String(now),
     CONTRACT_CLOCK_FILE: clockFile,
-    NODE_OPTIONS: `${process.env["NODE_OPTIONS"] ?? ""} --import=${pathToFileURL(fileURLToPath(new URL("./clock.mjs", import.meta.url))).href}`.trim(),
+    NODE_OPTIONS: `${inherited} --import=${pathToFileURL(fileURLToPath(new URL("./clock.mjs", import.meta.url))).href}`.trim(),
   };
-  const child: ChildProcess = spawn(process.execPath, [E2E_SERVER], { cwd: join(ADMINIUM_REPO, "apps", "e2e"), env, stdio: ["ignore", "pipe", "pipe"] });
+  const script = options.keep === undefined ? join(checkout, "apps", "e2e", "scripts", "e2e-server.mjs") : fileURLToPath(new URL("./studio-server.mjs", import.meta.url));
+  const started = Date.now();
+  let passed = 0;
+  const child: ChildProcess = spawn(process.execPath, [script], { cwd: join(checkout, "apps", "e2e"), env, stdio: ["ignore", "pipe", "pipe"] });
   let log = "";
   child.stdout?.on("data", (chunk: Buffer) => (log += chunk.toString()));
   child.stderr?.on("data", (chunk: Buffer) => (log += chunk.toString()));
@@ -235,8 +257,10 @@ export async function boot(engine: Engine, port: number, now: number, options: {
   return {
     base,
     sink: `http://127.0.0.1:${String(port + 2)}`,
+    now: () => now + (Date.now() - started) + passed,
     log: () => log,
     async pass(ms: number) {
+      passed += ms;
       writeFileSync(clockFile, String(ms));
       child.kill("SIGUSR2");
       const by = Date.now() + 10_000;
@@ -415,10 +439,26 @@ export function untar(buffer: Buffer): Record<string, Buffer> {
  */
 export const FROM_TARBALL = process.env["CONTRACT_FROM_TARBALL"] ?? "";
 
-/** Why the released tarball cannot be used here, or null when it can. */
+/**
+ * THE ADMINIUM THE RELEASE WAS INSTALLED UNDER: a built checkout of the
+ * Adminium a studio ran the released app on (`CONTRACT_FROM_ADMINIUM`, for
+ * 0.2.0 Adminium 0.3.3). A newer Adminium may refuse the released version
+ * outright (0.3.4 refuses 0.2.0's email words), so the update is proved on
+ * the path a studio takes: installed there, that Adminium upgraded in place
+ * to `ADMINIUM_REPO` on the same data, and only then the app updated. Its
+ * server is started with `CONTRACT_FROM_NODE_OPTIONS`, never this process's
+ * own NODE_OPTIONS, which are the new Adminium's.
+ */
+export const FROM_ADMINIUM = process.env["CONTRACT_FROM_ADMINIUM"] ?? "";
+export const FROM_NODE_OPTIONS = process.env["CONTRACT_FROM_NODE_OPTIONS"] ?? "";
+
+/** Why the released tarball, or the Adminium it was installed under, cannot be used here, or null when they can. */
 export function releasedMissing(): string | null {
   if (FROM_TARBALL === "") return "CONTRACT_FROM_TARBALL is not set (the published tarball of the release this one updates)";
   if (!existsSync(FROM_TARBALL)) return `no tarball at ${FROM_TARBALL}`;
+  if (FROM_ADMINIUM === "") return "CONTRACT_FROM_ADMINIUM is not set (a built checkout of the Adminium the released version was installed under)";
+  if (!existsSync(join(FROM_ADMINIUM, "apps", "server", "dist", "app.js"))) return `no built server in ${FROM_ADMINIUM}`;
+  if (!existsSync(join(FROM_ADMINIUM, "apps", "dashboard", "dist", "index.html"))) return `no built dashboard in ${FROM_ADMINIUM}`;
   return null;
 }
 

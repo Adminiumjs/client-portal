@@ -1,18 +1,25 @@
 /**
  * THE CLIENT PORTAL'S UPDATE CONTRACT: THE RELEASED 0.2.0, UPDATED IN PLACE.
  *
- * On a BUILT Adminium with Invoices & Receipts, on SQLite, Postgres and MySQL:
+ * On a BUILT Adminium with Invoices & Receipts, on SQLite, Postgres and MySQL,
+ * along the path a studio takes:
  *
  *   1. install the RELEASED 0.2.0 — the published tarball's own bytes
  *      (`CONTRACT_FROM_TARBALL`), refused unless they hash to what
- *      RELEASES.json recorded — as an operator's Adminium was handed it;
+ *      RELEASES.json recorded — on the Adminium it was released for
+ *      (`CONTRACT_FROM_ADMINIUM`, 0.3.3), as an operator's Adminium was
+ *      handed it;
  *   2. its own sample, added at 10:00 on Tuesday 28 July 2026 at the studio;
  *   3. a studio and its clients at work in 0.2.0, through 0.2.0's own doors:
  *      a payment and a void on sample invoices; a new client with a proposal
  *      sent and an invoice sent and part-paid; one client signing in by an
  *      emailed link to accept the proposal still out, another to leave a note
  *      on her work — and the outbox's messages about all of it, settled;
- *   4. every table of the app read straight from the database (each value as
+ *      an invoice emailed to a client, in 0.2.0's own words;
+ *   4. ADMINIUM UPGRADED IN PLACE: that Adminium stopped, and the one this
+ *      build needs (`ADMINIUM_REPO`) started on the same data directory,
+ *      secret and database, as a studio upgrades it — the app still 0.2.0;
+ *      every table of the app read straight from the database (each value as
  *      the engine spells it, each column as the engine declares it) and over
  *      HTTP: the snapshot;
  *   5. THIS build (0.2.1) uploaded; the update's plan is new tables and new
@@ -32,6 +39,10 @@
  *      it afterwards keeps every row the studio and its clients made; and
  *      the new release's sample, added after that, never writes a row twice.
  *
+ * The emails 0.2.0 could not write (its words asked a date column for a
+ * time's form, which nothing fills): marked failed at send, they stay failed
+ * through the update, and go in 0.2.1's words once someone queues them again.
+ *
  * And what an update must keep of the promises a fresh install makes: the
  * guest key reaches the new public enquiry door; the handover link's own key
  * still opens the links already sent; a link column the update adds keeps its
@@ -40,9 +51,14 @@
  * row the update only widened is not counted as the studio's change.
  *
  * It runs where the plain contract runs (`contract.test.ts`), with the
- * published tarball of the release it updates; `ADMINIUM_REQUIRE_CONTRACT`
- * (`1` or `true`) makes a missing one a failure.
+ * published tarball of the release it updates and a built checkout of the
+ * Adminium it was released for; `ADMINIUM_REQUIRE_CONTRACT` (`1` or `true`)
+ * makes a missing one a failure.
  */
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { DEMO_START, DEMO_ZONE } from "../lib/clock.ts";
@@ -57,6 +73,8 @@ import {
   boot,
   Caller,
   ENGINES,
+  FROM_ADMINIUM,
+  FROM_NODE_OPTIONS,
   missing,
   ok,
   PORTS_PER_ENGINE,
@@ -88,6 +106,8 @@ const database = (engine: Engine) => `cp_update_${engine}${process.env["CONTRACT
 const ADMIN = { email: process.env["E2E_ADMIN_EMAIL"] ?? "e2e@adminium.local", password: process.env["E2E_ADMIN_PASSWORD"] ?? "adminium-e2e-password" };
 const CLEO = { email: "cleo@marigoldlane.example", name: "Cleo Nkemdi" };
 const AMARA = { email: "amara@hearthandloaf.example" };
+/** A client on an address the outbox writes to (it skips the sample's reserved `.example` before it reads a template). */
+const FERN = { email: "fern@studio-update.net", company: "Dalby Print", name: "Fern Dalby" };
 
 /** What 0.2.1 adds to 0.2.0's tables, from the manifest: the update's plan must be exactly this. */
 const NEW_TABLES = ["events", "expenses", "running_costs", "suppliers", "time_entries"];
@@ -117,16 +137,27 @@ describe.skipIf(why !== null)(`the update of a live ${FROM} install to ${TO}${wh
       let changedBefore: { ref: string; label: string | null; columns: string[] }[] = [];
       let handoverKey = "";
 
-      beforeAll(async () => {
-        server = await boot(engine as Engine, port, DEMO_START, { database: database(engine as Engine) });
+      /** What the studio keeps between Adminium's boots: its data directory, secret and database. */
+      const studio = mkdtempSync(join(tmpdir(), `cp-update-${engine}-`));
+      /** The Adminium versions the studio ran: the one the release was installed under, and the one it upgraded to. */
+      const ran = { from: "", to: "" };
+
+      const signIn = async () => {
         staff = new Caller(server.base, { origin: server.base });
         await staff.signIn(ADMIN.email, ADMIN.password);
         const connections = ok(await staff.get<{ connections: { id: string; name: string }[] }>("/api/v1/connections"));
         connectionId = connections.connections.find((c) => c.name === "northwind")!.id;
+        return ok(await staff.get<{ version: string }>("/api/v1/healthz")).version;
+      };
+
+      beforeAll(async () => {
+        server = await boot(engine as Engine, port, DEMO_START, { database: database(engine as Engine), adminium: FROM_ADMINIUM, keep: studio, nodeOptions: FROM_NODE_OPTIONS });
+        ran.from = await signIn();
       }, 240_000);
 
       afterAll(async () => {
         await server?.stop();
+        rmSync(studio, { recursive: true, force: true });
       });
 
       const learnTables = async () => {
@@ -273,6 +304,73 @@ describe.skipIf(why !== null)(`the update of a live ${FROM} install to ${TO}${wh
         expect(about).toEqual(expect.arrayContaining(["proposal-sent", "invoice-sent", "payment-receipt"]));
       }, 300_000);
 
+      // ── the emails 0.2.0 wrote, and Adminium upgraded under it ─────────────
+
+      /** Fern's invoices, each with its `invoice-sent` email as it settled, and the Adminium it was sent under. */
+      const fern = { client: 0 as Id, invoices: [] as { id: Id; number: string; message: Id; status: string; error: string | null; under: string }[] };
+      const messageOf = async (id: Id) => (await rows("messages")).find((m) => m.id === id)!;
+      /** Fern is sent an invoice; its email is made at the send, and settles as the outbox sends it. */
+      const invoiceFern = async (title: string, under: string) => {
+        if (fern.client === 0) {
+          fern.client = ok(await staff.post<{ data: Row }>(data("clients"), { values: { company: FERN.company, contact_name: FERN.name, email: FERN.email } }), 201).data.id;
+        }
+        const invoice = ok(await staff.post<{ data: Row }>(data("invoices"), { values: { client_id: fern.client, title, terms: "net7" } }), 201).data;
+        ok(await staff.post(data("invoice_lines"), { values: { document_id: invoice.id, position: 1, description: "Letterpress run", qty: "1", rate: "240" } }), 201);
+        const sent = ok(await staff.patch<{ data: Row }>(`${data("invoices")}/${String(invoice.id)}`, { values: { status: "sent" } })).data;
+        const message = await until(
+          async () => (await rows("messages")).find((m) => m["invoice_id"] === invoice.id && m["kind"] === "invoice-sent" && ["sent", "failed", "skipped"].includes(String(m["status"]))),
+          `the email about ${title}`,
+          180_000,
+        );
+        const settled = { id: invoice.id, number: String(sent["number"]), message: message.id, status: String(message["status"]), error: message["error"] === null ? null : String(message["error"]), under };
+        console.info(`[0.2.0's invoice email under Adminium ${under}, ${engine}] ${JSON.stringify(settled)}`);
+        fern.invoices.push(settled);
+        return settled;
+      };
+
+      it(`marks failed, at send, ${FROM}'s invoice email under the Adminium it was released for: its words ask the due date for a time's form`, async () => {
+        /*
+         * 0.2.0 writes `{{invoice.due_on.date}}`; a date column is filled as
+         * `{{invoice.due_on}}` (and `.day_month`, `.days_since`), `.date` is a
+         * time's. So the email is not sent: marked failed, naming the variable.
+         */
+        const settled = await invoiceFern("Letterpress, before the upgrade", ran.from);
+        expect([settled.status, settled.error]).toEqual(["failed", expect.stringContaining("{{invoice.due_on.date}}")]);
+        expect((await (await fetch(`${server.sink}/messages`)).json()) as { to: string[] }[]).not.toContainEqual(expect.objectContaining({ to: [FERN.email] }));
+      }, 240_000);
+
+      it("upgrades Adminium in place to the one this build needs, on the same data, the app still at its release", async () => {
+        const plan = async () => ok(await staff.post<{ changed: { ref: string; label: string | null; columns: string[] }[] }>("/api/v1/apps/clients/sample-data/remove-plan")).changed;
+        const key = (c: { ref: string; label: string | null; columns: string[] }) => `${c.ref}|${String(c.label)}|${[...c.columns].sort().join(",")}`;
+        const changedUnder = (await plan()).map(key);
+        const rawUnder = await raw();
+        // Stopped, and the next Adminium started on what the studio keeps, its clock running on.
+        const at = server.now();
+        await server.stop();
+        server = await boot(engine as Engine, port, at, { database: database(engine as Engine), keep: studio });
+        ran.to = await signIn();
+        console.info(`[upgrade, ${engine}] Adminium ${ran.from} → ${ran.to}`);
+        expect(ran.to).not.toBe(ran.from);
+        const apps = ok(await staff.get<{ apps: { key: string; version: string; connectionId: string }[] }>("/api/v1/apps"));
+        expect(apps.apps.filter((a) => a.key === "clients").map((a) => [a.version, a.connectionId])).toEqual([[FROM, connectionId]]);
+        // The upgrade itself writes nothing into the app's tables.
+        expect(await raw()).toEqual(rawUnder);
+        /*
+         * Adminium 0.3.3 remembered a sample row's date column as it read it
+         * then: on Postgres and MySQL, the server's midnight, which is the day
+         * before east of UTC. The upgrade reads dates as days, and still
+         * measures those rows the way they were remembered, so none of them
+         * reads as changed and a removal still takes them all.
+         */
+        const newly = (await plan()).filter((c) => !changedUnder.includes(key(c)));
+        expect(newly).toEqual([]);
+      }, 300_000);
+
+      it(`marks failed ${FROM}'s invoice email made after the upgrade, on every engine: the app's words are still ${FROM}'s`, async () => {
+        const settled = await invoiceFern("Letterpress, after the upgrade", ran.to);
+        expect([settled.status, settled.error]).toEqual(["failed", expect.stringContaining("{{invoice.due_on.date}}")]);
+      }, 240_000);
+
       it("reads every table of the app, straight from the database and over HTTP, once nothing is moving", async () => {
         // Still: two reads a few seconds apart agree (no job is still at a row).
         await until(
@@ -338,10 +436,16 @@ describe.skipIf(why !== null)(`the update of a live ${FROM} install to ${TO}${wh
         expect(plan.addOns?.find((a) => a.key === "invoices")?.action ?? null).toBeNull();
       }, 120_000);
 
-      let updated: { app: Record<string, unknown> & { version: string; schema?: { created: string[]; reused: string[] }; rules?: { skipped: unknown[] } }; from: string; to: string; pruned: string[] };
+      let updated: {
+        app: Record<string, unknown> & { version: string; schema?: { created: string[]; reused: string[] }; rules?: { skipped: unknown[] }; outbox?: { templates: { written: string[]; kept: string[]; skipped: unknown[] } } };
+        from: string;
+        to: string;
+        pruned: string[];
+      };
 
-      it(`updates in place to ${TO}, as planned`, async () => {
-        updated = ok(await staff.post<typeof updated>("/api/v1/apps/clients/update", { planChecksum: plan.checksum }));
+      it(`updates in place to ${TO}, as planned, allowing the public access it adds`, async () => {
+        // The operator ticks "Allow this public access": through the API, what a version adds is given only when asked.
+        updated = ok(await staff.post<typeof updated>("/api/v1/apps/clients/update", { planChecksum: plan.checksum, publicAccess: true }));
         const reply = updated.app;
         console.info(
           `[update reply, ${engine}] ` +
@@ -483,8 +587,8 @@ describe.skipIf(why !== null)(`the update of a live ${FROM} install to ${TO}${wh
       it("gives the app's live guest key the new public enquiry door, which takes an enquiry behind the human check", async () => {
         /*
          * The update saves the new endpoint and grants it to the guest key the
-         * install made at 0.2.0 (an update allows public access unless the
-         * operator says not to). So the studio's enquiry form answers on an
+         * install made at 0.2.0 (the operator allowed the public access it
+         * adds, `publicAccess: true`). So the studio's enquiry form answers on an
          * updated install as on a fresh one (`contract.test.ts`): the door is
          * in the guest config, refused without the human check, and takes an
          * enquiry with it.
@@ -514,6 +618,41 @@ describe.skipIf(why !== null)(`the update of a live ${FROM} install to ${TO}${wh
         const handover = new Caller(server.base, { authorization: `Bearer ${handoverKey}`, origin: server.base });
         expect((await handover.get("/api/v1/public/config")).status).toBe(200);
       }, 60_000);
+
+      it(`sends ${FROM}'s failed emails in ${TO}'s words once they are queued again — never on their own`, async () => {
+        /*
+         * The update writes the app's email words afresh (those nobody edited:
+         * an edited one would be kept, and fail as before). A message already
+         * marked failed stays failed: nothing sends it again by itself. Queued
+         * again by a person, it is written at its send from the words the
+         * store holds now, so it goes, the due date named.
+         */
+        expect(updated.app.outbox?.templates.kept).toEqual([]);
+        expect(updated.app.outbox?.templates.written).toContain("clients-invoice-sent/en_US");
+        await new Promise((resolve) => setTimeout(resolve, 5_000));
+        for (const invoice of fern.invoices) {
+          const message = await messageOf(invoice.message);
+          expect([invoice.number, message["status"], message["error"]]).toEqual([invoice.number, "failed", invoice.error]);
+        }
+        const inbox = async () => ((await (await fetch(`${server.sink}/messages`)).json()) as { to: string[]; subject: string; text: string }[]).filter((m) => m.to.includes(FERN.email));
+        expect(await inbox()).toEqual([]);
+        for (const invoice of fern.invoices) {
+          ok(await staff.patch(`${data("messages")}/${String(invoice.message)}`, { values: { status: "queued" } }));
+          const message = await until(async () => {
+            const now = await messageOf(invoice.message);
+            return ["sent", "failed", "skipped"].includes(String(now["status"])) ? now : undefined;
+          }, `${invoice.number}'s email, queued again`, 180_000);
+          expect([invoice.number, message["status"], message["error"]]).toEqual([invoice.number, "sent", null]);
+          const mail = await until(async () => (await inbox()).find((m) => m.subject.includes(invoice.number)), `${invoice.number}'s email in the sink`);
+          // The due date, as the words name a day: never a blank, never another day.
+          const due = String((await rows("invoices")).find((i) => i.id === invoice.id)!["due_on"]);
+          expect(due).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+          const [y, m, d] = due.split("-").map(Number) as [number, number, number];
+          const named = new Intl.DateTimeFormat("en-US", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(Date.UTC(y, m - 1, d, 12)));
+          console.info(`[${FROM}'s email queued again, ${engine}] ${invoice.number} due ${due}: ${mail.subject} / ${mail.text.replace(/\s+/g, " ").slice(0, 400)}`);
+          expect([invoice.number, mail.text.includes(named)]).toEqual([invoice.number, true]);
+        }
+      }, 400_000);
 
       it(`settles money on the invoices made in ${FROM}, and refuses an overpayment`, async () => {
         const pay = (id: Id, amount: string) => staff.post<{ data: Row }>(data("payments"), { values: { document_id: id, amount, method: "bank-transfer", paid_on: "2026-07-28" } });
@@ -563,8 +702,8 @@ describe.skipIf(why !== null)(`the update of a live ${FROM} install to ${TO}${wh
         const entry = (await rows("time_entries")).find((e) => e["project_id"] === made.project)!;
         const line = (await rows("invoice_lines")).find((l) => l["time_entry_id"] === entry.id)!;
         const kept = await staff.patch(`${data("time_entries")}/${String(entry.id)}`, { values: { logged_hours: "5" } });
-        // The refusal names the lines' table as Adminium's schema knows it (`<schema>.<table>`).
-        expect([kept.status, kept.code, String(kept.details["linkedFrom"]).endsWith(`.${prefix}invoice_lines`)]).toEqual([409, "RECORD_LOCKED", true]);
+        // The refusal names the lines' table by its own name.
+        expect([kept.status, kept.code, kept.details["linkedFrom"]]).toEqual([409, "RECORD_LOCKED", `${prefix}invoice_lines`]);
         ok(await staff.patch(`${data("invoices")}/${String(line["document_id"])}`, { values: { status: "void", void_reason: "Raised in error" } }));
         const figures = await staff.patch(`${data("invoice_lines")}/${String(line.id)}`, { values: { qty: "1" } });
         expect([figures.status, figures.code]).toEqual([409, "RECORD_LOCKED"]);

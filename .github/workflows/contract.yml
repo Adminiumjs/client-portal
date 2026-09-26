@@ -14,9 +14,12 @@
 #                  two checkouts; here `ADMINIUM_REQUIRE_CONTRACT=1` makes a
 #                  skip a failure, so it cannot go quietly green.
 #   the update     `src/contract/update.test.ts`: the RELEASED 0.2.0 (the
-#                  published file, checked against RELEASES.json) installed,
-#                  worked in, and updated in place to this build — nothing
-#                  the studio or its clients made is lost or changed.
+#                  published file, checked against RELEASES.json) installed
+#                  on the Adminium it was released for (0.3.3, built from its
+#                  tag), worked in, that Adminium upgraded in place to the one
+#                  this build needs, and the app updated in place to this
+#                  build — nothing the studio or its clients made is lost or
+#                  changed.
 #   the roles      `src/contract/roles.test.ts`: real people holding only
 #                  one of the app's roles, and what each is refused.
 #   drift          the copies this repo keeps of other repos' files — the
@@ -44,7 +47,7 @@ jobs:
   contract:
     name: three-engine contract & drift
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
 
     services:
       postgres:
@@ -87,6 +90,15 @@ jobs:
           repository: MoSofi/Adminium
           path: .adminium-product
 
+      # Adminium 0.3.4 refuses to install 0.2.0 (its emails ask a date for a time's
+      # form), so the update contract installs it where studios did, and upgrades.
+      - name: Check out the Adminium 0.2.0 was released for
+        uses: actions/checkout@v4
+        with:
+          repository: MoSofi/Adminium
+          ref: v0.3.3
+          path: .adminium-from
+
       - name: Check out the add-ons, at the pin
         uses: actions/checkout@v4
         with:
@@ -103,6 +115,13 @@ jobs:
           pnpm install --frozen-lockfile
           pnpm turbo run build --filter="@adminium/e2e..."
 
+      - name: Build that Adminium too
+        run: |
+          cd .adminium-from
+          corepack enable
+          pnpm install --frozen-lockfile
+          pnpm turbo run build --filter="@adminium/e2e..."
+
       - name: Build the add-ons
         run: |
           cd .add-ons
@@ -112,6 +131,7 @@ jobs:
       - name: Move both checkouts out of the workspace
         run: |
           mv "$GITHUB_WORKSPACE/.adminium-product" "$RUNNER_TEMP/adminium-product"
+          mv "$GITHUB_WORKSPACE/.adminium-from" "$RUNNER_TEMP/adminium-from"
           mv "$GITHUB_WORKSPACE/.add-ons" "$RUNNER_TEMP/add-ons"
 
       - name: The released 0.2.0, which the update contract installs and then updates
@@ -129,6 +149,7 @@ jobs:
           ADMINIUM_REQUIRE_CONTRACT: "1"
           ADMINIUM_REQUIRE_VALIDATOR: "true"
           CONTRACT_FROM_TARBALL: ${{ runner.temp }}/clients-0.2.0.tgz
+          CONTRACT_FROM_ADMINIUM: ${{ runner.temp }}/adminium-from
           TEST_POSTGRES_URL: postgres://postgres:postgres@127.0.0.1:5432/postgres
           TEST_MYSQL_URL: mysql://root@127.0.0.1:3306
         run: npx vitest run

@@ -118,7 +118,7 @@ test("hours moved again after their draft went to another client land on their o
 
   // Billed on a draft, the hours stay as the line bills them, whichever door is used.
   const kept = await stack.staff.patch(`${stack.data("time_entries")}/${String(entry.id)}`, { values: { logged_hours: "9" } });
-  expect([kept.status, kept.code, String(kept.details["linkedFrom"]).endsWith("invoice_lines")]).toEqual([409, "RECORD_LOCKED", true]);
+  expect([kept.status, kept.code, kept.details["linkedFrom"]]).toEqual([409, "RECORD_LOCKED", stack.real["invoice_lines"]]);
 
   // The invoice is sent and voided: the hours are billed nowhere, the page says so, and they can move again.
   await sendAndVoid(again.id);
@@ -195,7 +195,7 @@ test("a purchase passed on again after its draft went out with another one goes 
 
   // On the sent invoice, the courier's cost stays as it was billed.
   const kept = await stack.staff.patch(`${stack.data("expenses")}/${String(courier.id)}`, { values: { amount: "20.00" } });
-  expect([kept.status, kept.code, kept.details["column"], String(kept.details["linkedFrom"]).endsWith("invoice_lines")]).toEqual([409, "RECORD_LOCKED", "amount", true]);
+  expect([kept.status, kept.code, kept.details["column"], kept.details["linkedFrom"]]).toEqual([409, "RECORD_LOCKED", "amount", stack.real["invoice_lines"]]);
 
   // The sent invoice is voided: the courier was never charged, the page says so, and Pass on offers it again.
   await patch("invoices", draft.id, { status: "void", void_reason: "Raised in error" });

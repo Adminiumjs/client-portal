@@ -33,9 +33,12 @@
  *      come due on their days, go only when approved, go with the words a
  *      person edited, are skipped when overtaken, paid or voided; the third's
  *      follow-up refused never sends it twice;
- *   8. ANOTHER CONNECTION — the app installed a second time on another
- *      connection: the client's key keeps to its own, so the same ids and the
- *      same address there reach nothing.
+ *   8. ANOTHER CONNECTION — an app installed on one connection is refused on
+ *      a second (the plan says where it is; an install sent anyway is refused
+ *      and writes nothing there), so a client's key keeps to its own;
+ *   9. DAYS — a date reaches a client's page as the day it is, on every
+ *      engine; the link's page greets a client by the first name the app
+ *      declares for them.
  *
  * Runs where the plain contract runs (`contract.test.ts`); its own servers
  * (`CONTRACT_ACCEPT_PORT_BASE`) and databases, so the files run side by side.
@@ -219,16 +222,10 @@ describe.skipIf(why !== null)(`the Client Portal's acceptance checks against a b
       let tableIds: Record<string, string> = {};
       let publishable = "";
       let mailDomain = "";
-      /** The server's own zone: Postgres and MySQL hand a day out as the instant of its midnight there (as the desk reads it). */
-      let serverZone = "UTC";
-      /** The day an instant falls on in `zone`. */
-      const dayIn = (instant: string, zone: string): string => {
-        const parts = Object.fromEntries(new Intl.DateTimeFormat("en-CA", { timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date(instant)).map((p) => [p.type, p.value]));
-        return `${parts["year"]!}-${parts["month"]!}-${parts["day"]!}`;
-      };
+      /** A date column's value: the day itself, `YYYY-MM-DD`, on every engine (never an instant to be read in some zone). */
       const dayOf = (value: unknown): string => {
-        const text = String(value);
-        return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : dayIn(text, serverZone);
+        expect(String(value)).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+        return String(value);
       };
 
       const data = (ref: string) => `/api/v1/data/${connectionId}/${encodeURIComponent(tableIds[ref]!)}`;
@@ -389,7 +386,6 @@ describe.skipIf(why !== null)(`the Client Portal's acceptance checks against a b
         ok(await admin.put("/api/v1/public-api", { enabled: true }));
         ok(await admin.put("/api/v1/settings/email", { publicOrigin: server.base }));
         publishable = ok(await new Caller(server.base).get<{ publishableKey: string }>("/apps/clients/customer/surface-config.json")).publishableKey;
-        serverZone = ok(await admin.get<{ serverTimezone: string | null }>("/apps/clients/staff/surface-config.json")).serverTimezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
 
         // The desks: API keys acting as a super admin, each with its own budget.
         const roles = ok(await admin.get<{ roles: { id: string; slug: string }[] }>("/api/v1/roles")).roles;
@@ -734,11 +730,10 @@ describe.skipIf(why !== null)(`the Client Portal's acceptance checks against a b
         for (const address of strangers) expect(await mailsTo(address)).toEqual([]);
       }, 600_000);
 
-      it("DEFECT: the link's Continue page greets the client by their first name, and by nothing else", async () => {
-        // Adminium greets with the first word of the sign-in entry's first `select` column, a rule no guide states,
-        // rather than the person's name the manifest already declares (the outbox's recipient name, `contact_name`).
-        // The `clients` entry lists `id` first, as every entry does, so the page is handed "".
-        const client = await newClient({ contact_name: "Dana Greeted" });
+      it("greets a client on the link's Continue page by the first word of the name the app declares for them, and by nothing else", async () => {
+        // The outbox's recipient names the person (`contact_name`); the `clients` entry shows it, after its `id` and
+        // the company, so the page is handed that name's first word — never the id, the company or the address.
+        const client = await newClient({ contact_name: "Dana Greeted", company: "Company First Ltd" });
         const email = String(client["email"]);
         const seen = (await mailsTo(email)).length;
         expect((await askLink(email)).status).toBe(202);
@@ -747,24 +742,20 @@ describe.skipIf(why !== null)(`the Client Portal's acceptance checks against a b
         expect([peek.status, peek.body?.data]).toEqual([200, { firstName: "Dana" }]);
       }, 120_000);
 
-      it("DEFECT: a client's page can tell the day an invoice falls due", async () => {
-        // On Postgres and MySQL a `date` comes out of the APIs as the instant of the server's local midnight
-        // (`2026-08-13T22:00:00.000Z` for the 14th on a server in Berlin). The staff side reads it on the
-        // `serverTimezone` its config carries; nothing a client's page is served names that zone, so the page
-        // can only guess — and on UTC, a day early on every server east of it.
+      it("hands a client's page the day an invoice falls due as that day, `YYYY-MM-DD`, as the desk is handed it", async () => {
+        // A day has no clock: Adminium hands a `date` out as its text on every engine, so a page in any zone
+        // reads the day itself, with no server zone to know.
         const client = await newClient({ contact_name: "Dee Dated" });
         const { doc } = await document("invoices", { client_id: client.id, title: "Dated", terms: "net7" }, [{ qty: "1", rate: "50" }], true);
         const due = "2026-08-14";
-        expect(dayOf((await change("invoices", doc.id, { due_on: due }))["due_on"])).toBe(due);
+        expect((await change("invoices", doc.id, { due_on: due }))["due_on"]).toBe(due);
+        expect((await one("invoices", doc.id))["due_on"]).toBe(due);
         const session = await signIn(String(client["email"]));
         const invoicesRef = refFor((await refsOf(session)).refs, CLIENT_ENTRIES.find((e) => e.table === "invoices" && e.methods.includes("GET"))!);
-        const value = String(((await pub("GET", `/api/v1/public/records/${invoicesRef}/${String(doc.id)}`, undefined, session)).body!.data as Row)["due_on"]);
-        // Everything the page is told: its surface's config and the public config.
-        const surface = ok(await new Caller(server.base).get<{ serverTimezone?: string }>("/apps/clients/customer/surface-config.json"));
-        const config = (await pub("GET", "/api/v1/public/config", undefined, session)).body!.data as { serverTimezone?: string };
-        const zone = surface.serverTimezone ?? config.serverTimezone ?? null;
-        const onPage = /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : zone === null ? `${value}, with no zone to read it in` : dayIn(value, zone);
+        const onPage = ((await pub("GET", `/api/v1/public/records/${invoicesRef}/${String(doc.id)}`, undefined, session)).body!.data as Row)["due_on"];
         expect(onPage).toBe(due);
+        const listed = (await pub("GET", `/api/v1/public/records/${invoicesRef}`, undefined, session)).body!.data as Row[];
+        expect(listed.map((r) => r["due_on"])).toEqual([due]);
       }, 120_000);
 
       // ── 6. isolation ──────────────────────────────────────────────────────
@@ -1463,52 +1454,43 @@ describe.skipIf(why !== null)(`the Client Portal's acceptance checks against a b
         return third;
       };
 
-      // After the reminders: a second install of the app moves what the outbox and the desk run against.
-      it("DEFECT: an app already installed is offered, and installed, onto a second connection — it should be refused, not split in two", async () => {
+      // After the reminders: were a second install let through, it would move what the outbox and the desk run against.
+      it("refuses an app already installed onto a second connection: the plan says where it is, and an install sent anyway writes nothing", async () => {
         const as = desks[5]!;
-        const plan = await as.post<{ plan?: { installable: boolean; problems: { code: string }[] } }>("/api/v1/apps/plan", { key: appBundle().key, version: appBundle().version, connectionId: await thirdConnection(as) });
-        console.info(`[second install, ${engine}] planned onto a second connection: ${String(plan.status)} installable ${String(plan.body.plan?.installable)} ${JSON.stringify(plan.body.plan?.problems ?? plan.body).slice(0, 300)}`);
-        // One install per app: the plan says it is installed already (or the request is refused outright).
-        expect(plan.status !== 200 || plan.body.plan?.installable === false, "the app is installed on the studio's connection already").toBe(true);
+        const app = appBundle();
+        const conn = await thirdConnection(as);
+        const plan = ok(await as.post<{ plan: { installable: boolean; checksum: string; problems: { code: string; connectionId?: string; message?: string }[] } }>("/api/v1/apps/plan", { key: app.key, version: app.version, connectionId: conn })).plan;
+        console.info(`[second install, ${engine}] planned onto a second connection: installable ${String(plan.installable)} ${JSON.stringify(plan.problems).slice(0, 300)}`);
+        expect(plan.installable).toBe(false);
+        expect(plan.problems.filter((p) => p.code === "APP_INSTALLED_ELSEWHERE").map((p) => p.connectionId)).toEqual([connectionId]);
+        const installed = await as.post("/api/v1/apps/install", { key: app.key, version: app.version, connectionId: conn, planChecksum: plan.checksum });
+        expect([installed.status, installed.code, installed.details["connectionId"]]).toEqual([409, "APP_INSTALLED_ELSEWHERE", connectionId]);
+        // Where it was: installed once, on the studio's connection; the second database holds only what it held.
+        const apps = ok(await as.get<{ apps: { key: string; connectionId: string }[] }>("/api/v1/apps")).apps.filter((a) => a.key === app.key);
+        expect(apps.map((a) => a.connectionId)).toEqual([connectionId]);
+        expect([200, 202]).toContain((await as.post(`/api/v1/connections/${conn}/introspect`)).status);
+        const tables = await until(async () => {
+          const schema = await as.get<{ model?: { tables: { name: string }[] } }>(`/api/v1/connections/${conn}/schema`);
+          return schema.status === 200 && schema.body.model !== undefined ? schema.body.model.tables.map((t) => t.name) : undefined;
+        }, "the second connection's schema", 60_000);
+        expect(tables).toEqual(["unrelated"]);
       }, 120_000);
 
-      it("keeps a client's session on its own connection: with the app installed on a second one, the same ids and the same address there reach nothing", async () => {
+      it("keeps a client's session on its own connection, with a second connection beside it", async () => {
         const as = desks[5]!;
         const home = await newClient({ contact_name: "Hana Home" }, as);
         const homeEmail = String(home["email"]);
         const { doc: homeInvoice } = await document("invoices", { client_id: home.id, title: "Home invoice" }, [{ qty: "1", rate: "10" }], true, as);
-        const conn = await thirdConnection(as);
-        const plan = await as.post<{ plan?: { installable: boolean; checksum: string } }>("/api/v1/apps/plan", { key: appBundle().key, version: appBundle().version, connectionId: conn });
-        if (plan.status !== 200 || plan.body.plan?.installable !== true) {
-          // Refused, as it should be: the key then serves the one connection there is, and there is nothing else to reach.
-          console.info(`[second install, ${engine}] refused: ${String(plan.status)}`);
-          return;
-        }
-        const installed = await as.post<{ schema: { created: string[] } }>("/api/v1/apps/install", { key: appBundle().key, version: appBundle().version, connectionId: conn, planChecksum: plan.body.plan.checksum });
-        expect(installed.status, JSON.stringify(installed.body).slice(0, 300)).toBe(200);
-        const schema = ok(await as.get<{ model: { tables: { id: string; name: string }[] } }>(`/api/v1/connections/${conn}/schema`));
-        const there = (ref: string) => `/api/v1/data/${conn}/${encodeURIComponent(schema.model.tables.find((t) => t.name === real[ref])!.id)}`;
-        // On the second connection: the same person's address, and rows whose ids are the first connection's ids — some of them hers.
-        const twin = ok(await as.post<{ data: Row }>(there("clients"), { values: { company: "Twin Ltd", contact_name: "Hana Twin", email: homeEmail } }), 201).data;
-        const twinRows: Row[] = [];
-        for (let i = 0; i < 3; i += 1) {
-          const inv = ok(await as.post<{ data: Row }>(there("invoices"), { values: { client_id: twin.id, title: `On the second connection ${String(i)}` } }), 201).data;
-          ok(await as.post(there("invoice_lines"), { values: { document_id: inv.id, position: 1, description: "Elsewhere", qty: "1", rate: "999" } }), 201);
-          twinRows.push(ok(await as.patch<{ data: Row }>(`${there("invoices")}/${String(inv.id)}`, { values: { status: "sent" } })).data);
-        }
-        console.info(`[second install, ${engine}] the second connection's invoice ids ${JSON.stringify(twinRows.map((r) => r.id))}; the home invoice is ${String(homeInvoice.id)}; the apps list says ${JSON.stringify((await as.get<{ apps: { connectionId: string }[] }>("/api/v1/apps")).body.apps.map((x) => x.connectionId === conn ? "the second connection" : x.connectionId === connectionId ? "the first" : x.connectionId))}`);
-        // Signed in by her link, she reaches her invoice on the first connection, and nothing of the second.
+        await thirdConnection(as);
+        // Signed in by her link, she reaches her invoice on the studio's connection, and nothing that is not hers.
         const session = await signIn(homeEmail);
         const { refs } = await refsOf(session);
         const invoicesRef = refFor(refs, CLIENT_ENTRIES.find((e) => e.table === "invoices" && e.methods.includes("GET"))!);
         const list = (await pub("GET", `/api/v1/public/records/${invoicesRef}`, undefined, session)).body!.data as Row[];
         expect(list.map((r) => [Number(r.id), r["title"]])).toEqual([[Number(homeInvoice.id), "Home invoice"]]);
         const missing = await pub("GET", `/api/v1/public/records/${invoicesRef}/987654321`, undefined, session);
-        for (const row of twinRows) {
-          const answer = await pub("GET", `/api/v1/public/records/${invoicesRef}/${String(row.id)}`, undefined, session);
-          if (Number(row.id) === Number(homeInvoice.id)) expect((answer.body!.data as Row)["title"]).toBe("Home invoice");
-          else expect([row.id, answer.status, answer.text]).toEqual([row.id, 404, missing.text]);
-        }
+        const other = await pub("GET", `/api/v1/public/records/${invoicesRef}/${String(Number(homeInvoice.id) - 1)}`, undefined, session);
+        expect([other.status, other.text]).toEqual([404, missing.text]);
       }, 300_000);
     });
   });
