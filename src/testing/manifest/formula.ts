@@ -22,8 +22,11 @@
  * ```
  *
  * The grammar is small on purpose: numbers, the row's own columns, the four
- * operations, `min`, `max`, `round`, `coalesce`, one `if`, and the hours
- * between two moments of the row (`hoursBetween`). Anything that
+ * operations, `min`, `max`, `round`, `coalesce`, one `if`, the hours
+ * between two moments of the row (`hoursBetween`), and the whole calendar
+ * days between two dates of it (`daysBetween`: a stay's nights). A text column
+ * may join columns and text into one (`join`: a guest's full name), empty
+ * parts left out. Anything that
  * reads another row is a `copy` or a `rollup`, which already know how to keep
  * in step when that other row changes; a formula that could read across rows
  * would need the same machinery again.
@@ -68,7 +71,9 @@ export type FormulaExpr =
   | { round: FormulaExpr | [FormulaExpr, number] }
   | { coalesce: [FormulaExpr, FormulaExpr] }
   | { if: [FormulaCondition, FormulaExpr, FormulaExpr] }
-  | { hoursBetween: [string, string] };
+  | { hoursBetween: [string, string] }
+  | { daysBetween: [string, string] }
+  | { join: string[] };
 
 export type FormulaCondition =
   | { eq: [string, string | number | boolean] }
@@ -99,8 +104,15 @@ export const formulaExprSchema: z.ZodType<FormulaExpr> = z.lazy(() =>
     z.object({ coalesce: z.tuple([formulaExprSchema, formulaExprSchema]) }).strict(),
     z.object({ if: z.tuple([formulaConditionSchema, formulaExprSchema, formulaExprSchema]) }).strict(),
     z.object({ hoursBetween: z.tuple([columnName, columnName]) }).strict(),
+    z.object({ daysBetween: z.tuple([columnName, columnName]) }).strict(),
+    z.object({ join: z.array(z.string().min(1).max(64)).min(2).max(8) }).strict(),
   ]),
 );
+
+/** Whether a part of a `join` names a column of the row; any other part is text written as it is. */
+export function isJoinColumn(part: string): boolean {
+  return /^[a-z][a-z0-9_]*$/.test(part);
+}
 
 export const formulaConditionSchema: z.ZodType<FormulaCondition> = z.lazy(() =>
   z.union([
@@ -131,6 +143,10 @@ export function formulaColumns(expr: FormulaExpr | FormulaCondition): string[] {
     const [op, args] = Object.entries(node)[0] as [string, unknown];
     if (op === 'eq' || op === 'neq') {
       walk((args as unknown[])[0]);
+      return;
+    }
+    if (op === 'join') {
+      (args as string[]).filter(isJoinColumn).forEach(walk);
       return;
     }
     if (op === 'isNull') {
@@ -172,6 +188,15 @@ export function formulaIssues(
   for (const [start, stop] of moments.pairs) {
     if (start === stop) out.push('hours are counted between two different columns');
   }
+  // A join makes text: it is the whole formula, never a part of a sum.
+  if (typeof expr === 'object' && !('join' in expr) && joinsInside(expr)) {
+    out.push('a join is the whole formula, not a part of one');
+  }
+  const days = dayColumns(expr);
+  for (const [start, stop] of days.pairs) {
+    if (start === stop) out.push('days are counted between two different columns');
+  }
+  const joined = typeof expr === 'object' && 'join' in expr ? expr.join.filter(isJoinColumn) : [];
   for (const name of formulaColumns(expr)) {
     if (name === own) {
       out.push(`a formula does not read its own column "${name}"`);
@@ -182,11 +207,17 @@ export function formulaIssues(
       out.push(`the table has no column "${name}"`);
       continue;
     }
+    if (joined.includes(name) && !JOIN_COLUMN_TYPES.includes(found.type)) {
+      out.push(`"${name}" is a ${found.type} column: a join reads text and whole-number columns only`);
+    }
     if (arithmetic.has(name) && !NUMERIC_TYPES.includes(found.type)) {
       out.push(`"${name}" is not a number, so a formula cannot count with it`);
     }
     if (moments.columns.has(name) && found.type !== 'timestamptz') {
       out.push(`"${name}" is not a moment (a timestamptz column), so no hours are counted from it`);
+    }
+    if (days.columns.has(name) && found.type !== 'date') {
+      out.push(`"${name}" is not a date (a date column), so no days are counted from it`);
     }
   }
   return out;
@@ -213,7 +244,39 @@ export function momentColumns(expr: unknown): { columns: Set<string>; pairs: [st
   return { columns, pairs };
 }
 
-/** The columns a formula counts with (every name outside `eq`, `neq`, `isNull` and `hoursBetween`). */
+/** Whether a `join` appears anywhere in a formula. */
+function joinsInside(node: unknown): boolean {
+  if (typeof node !== 'object' || node === null) return false;
+  const [op, args] = Object.entries(node)[0] as [string, unknown];
+  if (op === 'join') return true;
+  return (Array.isArray(args) ? args : [args]).some(joinsInside);
+}
+
+/**
+ * The columns `daysBetween` reads, and each pair it reads them in: whole
+ * calendar days from the first date to the second (a stay's nights).
+ */
+export function dayColumns(expr: unknown): { columns: Set<string>; pairs: [string, string][] } {
+  const columns = new Set<string>();
+  const pairs: [string, string][] = [];
+  const walk = (node: unknown): void => {
+    if (typeof node !== 'object' || node === null) return;
+    const [op, args] = Object.entries(node)[0] as [string, unknown];
+    if (op === 'daysBetween') {
+      const [start, stop] = args as [string, string];
+      columns.add(start);
+      columns.add(stop);
+      pairs.push([start, stop]);
+      return;
+    }
+    const children = Array.isArray(args) ? args : [args];
+    children.forEach(walk);
+  };
+  walk(expr);
+  return { columns, pairs };
+}
+
+/** The columns a formula counts with (every name outside `eq`, `neq`, `isNull`, `hoursBetween` and `daysBetween`). */
 function arithmeticColumns(expr: unknown): Set<string> {
   const out = new Set<string>();
   const walk = (node: unknown): void => {
@@ -223,7 +286,7 @@ function arithmeticColumns(expr: unknown): Set<string> {
     }
     if (typeof node !== 'object' || node === null) return;
     const [op, args] = Object.entries(node)[0] as [string, unknown];
-    if (op === 'eq' || op === 'neq' || op === 'isNull' || op === 'hoursBetween') return;
+    if (op === 'eq' || op === 'neq' || op === 'isNull' || op === 'hoursBetween' || op === 'daysBetween' || op === 'join') return;
     const children = Array.isArray(args) ? args : [args];
     children.forEach(walk);
   };
@@ -365,6 +428,42 @@ export function ratioText(value: Ratio, scale: number): string {
   return `${negative && units !== 0n ? '-' : ''}${whole}${fraction}`;
 }
 
+/**
+ * What a total over child rows comes to, exactly: each row's `sum` (times its
+ * `times`) added up as fractions and rounded once to `places`, or the rows
+ * counted. A row whose value is empty or not a number adds nothing, as SQL's
+ * `sum` leaves it out. SQLite adds decimals as floats, where 1.500 × 0.33 is
+ * a hair under 0.495 and rounds to 0.49; this answers 0.50, as Postgres and
+ * MySQL do.
+ */
+export function rollupValue(
+  rows: readonly Readonly<Record<string, unknown>>[],
+  spec: { sum?: string | undefined; times?: string | undefined; count?: true | undefined },
+  places: number,
+): string {
+  if (spec.count === true) return String(rows.length);
+  let total: Ratio = { n: 0n, d: 1n };
+  for (const row of rows) {
+    const amount = spec.sum === undefined ? null : toRatio(row[spec.sum]);
+    if (amount === null) continue;
+    if (spec.times === undefined) {
+      total = add(total, amount);
+      continue;
+    }
+    const times = toRatio(row[spec.times]);
+    if (times !== null) total = add(total, mul(amount, times));
+  }
+  return ratioText(total, places);
+}
+
+/** Whether two decimals are the same number at `places` (`90` and `"90.00"` are; `"89.999"` at 2 is `"90.00"`). */
+export function sameDecimal(a: unknown, b: unknown, places: number): boolean {
+  const left = toRatio(a);
+  const right = toRatio(b);
+  if (left === null || right === null) return left === right;
+  return ratioText(left, places) === ratioText(right, places);
+}
+
 function sameValue(stored: unknown, literal: string | number | boolean): boolean {
   if (stored === null || stored === undefined) return false;
   if (typeof literal === 'boolean') {
@@ -384,6 +483,7 @@ function sameValue(stored: unknown, literal: string | number | boolean): boolean
  * zero. `row` holds the stored row with the new values over it.
  */
 export function evaluateFormula(expr: FormulaExpr, row: Readonly<Record<string, unknown>>, scale: number): string | null {
+  if (typeof expr === 'object' && 'join' in expr) return joinText(expr.join, row);
   const value = evaluate(expr, row, scale);
   return value === null ? null : ratioText(value, scale);
 }
@@ -439,6 +539,11 @@ function evaluate(expr: FormulaExpr, row: Readonly<Record<string, unknown>>, sca
       if (start === null || start === undefined || stop === null || stop === undefined || stop < start) return null;
       return ratio(BigInt(stop - start), MS_PER_HOUR);
     }
+    case 'daysBetween': {
+      const [start, stop] = (args as [string, string]).map((column) => dayNumberOf(row[column]));
+      if (start === null || start === undefined || stop === null || stop === undefined || stop < start) return null;
+      return { n: BigInt(stop - start), d: 1n };
+    }
     default:
       return null;
   }
@@ -483,6 +588,202 @@ export function momentOf(value: unknown): number | null {
   const [, sign, hours, minutes] = /^([+-])(\d{2}):?(\d{2})?$/.exec(zone) ?? [];
   const offset = sign === undefined ? 0 : (sign === '-' ? -1 : 1) * (Number(hours) * 60 + Number(minutes ?? 0));
   return Date.UTC(y, mo - 1, d, h, mi, s, ms) - offset * 60_000;
+}
+
+/** A date as the drivers and a form spell one: `2026-08-03`, optionally followed by a time. */
+const DAY = /^(\d{4})-(\d{2})-(\d{2})(?:$|[T ])/;
+
+/**
+ * A stored date as a day number (days since 1970-01-01 on the calendar), or
+ * `null` when it is empty or not a day the calendar has. Text is read as the
+ * calendar day it spells, whatever the zone; a `Date` (how a driver hands a
+ * DATE back) as the day it falls on on this clock, since the drivers make it
+ * at local midnight. The count is of calendar days, so a night the clocks
+ * change is still one night.
+ */
+export function dayNumberOf(value: unknown): number | null {
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return null;
+    return Date.UTC(value.getFullYear(), value.getMonth(), value.getDate()) / 86_400_000;
+  }
+  if (typeof value !== 'string') return null;
+  const found = DAY.exec(value.trim());
+  if (found === null) return null;
+  const [y, mo, d] = found.slice(1, 4).map(Number) as [number, number, number];
+  if (!onTheCalendar(y, mo, d, 0, 0, 0)) return null;
+  return Date.UTC(y, mo - 1, d) / 86_400_000;
+}
+
+// ── a text joined from columns ─────────────────────────────────────────────
+
+/**
+ * The column types a join reads: text, and whole numbers. A decimal
+ * (`8.250` on one database, `8.25` on another), a yes or no (`true`, `1`) or
+ * a time (on the server's clock) would join differently on each engine.
+ */
+export const JOIN_COLUMN_TYPES: readonly string[] = ['text', 'int', 'bigint'];
+
+/** A value as a joined text spells it: text trimmed, a whole number as its digits; anything else adds nothing. */
+function joinedPart(value: unknown): string {
+  if (typeof value === 'string') return value.trim();
+  if (typeof value === 'bigint') return String(value);
+  if (typeof value === 'number' && Number.isSafeInteger(value)) return String(value);
+  return '';
+}
+
+/**
+ * A `join` worked out: its columns' values and its text, in order. An empty
+ * column is left out, and so is the text between it and its neighbour (a
+ * guest with no last name is "Mia", not "Mia "); text before the first
+ * column or after the last stays while that column has a value. The result
+ * is trimmed, and empty when every column is.
+ */
+export function joinText(parts: readonly string[], row: Readonly<Record<string, unknown>>): string | null {
+  const columns = parts.map((part) => isJoinColumn(part));
+  const filled = parts.map((part, i) => (columns[i] ? joinedPart(row[part]) !== '' : true));
+  let out = '';
+  let any = false;
+  parts.forEach((part, i) => {
+    if (columns[i]) {
+      if (!filled[i]) return;
+      out += joinedPart(row[part]);
+      any = true;
+      return;
+    }
+    // Text sits between the nearest columns on each side: kept only while both (that there are) have a value.
+    let left = i - 1;
+    while (left >= 0 && !columns[left]) left -= 1;
+    let right = i + 1;
+    while (right < parts.length && !columns[right]) right += 1;
+    const leftOk = left < 0 || filled[left];
+    const rightOk = right >= parts.length || filled[right];
+    if (leftOk && rightOk) out += part;
+  });
+  const text = out.trim();
+  return any && text !== '' ? text : null;
+}
+
+// ── prices by the night ────────────────────────────────────────────────────
+
+/** The most nights one stay is priced for: two years. A longer one is refused, not priced. */
+export const PER_NIGHT_MAX = 731;
+
+const WEEKDAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const;
+
+/**
+ * A weekdays value (`fri,sat`, `Fri Sat`) as the nights it names, 0 being
+ * Sunday: an empty set for an empty value (every night), or `null` when any
+ * word in it is not a day's three letters.
+ */
+export function weekdaysOf(value: unknown): Set<number> | null {
+  if (value === null || value === undefined) return new Set();
+  if (typeof value !== 'string') return null;
+  const out = new Set<number>();
+  for (const word of value.toLowerCase().split(/[\s,]+/)) {
+    if (word === '') continue;
+    const day = (WEEKDAYS as readonly string[]).indexOf(word);
+    if (day < 0) return null;
+    out.add(day);
+  }
+  return out;
+}
+
+/** One adjustment row as a price by the night reads it. */
+export interface NightlyAdjustment {
+  /** Added to the night (negative: a discount). */
+  add: unknown;
+  /** Its name: the night's tag. */
+  name: string;
+  /** Whether it is for this row's rate (its link empty, or the same row). */
+  typeMatch: boolean;
+  weekdays: unknown;
+  /** The first and the last night it applies on, both included; empty = open. */
+  from: unknown;
+  to: unknown;
+}
+
+/** One night of a stay: its date, its rate (rounded), the base it started from, and the adjustments' names. */
+export interface Night {
+  date: string;
+  rate: string;
+  base: string;
+  tags: string[];
+}
+
+/** An adjustment row a price cannot read (its weekdays, dates or amount): the price is refused, never guessed. */
+export class NightlyRuleUnreadable extends Error {
+  override readonly name = 'NightlyRuleUnreadable';
+
+  constructor(
+    /** Its place in the adjustments given. */
+    readonly index: number,
+    /** The column that could not be read: `weekdays`, `from`, `to` or `add`. */
+    readonly column: 'weekdays' | 'from' | 'to' | 'add',
+  ) {
+    super(`An adjustment's ${column} cannot be read.`);
+  }
+}
+
+/** The day number as `YYYY-MM-DD`. */
+function dayText(day: number): string {
+  return new Date(day * 86_400_000).toISOString().slice(0, 10);
+}
+
+/**
+ * The nights from `from` up to the day before `to`, each priced at the base
+ * rate plus every adjustment that applies to it — its rate, its day of the
+ * week, its dates, both ends included — and rounded once, to `scale`; the
+ * total is the rounded nights added up, so a folio's lines add up to it.
+ * Days are calendar days (`dayNumberOf`): a night the clocks change is one
+ * night, whatever the zone. `null` when a date or the base is empty, the stay
+ * is no night long, or longer than {@link PER_NIGHT_MAX}. Throws
+ * {@link NightlyRuleUnreadable} for an adjustment of this rate it cannot read.
+ */
+export function nightlyRates(input: {
+  from: unknown;
+  to: unknown;
+  base: unknown;
+  scale: number;
+  adjustments: readonly NightlyAdjustment[];
+}): { nights: Night[]; total: string } | null {
+  const from = dayNumberOf(input.from);
+  const to = dayNumberOf(input.to);
+  const base = toRatio(input.base);
+  if (from === null || to === null || base === null || to <= from || to - from > PER_NIGHT_MAX) return null;
+  const rules = input.adjustments.flatMap((adjustment, index) => {
+    if (!adjustment.typeMatch) return [];
+    const weekdays = weekdaysOf(adjustment.weekdays);
+    if (weekdays === null) throw new NightlyRuleUnreadable(index, 'weekdays');
+    const first = empty(adjustment.from) ? null : dayNumberOf(adjustment.from);
+    if (!empty(adjustment.from) && first === null) throw new NightlyRuleUnreadable(index, 'from');
+    const last = empty(adjustment.to) ? null : dayNumberOf(adjustment.to);
+    if (!empty(adjustment.to) && last === null) throw new NightlyRuleUnreadable(index, 'to');
+    const add = empty(adjustment.add) ? { n: 0n, d: 1n } : toRatio(adjustment.add);
+    if (add === null) throw new NightlyRuleUnreadable(index, 'add');
+    return [{ weekdays, first, last, add, name: adjustment.name }];
+  });
+  const nights: Night[] = [];
+  let total: Ratio = { n: 0n, d: 1n };
+  for (let day = from; day < to; day += 1) {
+    const weekday = new Date(day * 86_400_000).getUTCDay();
+    let rate = base;
+    const tags: string[] = [];
+    for (const rule of rules) {
+      if (rule.weekdays.size > 0 && !rule.weekdays.has(weekday)) continue;
+      if (rule.first !== null && day < rule.first) continue;
+      if (rule.last !== null && day > rule.last) continue;
+      rate = add(rate, rule.add);
+      tags.push(rule.name);
+    }
+    const rounded = roundTo(rate, input.scale);
+    total = add(total, rounded);
+    nights.push({ date: dayText(day), rate: ratioText(rounded, input.scale), base: ratioText(base, input.scale), tags });
+  }
+  return { nights, total: ratioText(total, input.scale) };
+}
+
+function empty(value: unknown): boolean {
+  return value === null || value === undefined || (typeof value === 'string' && value.trim() === '');
 }
 
 /** Whether a condition holds for the row; a comparison with an empty side does not. */
@@ -540,7 +841,10 @@ export function tableFormulaIssues(
     const formula = column.rules?.formula;
     if (formula === undefined) return;
     formulas.set(column.ref, formula);
-    if (!NUMERIC_TYPES.includes(column.type) || column.type === 'float') {
+    const joins = typeof formula === 'object' && 'join' in formula;
+    if (joins && column.type !== 'text') {
+      out.push({ path: at(c, 'rules', 'formula'), message: 'a join fills a text column' });
+    } else if (!joins && (!NUMERIC_TYPES.includes(column.type) || column.type === 'float')) {
       out.push({ path: at(c, 'rules', 'formula'), message: 'a formula fills a decimal, money or whole-number column' });
     }
     for (const message of formulaIssues(formula, column.ref, (ref) => byRef.get(ref))) {

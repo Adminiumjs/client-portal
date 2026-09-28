@@ -32,6 +32,12 @@
  * that update (itself or through `cloneFrom`) for a limit on the table to
  * mean anything. Roles add up: someone who also holds a role with a plain
  * update on the table is not held to the limit. Creating rows is not limited.
+ *
+ * `readable` limits the role's READ of the table to some columns, the same
+ * way: housekeeping reads a stay's room and dates, and none of its guest or
+ * its money. The key and the table's links to other rows are always read (a
+ * screen moves through them). A column the role may not read is not written
+ * through it either, unless `writable` names it.
  */
 import { z } from 'zod';
 
@@ -41,11 +47,14 @@ import { refSchema, scalarSchema, valueFits, type ColumnShape, type ReferenceIss
 export const roleLimitSchema = z
   .object({
     /** The only columns the update may change. */
-    writable: z.array(refSchema).min(1),
+    writable: z.array(refSchema).min(1).optional(),
     /** For some of those columns, the only values it may set. */
     writableValues: z.record(refSchema, z.array(scalarSchema).min(1).max(32)).optional(),
+    /** The only columns the read shows (with the key and the links to other rows). */
+    readable: z.array(refSchema).min(1).max(200).optional(),
   })
-  .strict();
+  .strict()
+  .refine((limit) => limit.writable !== undefined || limit.readable !== undefined, { message: 'a limit names what the role may write (writable) or read (readable)' });
 export type RoleLimit = z.infer<typeof roleLimitSchema>;
 
 /** Per table ref, the limit on the role's update there. */
@@ -76,12 +85,22 @@ export function roleLimitIssues<C extends ColumnShape>(roles: readonly RoleShape
         out.push({ path: at(), message: `"${ref}" is not a table of this app` });
         continue;
       }
-      if (!grants.has(`table:@${ref}:update`)) {
+      if (limit.writable !== undefined && !grants.has(`table:@${ref}:update`)) {
         out.push({ path: at(), message: `the role does not grant table:@${ref}:update, so there is nothing to limit` });
       }
-      const writable = new Set(limit.writable);
-      for (const column of limit.writable) {
+      if (limit.writable === undefined && limit.writableValues !== undefined) {
+        out.push({ path: at('writableValues'), message: 'values are limited for the columns the role may write: name them (writable)' });
+      }
+      const writable = new Set(limit.writable ?? []);
+      for (const column of limit.writable ?? []) {
         if (index.column(ref, column) === undefined) out.push({ path: at('writable'), message: `"${ref}" has no column "${column}"` });
+      }
+      if (limit.readable !== undefined) {
+        if (!grants.has(`table:@${ref}:read`)) out.push({ path: at('readable'), message: `the role does not grant table:@${ref}:read, so there is nothing to limit` });
+        limit.readable.forEach((column, c) => {
+          if (index.column(ref, column) === undefined) out.push({ path: at('readable', c), message: `"${ref}" has no column "${column}"` });
+          else if (limit.readable!.indexOf(column) !== c) out.push({ path: at('readable', c), message: `"${column}" is listed twice` });
+        });
       }
       for (const [column, values] of Object.entries(limit.writableValues ?? {})) {
         if (!writable.has(column)) out.push({ path: at('writableValues', column), message: `"${column}" is not writable` });

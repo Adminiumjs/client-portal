@@ -41,6 +41,8 @@ import { z } from 'zod';
 
 import type { AddOnNeeds } from './add-ons.ts';
 import { formulaColumns, type FormulaExpr } from './formula.ts';
+import { personalColumn, unlistedColumn } from './public-access.ts';
+import { reachedOnlyByUndo, type StateMove } from './states.ts';
 import {
   bcp47TagSchema,
   refSchema,
@@ -117,7 +119,14 @@ const producerBase = {
    * one, while that bool of the settings row is false (each of a studio's
    * notices has its own switch).
    */
-  gate: z.union([z.literal('enabled'), z.object({ setting: settingRefSchema }).strict()]).optional(),
+  gate: z
+    .union([
+      z.literal('enabled'),
+      z.object({ setting: settingRefSchema }).strict(),
+      /** Only while a feature of the app is on (its add-ons attached): a receipt, with Invoices & Receipts. */
+      z.object({ feature: z.string().regex(/^[a-z][a-z0-9-]{0,39}$/, 'a feature id') }).strict(),
+    ])
+    .optional(),
   /** Skipped for a recipient whose `recipient.optIn` column is false. */
   optIn: z.literal(true).optional(),
   /** Written `held`: sent only once someone approves it. */
@@ -135,10 +144,47 @@ const producerBase = {
   supersede: z.string().regex(/^[a-z][a-z0-9-]{0,39}$/, 'a group name').optional(),
   /** While the source row meets one of these, its waiting messages are skipped, with the reason. */
   dropWhen: z.array(dropConditionSchema).min(1).max(4).optional(),
-  /** Sent to an address a setting holds (the studio's own) instead of the outbox's recipient. */
-  recipient: z.object({ setting: settingSourceSchema }).strict().optional(),
+  /**
+   * Sent instead of the outbox's recipient: to an address a setting holds
+   * (the studio's own), or to an address a text column of the producing row
+   * holds (a ticket's `send_to_email`, the friend it is offered to), with
+   * that row's `name` column as the name.
+   */
+  recipient: z
+    .union([
+      z.object({ setting: settingSourceSchema }).strict(),
+      /** `language`: a text column of the same row, the language the message is written in. */
+      z.object({ column: refSchema, name: refSchema.optional(), language: refSchema.optional() }).strict(),
+    ])
+    .optional(),
   /** One message per linked row in each window of this many minutes. */
   batchMinutes: z.number().int().min(1).max(240).optional(),
+  /**
+   * The message waits this many seconds before it may go, so a move taken
+   * back at once (an order marked ready by mistake) drops it by `dropWhen`
+   * before anyone is told. A message dropped so does not stop the next one.
+   */
+  holdSeconds: z.number().int().min(1).max(3600).optional(),
+  /**
+   * A column of the row the message is about: one message for each value it
+   * holds, not one for the row for ever — a ticket offered again, its link
+   * made afresh, is emailed again. Kept as a digest in the outbox's
+   * `repeatKey` column.
+   */
+  repeatBy: refSchema.optional(),
+  /**
+   * One message for each change it hears of, not one for the row for ever:
+   * "Resend tickets" twice is two messages, a stay's dates moved twice is two
+   * notices. On a producer that listens for changes (`onChange`).
+   */
+  repeat: z.literal(true).optional(),
+  /**
+   * The columns of the changed row as they were before the change (a stay's
+   * old dates, its old total), kept on the message in the outbox's `was`
+   * column and read by its template as `{{was.<column>}}`, in every form the
+   * column has. On a producer that listens for changes (`onChange`).
+   */
+  was: z.array(refSchema).min(1).max(8).optional(),
   /**
    * A change made once the message has gone, through the ordinary write: to
    * the source row, or (with `via`) the row its foreign key points at.
@@ -164,15 +210,27 @@ export const outboxProducerSchema = z.union([
   z
     .object({
       ...producerBase,
-      onChange: z
-        .object({
-          table: refSchema,
-          via: refSchema.optional(),
-          column: refSchema,
-          to: z.union([scalarSchema, z.array(scalarSchema).min(1).max(16)]),
-          where: conditionSchema.optional(),
-        })
-        .strict(),
+      onChange: z.union([
+        z
+          .object({
+            table: refSchema,
+            via: refSchema.optional(),
+            column: refSchema,
+            to: z.union([scalarSchema, z.array(scalarSchema).min(1).max(16)]),
+            where: conditionSchema.optional(),
+          })
+          .strict(),
+        /** Any change of one of these columns, compared with the row as it was stored (a stay's dates, whatever they became). */
+        z
+          .object({
+            table: refSchema,
+            via: refSchema.optional(),
+            columns: z.array(refSchema).min(1).max(8),
+            changed: z.literal(true),
+            where: conditionSchema.optional(),
+          })
+          .strict(),
+      ]),
     })
     .strict(),
   z
@@ -192,6 +250,12 @@ export const outboxProducerSchema = z.union([
               fallback: settingRefSchema.optional(),
               /** The largest lead anyone may choose, in hours — how far ahead Adminium looks. */
               max: z.number().int().min(1).max(24 * 14),
+              /**
+               * Sent at this wall time on the venue's day the lead reaches,
+               * not at the hour itself: 24 hours before an 20:00 show, at
+               * 09:00, is 09:00 the day before.
+               */
+              at: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'a time such as 09:00').optional(),
             })
             .strict(),
           where: conditionSchema.optional(),
@@ -209,7 +273,12 @@ const recipientSchema = z
     table: refSchema,
     email: refSchema,
     name: refSchema.optional(),
-    language: refSchema.optional(),
+    /**
+     * The language the message is written in: a text column of the person's
+     * row, or (`{column}`) of the row the message is about — an order placed
+     * in German is written to in German, whatever the person's own row says.
+     */
+    language: z.union([refSchema, z.object({ column: refSchema }).strict()]).optional(),
     /** A bool the person sets: false means no reminders. */
     optIn: refSchema.optional(),
     /**
@@ -245,6 +314,10 @@ export const outboxSchema = z
         /** When `onSent`'s change was made, or why it was refused. */
         effectAt: refSchema.optional(),
         effectError: refSchema.optional(),
+        /** A text column (at least 43 characters) Adminium fills with the digest of a producer's `repeatBy` value. */
+        repeatKey: refSchema.optional(),
+        /** A text column (unbounded, or at least 1000 characters) Adminium fills with a producer's `was` columns, as they were. */
+        was: refSchema.optional(),
       })
       .strict(),
     /**
@@ -260,7 +333,14 @@ export const outboxSchema = z
      * the one sent to an old address after a change of email.
      */
     settings: z
-      .object({ table: refSchema, enabled: refSchema.optional(), name: refSchema.optional(), phone: refSchema.optional() })
+      .object({
+        table: refSchema,
+        enabled: refSchema.optional(),
+        name: refSchema.optional(),
+        phone: refSchema.optional(),
+        /** The address a reply to any of the app's messages goes to (the house's own): a Reply-To on each. Empty or not an address: none. */
+        replyTo: refSchema.optional(),
+      })
       .strict()
       .optional(),
     /**
@@ -332,7 +412,20 @@ export const emailTemplateSchema = z
      * else the print copy. A message whose document cannot be drawn fails
      * rather than going without it.
      */
-    attach: z.object({ kind: z.string().regex(/^[a-z][a-z0-9-]*$/, 'a document kind'), link: z.string().min(1).max(40) }).strict().optional(),
+    attach: z
+      .object({
+        kind: z.string().regex(/^[a-z][a-z0-9-]*$/, 'a document kind'),
+        link: z.string().min(1).max(40),
+        /**
+         * Sent without the document when no add-on the app has draws its
+         * kind (a receipt, without Invoices & Receipts): the part is left out,
+         * and so is every block marked `data.withAttachment: true`. Without
+         * it, such a message fails rather than go without its document.
+         */
+        optional: z.literal(true).optional(),
+      })
+      .strict()
+      .optional(),
     /** The variables it reads, for the editor's list. */
     vars: z.array(templateVariableSchema).max(60).optional(),
     /** The template in each language it ships, US English always among them. */
@@ -344,9 +437,16 @@ export const emailTemplateSchema = z
 export type EmailTemplate = z.infer<typeof emailTemplateSchema>;
 
 /** The column rules that decide a value on the server (see `columnRulesSchema`). */
-const DECIDING_RULES = ['copy', 'default', 'sequence', 'format', 'code', 'rollup', 'formula', 'stamp'] as const;
+const DECIDING_RULES = ['copy', 'default', 'sequence', 'format', 'code', 'rollup', 'formula', 'stamp', 'perNight'] as const;
 /** The column rules that refuse a value: Adminium's own writes to the column would be refused by them. */
 const REFUSING_RULES = ['options', 'validation', 'required', 'requiredWhen', 'notAfter', 'notBefore'] as const;
+/** How long a `repeatKey` is: a SHA-256 digest in base64url. */
+export const REPEAT_KEY_LENGTH = 43;
+/** The fewest characters a bounded `was` column holds: the columns a message keeps, as they were. */
+export const WAS_MIN_LENGTH = 1000;
+/** The mark on a template's block that is sent only with the document the template carries (`attach.optional`). */
+export const WITH_ATTACHMENT = 'withAttachment';
+
 /** What the outbox writes, and which rules each refuses: everything, but a check of the address a person types. */
 export const OUTBOX_WRITTEN = {
   status: [...DECIDING_RULES, ...REFUSING_RULES],
@@ -356,6 +456,8 @@ export const OUTBOX_WRITTEN = {
   approvedBy: [...DECIDING_RULES, ...REFUSING_RULES],
   effectAt: [...DECIDING_RULES, ...REFUSING_RULES],
   effectError: [...DECIDING_RULES, ...REFUSING_RULES],
+  repeatKey: [...DECIDING_RULES, ...REFUSING_RULES],
+  was: [...DECIDING_RULES, ...REFUSING_RULES],
   // Left empty by a desk that asks Adminium to look the address up, and written when it sends.
   to: [...DECIDING_RULES, 'options', 'required', 'requiredWhen'],
   language: [...DECIDING_RULES, 'options', 'required', 'requiredWhen'],
@@ -390,7 +492,7 @@ export function outboxIssues(
     outbox?: Outbox | undefined;
     emailTemplates?: readonly EmailTemplate[] | undefined;
     addOns?: AddOnNeeds | undefined;
-  },
+  } & Parameters<typeof unlistedColumn>[0],
   index: TableIndex,
 ): ReferenceIssue[] {
   const out: ReferenceIssue[] = [];
@@ -398,6 +500,16 @@ export function outboxIssues(
   (m.emailTemplates ?? []).forEach((template, i) => {
     if (template.attach !== undefined && m.outbox?.links?.[template.attach.link] === undefined) {
       out.push({ path: ['emailTemplates', i, 'attach', 'link'], message: `"${template.attach.link}" is not one of the outbox's links` });
+    }
+    // A block sent only with the document: marked `true`, and only where the document may be left out.
+    for (const [locale, content] of Object.entries(template.locales)) {
+      content.blocks.forEach((block, b) => {
+        const mark = block.data?.[WITH_ATTACHMENT];
+        if (mark === undefined) return;
+        const path = ['emailTemplates', i, 'locales', locale, 'blocks', b, 'data', WITH_ATTACHMENT];
+        if (mark !== true) out.push({ path, message: `${WITH_ATTACHMENT} is true or absent` });
+        else if (template.attach?.optional !== true) out.push({ path, message: 'a block is sent only with the document when the template may go without it (attach.optional)' });
+      });
     }
     if (!template.key.startsWith(`${m.key}-`)) {
       out.push({ path: ['emailTemplates', i, 'key'], message: `an app's template key starts with "${m.key}-"` });
@@ -465,6 +577,18 @@ export function outboxIssues(
     if (ref !== undefined) col(box.table, ref, name === 'skipReason' ? ['text', 'enum'] : ['text'], at('columns', name), 'a text column');
   }
   if (box.columns.effectAt !== undefined) col(box.table, box.columns.effectAt, ['timestamptz'], at('columns', 'effectAt'), 'a timestamptz');
+  if (box.columns.repeatKey !== undefined) {
+    const found = col(box.table, box.columns.repeatKey, ['text'], at('columns', 'repeatKey'), 'a text column');
+    if (found !== undefined && found.maxLength !== undefined && found.maxLength < REPEAT_KEY_LENGTH) {
+      out.push({ path: at('columns', 'repeatKey'), message: `"${box.table}.${found.ref}" must hold ${REPEAT_KEY_LENGTH} characters (a digest)` });
+    }
+  }
+  if (box.columns.was !== undefined) {
+    const found = col(box.table, box.columns.was, ['text'], at('columns', 'was'), 'a text column');
+    if (found !== undefined && found.maxLength !== undefined && found.maxLength < WAS_MIN_LENGTH) {
+      out.push({ path: at('columns', 'was'), message: `"${box.table}.${found.ref}" keeps a message's values from before a change: it holds ${WAS_MIN_LENGTH} characters or more` });
+    }
+  }
   /*
    * The columns Adminium writes as it sends and as a person approves or skips
    * a message — and the address and language it writes when it looks them up.
@@ -533,7 +657,10 @@ export function outboxIssues(
   fk(box.table, r.via, r.table, at('recipient', 'via'));
   col(r.table, r.email, ['text'], at('recipient', 'email'), 'a text column');
   if (r.name !== undefined) col(r.table, r.name, ['text'], at('recipient', 'name'), 'a text column');
-  if (r.language !== undefined) col(r.table, r.language, ['text'], at('recipient', 'language'), 'a text column');
+  if (typeof r.language === 'string') col(r.table, r.language, ['text'], at('recipient', 'language'), 'a text column');
+  else if (r.language !== undefined && box.columns.language === undefined) {
+    out.push({ path: at('recipient', 'language'), message: 'a message\'s language read from the row it is about is kept in the outbox\'s language column: name it' });
+  }
   if (r.optIn !== undefined) col(r.table, r.optIn, ['bool'], at('recipient', 'optIn'), 'a bool');
   if (r.fallback !== undefined) {
     const via = fk(box.table, r.fallback.via, undefined, at('recipient', 'fallback', 'via'));
@@ -551,6 +678,7 @@ export function outboxIssues(
     if (box.settings.enabled !== undefined) col(box.settings.table, box.settings.enabled, ['bool'], at('settings', 'enabled'), 'a bool');
     if (box.settings.name !== undefined) col(box.settings.table, box.settings.name, ['text'], at('settings', 'name'), 'a text column');
     if (box.settings.phone !== undefined) col(box.settings.table, box.settings.phone, ['text'], at('settings', 'phone'), 'a text column');
+    if (box.settings.replyTo !== undefined) col(box.settings.table, box.settings.replyTo, ['text'], at('settings', 'replyTo'), 'a text column (an address)');
   }
 
   for (const [value, template] of Object.entries(box.kinds)) {
@@ -560,11 +688,17 @@ export function outboxIssues(
     if (!templates.has(template)) out.push({ path: at('kinds', value), message: `"${template}" is not one of the app's emailTemplates` });
   }
 
+  const unlisted = (table: string, column: string) => unlistedColumn(m, table, column);
   (box.producers ?? []).forEach((producer, p) => {
     const here = (...rest: (string | number)[]) => at('producers', p, ...rest);
     if (box.kinds[producer.kind] === undefined) out.push({ path: here('kind'), message: `"${producer.kind}" is not one of the outbox's kinds` });
     if (producer.gate === 'enabled' && box.settings?.enabled === undefined) {
       out.push({ path: here('gate'), message: 'the outbox names no settings column to be gated by' });
+    } else if (typeof producer.gate === 'object' && 'feature' in producer.gate) {
+      const feature = producer.gate.feature;
+      if (!(m.addOns?.features ?? []).some((candidate) => candidate.id === feature)) {
+        out.push({ path: here('gate', 'feature'), message: `"${feature}" is not one of the app's addOns.features` });
+      }
     } else if (typeof producer.gate === 'object') {
       col(producer.gate.setting.table, producer.gate.setting.column, ['bool'], here('gate', 'setting'), 'a bool');
     }
@@ -620,10 +754,35 @@ export function outboxIssues(
         if (!valueFits(found, value)) out.push({ path: here('dropWhen', d), message: `${JSON.stringify(value)} is not a value of "${linked}.${drop.column}"` });
       }
     });
-    if (producer.dropWhen !== undefined && producer.hold !== true && producer.due === undefined && producer.batchMinutes === undefined) {
+    if (producer.dropWhen !== undefined && producer.hold !== true && producer.due === undefined && producer.batchMinutes === undefined && producer.holdSeconds === undefined) {
       out.push({ path: here('dropWhen'), message: 'only a message that waits (held, or due later) can be dropped' });
     }
-    if (producer.recipient !== undefined) setting(producer.recipient.setting, here('recipient', 'setting'));
+    // A short wait before it may go: kept in the due column, and the only wait it has.
+    if (producer.holdSeconds !== undefined) {
+      if (box.columns.due === undefined) out.push({ path: here('holdSeconds'), message: 'a message waits in the outbox\'s due column, and none is named' });
+      const other = producer.hold === true ? 'hold' : producer.due !== undefined ? 'due' : producer.batchMinutes !== undefined ? 'batchMinutes' : 'before' in producer ? 'before' : null;
+      if (other !== null) out.push({ path: here('holdSeconds'), message: `a message that waits a few seconds takes no ${other} as well` });
+    }
+    // One message per value of a column of the row it is about: kept as a digest in the outbox.
+    if (producer.repeatBy !== undefined) {
+      col(linked, producer.repeatBy, null, here('repeatBy'), '');
+      if (box.columns.repeatKey === undefined) out.push({ path: here('repeatBy'), message: 'which value a message was sent for is kept in the outbox\'s repeatKey column, and none is named' });
+      const other = 'before' in producer ? 'before' : producer.batchMinutes !== undefined ? 'batchMinutes' : null;
+      if (other !== null) out.push({ path: here('repeatBy'), message: `a message sent again for each value takes no ${other}: that is one per row or window already` });
+    }
+    if (producer.recipient !== undefined) {
+      if ('setting' in producer.recipient) setting(producer.recipient.setting, here('recipient', 'setting'));
+      else {
+        col(linked, producer.recipient.column, ['text'], here('recipient', 'column'), 'a text column');
+        if (producer.recipient.name !== undefined) col(linked, producer.recipient.name, ['text'], here('recipient', 'name'), 'a text column');
+        if (producer.recipient.language !== undefined) {
+          col(linked, producer.recipient.language, ['text'], here('recipient', 'language'), 'a text column');
+          if (box.columns.language === undefined) out.push({ path: here('recipient', 'language'), message: 'a message\'s language is kept in the outbox\'s language column: name it' });
+        }
+      }
+    }
+    // The language read from the row a message is about: every producer's row has it.
+    if (typeof r.language === 'object') col(linked, r.language.column, ['text'], here(), 'a text column (the message\'s language)');
     if (producer.batchMinutes !== undefined && 'before' in producer) {
       out.push({ path: here('batchMinutes'), message: 'a reminder before a moment is one per row already' });
     }
@@ -637,8 +796,13 @@ export function outboxIssues(
         } else {
           fk(linked, effect.via, effect.table, here('onSent', 'via'));
         }
+        const states = (index.table(effect.table) as { states?: { column: string; moves: Readonly<Record<string, readonly StateMove[]>> } } | undefined)?.states;
         for (const [ref, value] of Object.entries(effect.set)) {
           const found = col(effect.table, ref, null, here('onSent', 'set', ref), '');
+          // An email's change names no state it saw: a state only an undo reaches is never its to make.
+          if (states?.column === ref && value !== null && reachedOnlyByUndo(states, value)) {
+            out.push({ path: here('onSent', 'set', ref), message: `every move of "${effect.table}" to ${JSON.stringify(value)} is an undo, which only a person makes` });
+          }
           if (found !== undefined && value === null && found.nullable !== true) {
             out.push({ path: here('onSent', 'set', ref), message: `"${effect.table}.${ref}" is never empty` });
           } else if (found !== undefined && value !== null && !valueFits(found, value)) {
@@ -649,10 +813,40 @@ export function outboxIssues(
     }
     if ('onChange' in producer) {
       const change = producer.onChange;
-      const watched = col(change.table, change.column, null, here('onChange', 'column'), '');
-      if (watched !== undefined) for (const value of Array.isArray(change.to) ? change.to : [change.to]) {
-        if (!valueFits(watched, value)) out.push({ path: here('onChange', 'to'), message: `${JSON.stringify(value)} is not a value of "${change.table}.${change.column}"` });
+      if ('columns' in change) {
+        change.columns.forEach((column, c) => {
+          col(change.table, column, null, here('onChange', 'columns', c), '');
+          if (change.columns.indexOf(column) !== c) out.push({ path: here('onChange', 'columns', c), message: `"${column}" is listed twice` });
+        });
+      } else {
+        const watched = col(change.table, change.column, null, here('onChange', 'column'), '');
+        if (watched !== undefined) for (const value of Array.isArray(change.to) ? change.to : [change.to]) {
+          if (!valueFits(watched, value)) out.push({ path: here('onChange', 'to'), message: `${JSON.stringify(value)} is not a value of "${change.table}.${change.column}"` });
+        }
       }
+    }
+    // One message per change it hears of: a producer that listens for changes, and repeats no other way.
+    if (producer.repeat === true) {
+      if (!('onChange' in producer)) out.push({ path: here('repeat'), message: 'a message is sent for each change by a producer that listens for changes (onChange)' });
+      const other = producer.repeatBy !== undefined ? 'repeatBy' : producer.batchMinutes !== undefined ? 'batchMinutes' : null;
+      if (other !== null) out.push({ path: here('repeat'), message: `a message sent for each change takes no ${other}` });
+    }
+    // The changed row's columns as they were: kept on the message, read as {{was.<column>}}.
+    if (producer.was !== undefined) {
+      if (!('onChange' in producer)) out.push({ path: here('was'), message: 'a message keeps what a row was before a change on a producer that listens for changes (onChange)' });
+      else {
+        const table = producer.onChange.table;
+        producer.was.forEach((column, c) => {
+          const found = col(table, column, null, here('was', c), '');
+          if (producer.was!.indexOf(column) !== c) out.push({ path: here('was', c), message: `"${column}" is listed twice` });
+          // Personal data as the install tells it too: by its mark, or guessed by its name — a message keeps it empty.
+          const tableDoc = m.requiredSchema.tables.find((candidate) => candidate.ref === table) as Parameters<typeof personalColumn>[0] | undefined;
+          const guessed = tableDoc !== undefined && personalColumn(tableDoc, column) === 'guessed' ? 'personal data' : null;
+          const kept = found === undefined ? null : (unlisted(table, column) ?? guessed);
+          if (kept !== null) out.push({ path: here('was', c), message: `"${table}.${column}" is ${kept}, which a message never keeps` });
+        });
+      }
+      if (box.columns.was === undefined) out.push({ path: here('was'), message: 'a message keeps what a row was in the outbox\'s was column, and none is named' });
     }
     if ('before' in producer) {
       const before = producer.before;
@@ -667,5 +861,301 @@ export function outboxIssues(
       }
     }
   });
+  out.push(...emailBlockIssues(m.emailTemplates ?? [], box, index, (table, column) => unlistedColumn(m, table, column)));
   return out;
+}
+
+// ── blocks that list rows, and QR codes ──────────────────────────────────────
+
+/**
+ * `email.rows`: the rows of a child table that link to the row an outbox link
+ * names, one line each (an order's tickets, with a QR code each). `from` is
+ * the documents' collection spelling: the link, the child table, the child's
+ * link back, its order, a filter and a bool that leaves a row out, and at
+ * most 50 rows. `joins` gathers up to two child lists of each row into one
+ * text (a dish's options). `row` is each line's text, reading `{{row.<column>}}`
+ * (`{{row.<link>.<column>}}` through one of the row's own links, and a join by
+ * its name); `image` is a QR code of a code column (`{{row.code.qr}}`) and
+ * nothing else. `empty` is said when there are no rows; without it the block
+ * is left out.
+ */
+export const emailRowsDataSchema = z
+  .object({
+    from: z
+      .object({
+        link: z.string().regex(/^[a-z][a-z_]*$/, 'a link name is snake_case'),
+        table: refSchema,
+        via: refSchema,
+        orderBy: refSchema.optional(),
+        where: z.object({ column: refSchema, in: z.array(scalarSchema).min(1).max(32) }).strict().optional(),
+        unless: refSchema.optional(),
+        limit: z.number().int().min(1).max(50).optional(),
+      })
+      .strict(),
+    joins: z
+      .record(
+        refSchema,
+        z
+          .object({ table: refSchema, via: refSchema, column: refSchema, orderBy: refSchema.optional(), separator: z.string().min(1).max(8).optional() })
+          .strict(),
+      )
+      .refine((joins) => Object.keys(joins).length >= 1 && Object.keys(joins).length <= 2, { message: 'a row joins one or two lists' })
+      .optional(),
+    row: z
+      .object({
+        title: z.string().min(1).max(300).optional(),
+        meta: z.string().min(1).max(300).optional(),
+        amount: z.string().min(1).max(300).optional(),
+        note: z.string().min(1).max(300).optional(),
+        image: z.string().min(1).max(300).optional(),
+      })
+      .strict(),
+    empty: z.string().min(1).max(200).optional(),
+  })
+  .strict();
+export type EmailRowsData = z.infer<typeof emailRowsDataSchema>;
+
+/** A QR code of a code column, as the whole value of an image: `{{ticket.code.qr}}`. */
+const QR_VALUE = /^\{\{\s*([A-Za-z0-9_.-]+)\.qr\s*\}\}$/;
+const PLACEHOLDERS = /\{\{\s*([A-Za-z0-9_.-]+)\s*\}\}/g;
+
+/** Every string inside a value, with the path it sits at. */
+function stringsIn(value: unknown, path: (string | number)[], out: { text: string; path: (string | number)[] }[] = []) {
+  if (typeof value === 'string') out.push({ text: value, path });
+  else if (Array.isArray(value)) value.forEach((item, i) => stringsIn(item, [...path, i], out));
+  else if (typeof value === 'object' && value !== null) for (const [key, item] of Object.entries(value)) stringsIn(item, [...path, key], out);
+  return out;
+}
+
+/**
+ * Everything wrong with the blocks of the app's templates that list rows or
+ * draw a QR code: the rows' link, table and columns; each `{{row.*}}` a row
+ * can fill; the same rows in every language; and a QR code only as a whole
+ * image value, of a code column.
+ */
+function emailBlockIssues(templates: readonly EmailTemplate[], box: Outbox, index: TableIndex, unlisted: (table: string, column: string) => string | null): ReferenceIssue[] {
+  const out: ReferenceIssue[] = [];
+  const links = box.links ?? {};
+  /** The table a link names. */
+  const linkTable = (link: string): string | undefined => {
+    const column = links[link];
+    return column === undefined ? undefined : index.column(box.table, column)?.references;
+  };
+  /** The table a template prefix reads (`ticket`, `order.event`), when the manifest can place it. */
+  const prefixTable = (prefix: string): string | undefined => {
+    const [head, ...rest] = prefix.split('.');
+    let table = linkTable(head!);
+    for (const base of rest) {
+      if (table === undefined) return undefined;
+      table = index.column(table, `${base}_id`)?.references;
+    }
+    return table;
+  };
+  /** Why `{{<prefix>.<column>.qr}}` draws no QR code, or null. */
+  const qrIssue = (table: string | undefined, name: string): string | null => {
+    const parts = name.split('.');
+    const column = parts.at(-1)!;
+    if (table === undefined) return null;
+    const found = index.column(table, column) as (ReturnType<typeof index.column> & { rules?: { code?: unknown } }) | undefined;
+    if (found === undefined) return `"${table}" has no column "${column}"`;
+    if (found.type !== 'text' || found.rules?.code === undefined) return `"${table}.${column}" is not a code column, so it has no QR code`;
+    return null;
+  };
+
+  templates.forEach((template, t) => {
+    let rowsOf: string | undefined;
+    for (const [locale, content] of Object.entries(template.locales)) {
+      const here = (...rest: (string | number)[]) => ['emailTemplates', t, 'locales', locale, ...rest];
+      const rows: string[] = [];
+      content.blocks.forEach((block, b) => {
+        const at = (...rest: (string | number)[]) => here('blocks', b, ...rest);
+        const qrSlot = block.block === 'email.image' ? block.data?.['qr'] : undefined;
+        // A QR code is the whole value of an image, and nothing else.
+        for (const { text, path } of stringsIn({ subject: content.subject, preheader: content.preheader, footer: content.footer, data: block.data }, [])) {
+          if (!/\.qr\s*\}\}/.test(text)) continue;
+          const isSlot = (block.block === 'email.image' && path.join('.') === 'data.qr') || (block.block === 'email.rows' && path.join('.') === 'data.row.image');
+          if (!isSlot || !QR_VALUE.test(text)) out.push({ path: path[0] === 'data' ? at(...path) : here(path[0]!), message: 'a QR code is the whole value of an image (email.image "qr", or a row\'s "image"), nowhere else' });
+        }
+        if (block.block === 'email.image' && qrSlot !== undefined) {
+          const match = typeof qrSlot === 'string' ? QR_VALUE.exec(qrSlot) : null;
+          if (match === null) out.push({ path: at('data', 'qr'), message: 'an image\'s QR code is written {{<link>.<column>.qr}}' });
+          else if (match[1]!.startsWith('row.')) out.push({ path: at('data', 'qr'), message: 'a row\'s QR code is drawn by an email.rows block' });
+          else {
+            const parts = match[1]!.split('.');
+            const issue = qrIssue(prefixTable(parts.slice(0, -1).join('.')), match[1]!);
+            if (issue !== null) out.push({ path: at('data', 'qr'), message: issue });
+          }
+          const size = block.data?.['size'];
+          if (size !== undefined && (typeof size !== 'number' || !Number.isInteger(size) || size < 80 || size > 200)) {
+            out.push({ path: at('data', 'size'), message: 'a QR code is 80 to 200 pixels across' });
+          }
+        }
+        if (block.block !== 'email.rows') {
+          // Only a block that lists rows has a row to read.
+          for (const { text, path } of stringsIn(block.data, [])) {
+            if ([...text.matchAll(PLACEHOLDERS)].some((m) => m[1]!.startsWith('row.'))) {
+              out.push({ path: at('data', ...path), message: '{{row.…}} is read only inside an email.rows block' });
+            }
+          }
+          return;
+        }
+        const parsed = emailRowsDataSchema.safeParse(block.data ?? {});
+        if (!parsed.success) {
+          for (const issue of parsed.error.issues) out.push({ path: at('data', ...issue.path.map((p) => (typeof p === 'symbol' ? String(p) : p))), message: issue.message });
+          return;
+        }
+        const data = parsed.data;
+        rows.push(JSON.stringify({ from: data.from, joins: data.joins ?? null }));
+        const from = data.from;
+        const parent = linkTable(from.link);
+        if (links[from.link] === undefined) out.push({ path: at('data', 'from', 'link'), message: `"${from.link}" is not one of the outbox's links` });
+        if (index.table(from.table) === undefined) {
+          out.push({ path: at('data', 'from', 'table'), message: `"${from.table}" is not a table of this app` });
+          return;
+        }
+        const via = index.column(from.table, from.via);
+        if (via?.type !== 'fk' || (parent !== undefined && via.references !== parent)) {
+          out.push({ path: at('data', 'from', 'via'), message: `"${from.table}.${from.via}" does not point at the row "${from.link}" names` });
+        }
+        for (const [name, ref] of [['orderBy', from.orderBy], ['where', from.where?.column], ['unless', from.unless]] as const) {
+          if (ref !== undefined && index.column(from.table, ref) === undefined) out.push({ path: at('data', 'from', name), message: `"${from.table}" has no column "${ref}"` });
+        }
+        if (from.unless !== undefined && index.column(from.table, from.unless) !== undefined && index.column(from.table, from.unless)?.type !== 'bool') {
+          out.push({ path: at('data', 'from', 'unless'), message: `"${from.table}.${from.unless}" is not a bool` });
+        }
+        const where = from.where;
+        const filter = where === undefined ? undefined : index.column(from.table, where.column);
+        if (where !== undefined && filter !== undefined) {
+          for (const value of where.in) if (!valueFits(filter, value)) out.push({ path: at('data', 'from', 'where'), message: `${JSON.stringify(value)} is not a value of "${from.table}.${where.column}"` });
+        }
+        for (const [name, join] of Object.entries(data.joins ?? {})) {
+          const path = at('data', 'joins', name);
+          if (index.table(join.table) === undefined) {
+            out.push({ path, message: `"${join.table}" is not a table of this app` });
+            continue;
+          }
+          const back = index.column(join.table, join.via);
+          if (back?.type !== 'fk' || back.references !== from.table) out.push({ path: [...path, 'via'], message: `"${join.table}.${join.via}" does not point at "${from.table}"` });
+          const shown = index.column(join.table, join.column);
+          if (shown === undefined) out.push({ path: [...path, 'column'], message: `"${join.table}" has no column "${join.column}"` });
+          else if (shown.type !== 'text') out.push({ path: [...path, 'column'], message: `"${join.table}.${join.column}" is not a text column` });
+          else {
+            const kept = unlisted(join.table, join.column);
+            if (kept !== null) out.push({ path: [...path, 'column'], message: `"${join.table}.${join.column}" is ${kept}, which an email never lists from another row` });
+          }
+          if (join.orderBy !== undefined && index.column(join.table, join.orderBy) === undefined) out.push({ path: [...path, 'orderBy'], message: `"${join.table}" has no column "${join.orderBy}"` });
+        }
+        // Each {{row.*}} names something a row fills, in a form its type has.
+        for (const { text, path } of stringsIn({ row: data.row, empty: data.empty }, [])) {
+          for (const m of text.matchAll(PLACEHOLDERS)) {
+            const name = m[1]!;
+            if (!name.startsWith('row.')) continue;
+            const parts = name.split('.').slice(1);
+            const where = at('data', ...path);
+            if (parts.length === 1 && data.joins?.[parts[0]!] !== undefined) continue;
+            const qr = parts.at(-1) === 'qr';
+            const bare = qr ? parts.slice(0, -1) : parts;
+            // `row.col`, `row.col.form`, and one link of the row's own: `row.base.col`, `row.base.col.form` (through `base_id`).
+            let table = from.table;
+            let column = bare[0]!;
+            let form = bare[1];
+            if (index.column(from.table, column) === undefined) {
+              const link = index.column(from.table, `${column}_id`);
+              if (link?.type !== 'fk' || link.references === undefined) {
+                out.push({ path: where, message: `{{${name}}}: "${from.table}" has no column "${column}", no link "${column}_id" and no join "${column}"` });
+                continue;
+              }
+              table = link.references;
+              column = bare[1] ?? '';
+              form = bare[2];
+            }
+            const found = index.column(table, column);
+            if (found === undefined) {
+              out.push({ path: where, message: `{{${name}}}: "${table}" has no column "${column}"` });
+              continue;
+            }
+            if (qr) {
+              if (path.join('.') !== 'row.image') continue; // said above
+              const issue = qrIssue(table, `${table}.${column}`);
+              if (issue !== null) out.push({ path: where, message: issue });
+            } else if (form !== undefined && !rowFormsOf(found).includes(form)) {
+              out.push({
+                path: where,
+                message:
+                  form === 'time' && found.type === 'text'
+                    ? `{{${name}}}: "${table}.${column}" is not a time of day kept as text (a text column of at most 8 characters), so it has no "time" form`
+                    : `{{${name}}}: "${table}.${column}" is a ${found.type} column, which has no "${form}" form`,
+              });
+            }
+          }
+        }
+        if (data.row.image !== undefined && !QR_VALUE.test(data.row.image)) {
+          out.push({ path: at('data', 'row', 'image'), message: 'a row\'s image is a QR code of a code column: {{row.<column>.qr}}' });
+        }
+      });
+      // A translation changes the words, never which rows are listed.
+      const key = rows.join('\n');
+      if (rowsOf === undefined) rowsOf = key;
+      else if (key !== rowsOf) out.push({ path: here('blocks'), message: 'every language lists the same rows: from and joins are the same in each' });
+    }
+  });
+  return out;
+}
+
+/** The forms of a number: as a number, a percentage and an amount of money, in the message's language. */
+const NUMBER_FORMS = ['number', 'percent', 'money'] as const;
+
+/** The forms of a value a row's column may be read in, by its type (as the sender fills a template's). */
+const ROW_FORMS: Readonly<Record<string, readonly string[]>> = {
+  timestamptz: ['date', 'time', 'day_month', 'relative_day'],
+  date: ['day_month', 'days_since'],
+  int: NUMBER_FORMS,
+  bigint: NUMBER_FORMS,
+  decimal: NUMBER_FORMS,
+  money: NUMBER_FORMS,
+  float: NUMBER_FORMS,
+  // A choice by its label; a time of day kept as text (`15:00`) in the reader's clock.
+  enum: ['label'],
+  text: ['time'],
+};
+
+/** The most characters a time of day kept as text takes: `09:30:00`. */
+export const CLOCK_TEXT_MAX = 8;
+
+/**
+ * Whether a text column keeps a time of day (`15:00`): one no longer than
+ * {@link CLOCK_TEXT_MAX} characters. Only such a column has a `time` form —
+ * the sender fills it from a value shaped like a clock, and a longer text
+ * column (a note, a name) never holds one.
+ */
+export function clockShaped(column: { type: string; maxLength?: number | undefined; rules?: { validation?: { maxLength?: number | undefined } | undefined } | undefined }): boolean {
+  if (column.type !== 'text') return false;
+  const widths = [column.maxLength, column.rules?.validation?.maxLength].filter((width): width is number => typeof width === 'number');
+  return widths.length > 0 && Math.min(...widths) <= CLOCK_TEXT_MAX;
+}
+
+/** The form of a code in groups of four (`K7QX-M2PD`), as a person reads it out. */
+export const GROUPED_FORM = 'grouped';
+
+/**
+ * A code in groups of four joined by `-` (`K7QXM2PD` → `K7QX-M2PD`), the way
+ * a person reads it out; separators already in it are dropped first. Empty
+ * stays empty.
+ */
+export function groupedCode(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  const bare = String(value).replace(/[\s-]+/g, '');
+  return (bare.match(/.{1,4}/g) ?? []).join('-');
+}
+
+/** Whether a column holds a code Adminium makes: a text column with a `code` rule. */
+export function isCodeColumn(column: { type: string; rules?: { code?: unknown } | undefined }): boolean {
+  return column.type === 'text' && column.rules?.code !== undefined;
+}
+
+/** The forms a row's column may be read in: its type's, a text column's `time` only when it keeps a time of day, and a code's groups. */
+export function rowFormsOf(column: Parameters<typeof clockShaped>[0] & { rules?: { code?: unknown } | undefined }): readonly string[] {
+  const forms = ROW_FORMS[column.type] ?? [];
+  const own = column.type === 'text' && !clockShaped(column) ? forms.filter((form) => form !== 'time') : forms;
+  return isCodeColumn(column) ? [...own, GROUPED_FORM] : own;
 }

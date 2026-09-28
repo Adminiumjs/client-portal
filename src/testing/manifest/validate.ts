@@ -23,9 +23,11 @@ import {
   FIRST_PARTY_PUBLISHER_ID,
   RESERVED_KEYS,
   addOnIssues,
+  cappedFormulaWarnings,
   manifestSchema,
   type Manifest,
 } from './schema.ts';
+import { tableShapeIssues } from './table-shapes.ts';
 
 export interface ManifestIssue {
   /** Dotted path to the offending field, e.g. `publisher.id`. */
@@ -63,7 +65,10 @@ export type ValidateManifestResult =
   | { ok: false; issues: ManifestIssue[]; warnings: ManifestIssue[] };
 
 /** Rules that fill a column, so an insert may leave it out. */
-const FILLING_RULES = ['copy', 'sequence', 'code', 'rollup', 'stamp', 'formula', 'format', 'default'] as const;
+const FILLING_RULES = ['copy', 'sequence', 'code', 'rollup', 'stamp', 'formula', 'format', 'default', 'lookup', 'perNight'] as const;
+
+/** A setting key that reads like bank details (an IBAN, an account or routing number). */
+const BANK_SETTING = /(^|_)(bank|iban|swift|routing)(_|$)|account_?(number|no|name)|sort_?code/i;
 
 /**
  * Advice about an app that validates: a column with no default that is not
@@ -81,6 +86,31 @@ export function manifestWarnings(manifest: Manifest): ManifestIssue[] {
         path: `requiredSchema.tables.${String(t)}.columns.${String(c)}`,
         message: `"${table.ref}.${column.ref}" has no default and is not nullable, so it will be required at install: every new row must give it a value`,
       });
+    });
+    // MySQL compares text ignoring case and accents; Postgres and SQLite do not.
+    (table.unique ?? []).forEach((set, k) => {
+      for (const ref of set) {
+        const column = table.columns.find((c) => c.ref === ref);
+        if (column?.type !== 'text' || column.rules?.normalize !== undefined || column.rules?.code !== undefined) continue;
+        out.push({
+          path: `requiredSchema.tables.${String(t)}.unique.${String(k)}`,
+          message: `MySQL compares "${table.ref}.${ref}" ignoring case and accents, Postgres and SQLite do not: give it normalize "email" or "trim"`,
+        });
+      }
+    });
+  });
+  // A capped balance worked out from a formula whose columns stay open while the capped rows exist.
+  for (const warning of cappedFormulaWarnings(manifest.requiredSchema?.tables ?? [])) out.push({ path: warning.path.map(String).join('.'), message: warning.message });
+  /*
+   * Every manifest setting that is not secret is published to the app's
+   * customer side. Bank details belong in the app's settings table, read
+   * only by a signed-in guest; one declared here must at least be secret.
+   */
+  (manifest.settings ?? []).forEach((setting, s) => {
+    if (setting.secret === true || !BANK_SETTING.test(setting.key)) return;
+    out.push({
+      path: `settings.${String(s)}`,
+      message: `"${setting.key}" reads like bank details, and a setting that is not secret is published to the customer side: keep them in the settings table, or mark it secret`,
     });
   });
   return out;
@@ -132,9 +162,51 @@ export function validateManifest(
     }),
   );
 
+  issues.push(...sampleDataIssues(manifest));
+  // A table shared under a shape Adminium writes down is what that shape says.
+  if (manifest.kind === 'app') issues.push(...tableShapeIssues(manifest));
+
   const warnings = manifestWarnings(manifest);
   if (issues.length > 0) return { ok: false, issues, warnings };
   return { ok: true, manifest, warnings };
+}
+
+/** `sampleData.skipWhenShared` names the app's own tables, its `table` is one it shares, and no table left in links to a skipped one. */
+function sampleDataIssues(manifest: Manifest): ManifestIssue[] {
+  const rule = manifest.kind === 'app' ? manifest.sampleData?.skipWhenShared : undefined;
+  if (rule === undefined) return [];
+  const out: ManifestIssue[] = [];
+  const tables = new Map((manifest.requiredSchema?.tables ?? []).map((table) => [table.ref, table]));
+  const shared = tables.get(rule.table);
+  if (shared === undefined) {
+    out.push({ path: 'sampleData.skipWhenShared.table', message: `"${rule.table}" is not one of this app's tables` });
+  } else if (shared.shape === undefined) {
+    out.push({
+      path: 'sampleData.skipWhenShared.table',
+      message: `"${rule.table}" is built on no shape, so no other app can share it`,
+    });
+  }
+  const seen = new Set<string>();
+  rule.skip.forEach((ref, i) => {
+    if (!tables.has(ref)) out.push({ path: `sampleData.skipWhenShared.skip.${String(i)}`, message: `"${ref}" is not one of this app's tables` });
+    else if (seen.has(ref)) out.push({ path: `sampleData.skipWhenShared.skip.${String(i)}`, message: `"${ref}" is listed twice` });
+    seen.add(ref);
+  });
+  /*
+   * Closed under links: a table left in whose rows point at a skipped table
+   * would point its sample rows at rows never added, so every add would fail.
+   */
+  for (const table of tables.values()) {
+    if (seen.has(table.ref)) continue;
+    for (const column of table.columns) {
+      if (column.type !== 'fk' || column.references === undefined || !seen.has(column.references)) continue;
+      out.push({
+        path: 'sampleData.skipWhenShared.skip',
+        message: `"${table.ref}" links to "${column.references}" (${column.ref}), which is skipped: skip "${table.ref}" too, or its sample rows point at rows never added`,
+      });
+    }
+  }
+  return out;
 }
 
 /** Throwing variant for trusted callers (build tooling); use the safe form at runtime. */

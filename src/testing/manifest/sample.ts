@@ -21,6 +21,10 @@
  *
  *   `{"@ref": "<label>"}`      the key of an earlier row with that `@label`
  *   `{"@ago": "PT19M"}`        an ISO-8601 duration before now
+ *   `{"@in": "PT20M", "@grid": 15}`   an ISO-8601 duration after now; with
+ *                               `@grid`, rounded up to the next time on that
+ *                               many minutes' grid of the venue's own clock
+ *                               (the first pickup slot at least 20 minutes on)
  *   `{"@day": -1, "@time": "09:30"}`   a wall time in the venue's own zone,
  *                               days from today
  *   `{"@day": 3}`              a date in the venue's own zone
@@ -29,7 +33,15 @@
  *
  * A `@day` may add `"@workdays": true`: its days count Monday to Friday, and
  * day 0 on a weekend is the Monday after — so "today's" busy day is never a
- * Saturday.
+ * Saturday. Or `"@week": true`: its days count from the bundle's anchor day
+ * (`weekAnchor`, a weekday) in the week nearest today, so every date keeps
+ * the weekday the sample was written for — a weekend stay stays on a
+ * weekend, whatever day the sample is added on.
+ *
+ *   `{"@in": "PT20M", "@slot": "orders"}`   the first open time of that
+ *                               table's slot limit at least that far ahead —
+ *                               its hours, closures and pauses, on its grid —
+ *                               on the next day it opens when today has none
  *
  *   `{"@month": -2, "@dom": 14}`   a date in the venue's own zone: that day of
  *                               the month so many months from this one; with
@@ -47,7 +59,13 @@
  * falls against the adding moment — more than half an hour before, within
  * half an hour, or later — so a sample day's statuses match the clock it is
  * added at. A set with `"@skip": true` leaves the row out (a payment for a
- * visit that has not happened yet).
+ * visit that has not happened yet). Or `@byStay` `{from, to, times?, before,
+ * during, after}`: by where the adding moment falls against the row's two
+ * times — its arrival and its departure (columns of the row, or `@day`s) —
+ * before the stay, during it, or after it; a date is read at `times.from` /
+ * `times.to` on its day (arriving from 15:00, leaving by 11:00), else at its
+ * midnight. So a stay's status (booked, in house, departed) matches the
+ * clock it is added at. A row takes one of the two.
  *
  * `"@onlyIfEmpty": true` is for a table that holds one row, the app's own
  * settings: the row is added only when the table has none, and otherwise its
@@ -71,12 +89,25 @@ const directive = z.union([
   z.object({ '@ago': z.string().regex(ISO_DURATION, 'an ISO-8601 duration such as PT19M') }).strict(),
   z
     .object({
+      '@in': z.string().regex(ISO_DURATION, 'an ISO-8601 duration such as PT20M'),
+      '@grid': z.number().int().min(1).max(1440).optional(),
+      '@slot': z.string().regex(/^[a-z][a-z0-9_]*$/, 'a table').optional(),
+    })
+    .strict()
+    .refine((d) => d['@grid'] === undefined || d['@slot'] === undefined, { message: 'a time on a slot limit takes its grid from the limit' }),
+  z
+    .object({
       '@day': z.number().int().min(-366).max(366),
       '@time': z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'a time such as 09:30'),
       '@workdays': z.literal(true).optional(),
+      '@week': z.literal(true).optional(),
     })
-    .strict(),
-  z.object({ '@day': z.number().int().min(-366).max(366), '@workdays': z.literal(true).optional() }).strict(),
+    .strict()
+    .refine((d) => d['@workdays'] === undefined || d['@week'] === undefined, { message: 'days count working days or from the week anchor, not both' }),
+  z
+    .object({ '@day': z.number().int().min(-366).max(366), '@workdays': z.literal(true).optional(), '@week': z.literal(true).optional() })
+    .strict()
+    .refine((d) => d['@workdays'] === undefined || d['@week'] === undefined, { message: 'days count working days or from the week anchor, not both' }),
   z
     .object({
       '@month': z.number().int().min(-120).max(0),
@@ -110,13 +141,35 @@ export const byClockSchema = z
   .strict();
 export type ByClock = z.infer<typeof byClockSchema>;
 
+const clockText = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'a time such as 15:00');
+
+/** `@byStay`: a row's columns by where the adding moment falls against its two times — before, during or after its stay. */
+export const byStaySchema = z
+  .object({
+    /** The arrival and the departure: columns of the row, or the times themselves. */
+    from: z.union([z.string().min(1), directive]),
+    to: z.union([z.string().min(1), directive]),
+    /** The wall times a date is read at: arriving from, leaving by. */
+    times: z.object({ from: clockText.optional(), to: clockText.optional() }).strict().optional(),
+    before: clockBranchSchema.optional(),
+    during: clockBranchSchema.optional(),
+    after: clockBranchSchema.optional(),
+  })
+  .strict();
+export type ByStay = z.infer<typeof byStaySchema>;
+
 /** The keys of a row that are directives about the row, not columns. */
-export const ROW_DIRECTIVES: ReadonlySet<string> = new Set(['@label', '@byClock', '@onlyIfEmpty']);
+export const ROW_DIRECTIVES: ReadonlySet<string> = new Set(['@label', '@byClock', '@byStay', '@onlyIfEmpty']);
+
+/** The weekdays a bundle's week anchor names. */
+export const SAMPLE_WEEKDAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
 
 export const sampleBundleSchema = z
   .object({
     format: z.literal(SAMPLE_FORMAT),
     app: z.string().min(1),
+    /** The weekday the sample's `@week` days count from (the day it was written for), in the week nearest the adding day. */
+    weekAnchor: z.enum(SAMPLE_WEEKDAYS).optional(),
     assets: z
       .record(label, z.object({ file: z.string().regex(/^seeds\/[a-z0-9][a-z0-9._/-]*$/), sha256: z.string().regex(/^[a-f0-9]{64}$/) }).strict())
       .default({}),
@@ -133,8 +186,9 @@ export type SampleValue = z.infer<typeof sampleValueSchema>;
 export function sampleDirective(value: unknown):
   | { kind: 'ref'; label: string }
   | { kind: 'ago'; duration: string }
-  | { kind: 'wall'; day: number; time: string; workdays: boolean }
-  | { kind: 'date'; day: number; workdays: boolean }
+  | { kind: 'in'; duration: string; grid: number | null; slot: string | null }
+  | { kind: 'wall'; day: number; time: string; workdays: boolean; week: boolean }
+  | { kind: 'date'; day: number; workdays: boolean; week: boolean }
   | { kind: 'month'; months: number; dom: number; time: string | null }
   | { kind: 't'; texts: Record<string, string> }
   | { kind: 'asset'; label: string }
@@ -143,10 +197,18 @@ export function sampleDirective(value: unknown):
   const record = value as Record<string, unknown>;
   if (typeof record['@ref'] === 'string') return { kind: 'ref', label: record['@ref'] };
   if (typeof record['@ago'] === 'string') return { kind: 'ago', duration: record['@ago'] };
-  if (typeof record['@day'] === 'number' && typeof record['@time'] === 'string') {
-    return { kind: 'wall', day: record['@day'], time: record['@time'], workdays: record['@workdays'] === true };
+  if (typeof record['@in'] === 'string') {
+    return {
+      kind: 'in',
+      duration: record['@in'],
+      grid: typeof record['@grid'] === 'number' ? record['@grid'] : null,
+      slot: typeof record['@slot'] === 'string' ? record['@slot'] : null,
+    };
   }
-  if (typeof record['@day'] === 'number') return { kind: 'date', day: record['@day'], workdays: record['@workdays'] === true };
+  if (typeof record['@day'] === 'number' && typeof record['@time'] === 'string') {
+    return { kind: 'wall', day: record['@day'], time: record['@time'], workdays: record['@workdays'] === true, week: record['@week'] === true };
+  }
+  if (typeof record['@day'] === 'number') return { kind: 'date', day: record['@day'], workdays: record['@workdays'] === true, week: record['@week'] === true };
   if (typeof record['@month'] === 'number' && typeof record['@dom'] === 'number') {
     return { kind: 'month', months: record['@month'], dom: record['@dom'], time: typeof record['@time'] === 'string' ? record['@time'] : null };
   }
@@ -176,6 +238,31 @@ export interface SampleIssue {
 }
 
 /**
+ * What a time directive needs of the bundle and the manifest: a `@week` day
+ * the bundle's week anchor, and a `@slot` time a table of the app with a slot
+ * limit to find its open times in.
+ */
+function timeDirectiveIssues(
+  found: ReturnType<typeof sampleDirective>,
+  path: string,
+  bundle: SampleBundle,
+  declared: ReadonlyMap<string, { capacity?: unknown }>,
+): SampleIssue[] {
+  if (found === null) return [];
+  if ((found.kind === 'wall' || found.kind === 'date') && found.week && bundle.weekAnchor === undefined) {
+    return [{ path, message: 'A `@week` day counts from the bundle’s week anchor: name it (`weekAnchor`).' }];
+  }
+  if (found.kind === 'in' && found.slot !== null) {
+    const capacity = declared.get(found.slot)?.capacity;
+    const rules = capacity === undefined ? [] : Array.isArray(capacity) ? capacity : [capacity];
+    if (!rules.some((rule) => ((rule as { kind?: string }).kind ?? 'slot') === 'slot')) {
+      return [{ path, message: `"${found.slot}" keeps no slot limit, so it has no open times to find.` }];
+    }
+  }
+  return [];
+}
+
+/**
  * Everything wrong with a bundle for this manifest: a table it does not
  * declare, a column the table does not have, a label used twice, a `@ref` to
  * a row that comes later or not at all, an `@asset` it does not list, a
@@ -195,6 +282,17 @@ export function sampleBundleIssues(bundle: SampleBundle, manifest: Manifest): Sa
       continue;
     }
     const columns = new Set(shape.columns.map((column) => column.ref));
+    // A row priced by the night is priced as it is written, from its rate and adjustment rows: those come first.
+    for (const column of shape.columns) {
+      const rule = column.rules?.perNight;
+      if (rule === undefined) continue;
+      const rateTable = shape.columns.find((c) => c.ref === rule.rate.via)?.references;
+      for (const source of [rateTable, rule.adjust?.table]) {
+        if (source === undefined) continue;
+        const listed = bundle.tables.findIndex((other) => other.ref === source);
+        if (listed >= t) issues.push({ path: `tables.${String(t)}.ref`, message: `"${source}" must come before "${table.ref}": "${table.ref}" is priced from it.` });
+      }
+    }
     // A number Adminium gives without gaps: a sample row names it, empty, or the load numbers it into the real series.
     const gapless = shape.columns.filter((column) => column.rules?.sequence?.gapless === true).map((column) => column.ref);
     for (const [r, row] of table.rows.entries()) {
@@ -215,6 +313,36 @@ export function sampleBundleIssues(bundle: SampleBundle, manifest: Manifest): Sa
         }
         if (column === '@onlyIfEmpty') {
           if (value !== true) issues.push({ path: `${at}.@onlyIfEmpty`, message: '"@onlyIfEmpty" is true, or absent.' });
+          continue;
+        }
+        if (column === '@byStay') {
+          if (row['@byClock'] !== undefined) issues.push({ path: `${at}.@byStay`, message: 'A row takes @byClock or @byStay, not both.' });
+          const stay = byStaySchema.safeParse(value);
+          if (!stay.success) {
+            issues.push({ path: `${at}.@byStay`, message: '@byStay names its two times (`from`, `to`) and up to three sets: before, during, after.' });
+            continue;
+          }
+          for (const end of ['from', 'to'] as const) {
+            const when = stay.data[end];
+            if (typeof when === 'string' && !(columns.has(when) && when in row)) {
+              issues.push({ path: `${at}.@byStay.${end}`, message: `"${when}" is not a column this row sets.` });
+            } else if (typeof when !== 'string' && !['wall', 'date'].includes(sampleDirective(when)?.kind ?? '')) {
+              issues.push({ path: `${at}.@byStay.${end}`, message: 'A time is a column of the row or a `@day` (with a `@time`, or not).' });
+            }
+          }
+          for (const branch of ['before', 'during', 'after'] as const) {
+            for (const [name, part] of Object.entries(stay.data[branch] ?? {})) {
+              if (name === '@skip') {
+                if (part !== true) issues.push({ path: `${at}.@byStay.${branch}.@skip`, message: '"@skip" is true, or absent.' });
+                continue;
+              }
+              if (!columns.has(name)) issues.push({ path: `${at}.@byStay.${branch}.${name}`, message: `"${table.ref}" has no column "${name}".` });
+              const found = sampleDirective(part);
+              if (found?.kind === 'ref' && !seen.has(found.label)) {
+                issues.push({ path: `${at}.@byStay.${branch}.${name}`, message: `"${found.label}" is not an earlier row: a referenced row must come first.` });
+              }
+            }
+          }
           continue;
         }
         if (column === '@byClock') {
@@ -269,6 +397,18 @@ export function sampleBundleIssues(bundle: SampleBundle, manifest: Manifest): Sa
         }
         if (found?.kind === 'asset' && bundle.assets[found.label] === undefined) {
           issues.push({ path: `${at}.${column}`, message: `"${found.label}" is not one of the bundle’s assets.` });
+        }
+        issues.push(...timeDirectiveIssues(found, `${at}.${column}`, bundle, declared));
+      }
+      // A time a row directive reads or sets obeys the same rules as a column's.
+      for (const rowDirective of ['@byClock', '@byStay'] as const) {
+        const set = row[rowDirective];
+        if (typeof set !== 'object' || set === null) continue;
+        for (const [key, part] of Object.entries(set as Record<string, unknown>)) {
+          const parts = typeof part === 'object' && part !== null && !Array.isArray(part) && sampleDirective(part) === null ? Object.entries(part as Record<string, unknown>) : [['', part] as const];
+          for (const [name, inner] of parts) {
+            issues.push(...timeDirectiveIssues(sampleDirective(inner), `${at}.${rowDirective}.${key}${name === '' ? '' : `.${name}`}`, bundle, declared));
+          }
         }
       }
       // Labelled AFTER its own values are checked: a row cannot refer to itself.
