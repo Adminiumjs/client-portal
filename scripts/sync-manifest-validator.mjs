@@ -64,6 +64,8 @@ const FILES = [
   ['packages/manifest/src/semver.ts', 'semver.ts'],
   ['packages/manifest/src/booking.ts', 'booking.ts'],
   ['packages/manifest/src/public-access.ts', 'public-access.ts'],
+  // Limits by slot, by a parent's pool and by the night: imported by `public-access.ts`.
+  ['packages/manifest/src/capacity.ts', 'capacity.ts'],
   ['packages/manifest/src/outbox.ts', 'outbox.ts'],
   // An app role's limits on what its update writes, and a calendar page's columns.
   ['packages/manifest/src/roles.ts', 'roles.ts'],
@@ -78,6 +80,8 @@ const FILES = [
   ['packages/manifest/src/add-ons.ts', 'add-ons.ts'],
   ['packages/manifest/src/documents.ts', 'documents.ts'],
   ['packages/manifest/src/shapes.ts', 'shapes.ts'],
+  // The core's own table shapes (a menu shared with Point of Sale), checked by `validate.ts`.
+  ['packages/manifest/src/table-shapes.ts', 'table-shapes.ts'],
   ['packages/add-on-contracts/src/add-on-block.ts', 'add-on-block.ts'],
   ['packages/add-on-contracts/src/contracts.ts', 'contracts.ts'],
   ['packages/add-on-contracts/src/slots.ts', 'slots.ts'],
