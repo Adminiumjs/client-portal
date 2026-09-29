@@ -713,14 +713,15 @@ export interface Night {
 /** An adjustment row a price cannot read (its weekdays, dates or amount): the price is refused, never guessed. */
 export class NightlyRuleUnreadable extends Error {
   override readonly name = 'NightlyRuleUnreadable';
+  /** Its place in the adjustments given. */
+  readonly index: number;
+  /** The column that could not be read: `weekdays`, `from`, `to` or `add`. */
+  readonly column: 'weekdays' | 'from' | 'to' | 'add';
 
-  constructor(
-    /** Its place in the adjustments given. */
-    readonly index: number,
-    /** The column that could not be read: `weekdays`, `from`, `to` or `add`. */
-    readonly column: 'weekdays' | 'from' | 'to' | 'add',
-  ) {
+  constructor(index: number, column: 'weekdays' | 'from' | 'to' | 'add') {
     super(`An adjustment's ${column} cannot be read.`);
+    this.index = index;
+    this.column = column;
   }
 }
 

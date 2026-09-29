@@ -125,6 +125,8 @@ const producerBase = {
       z.object({ setting: settingRefSchema }).strict(),
       /** Only while a feature of the app is on (its add-ons attached): a receipt, with Invoices & Receipts. */
       z.object({ feature: z.string().regex(/^[a-z][a-z0-9-]{0,39}$/, 'a feature id') }).strict(),
+      /** Both at once: only while the feature is on AND that bool of the settings row is true (a receipt, when the manager wants one sent). */
+      z.object({ feature: z.string().regex(/^[a-z][a-z0-9-]{0,39}$/, 'a feature id'), setting: settingRefSchema }).strict(),
     ])
     .optional(),
   /** Skipped for a recipient whose `recipient.optIn` column is false. */
@@ -694,13 +696,15 @@ export function outboxIssues(
     if (box.kinds[producer.kind] === undefined) out.push({ path: here('kind'), message: `"${producer.kind}" is not one of the outbox's kinds` });
     if (producer.gate === 'enabled' && box.settings?.enabled === undefined) {
       out.push({ path: here('gate'), message: 'the outbox names no settings column to be gated by' });
-    } else if (typeof producer.gate === 'object' && 'feature' in producer.gate) {
-      const feature = producer.gate.feature;
-      if (!(m.addOns?.features ?? []).some((candidate) => candidate.id === feature)) {
-        out.push({ path: here('gate', 'feature'), message: `"${feature}" is not one of the app's addOns.features` });
-      }
     } else if (typeof producer.gate === 'object') {
-      col(producer.gate.setting.table, producer.gate.setting.column, ['bool'], here('gate', 'setting'), 'a bool');
+      // Each half judged as it is alone: a feature the app declares, a bool of the settings row.
+      if ('feature' in producer.gate) {
+        const feature = producer.gate.feature;
+        if (!(m.addOns?.features ?? []).some((candidate) => candidate.id === feature)) {
+          out.push({ path: here('gate', 'feature'), message: `"${feature}" is not one of the app's addOns.features` });
+        }
+      }
+      if ('setting' in producer.gate) col(producer.gate.setting.table, producer.gate.setting.column, ['bool'], here('gate', 'setting'), 'a bool');
     }
     if (producer.optIn === true && r.optIn === undefined) {
       out.push({ path: here('optIn'), message: 'the recipient names no opt-in column' });

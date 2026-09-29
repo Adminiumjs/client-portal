@@ -442,8 +442,13 @@ const forgetSchema = z.object({ columns: z.array(refSchema).min(1).max(16), stam
  * "Make a new link" for a signed-in person's row: its own link (`column`)
  * gets a new code, which closes every session the old one opened, and the new
  * link is emailed as the app's outbox message `kind` (sent once per code).
+ * On a row's own link it is "send it again": another link of the row (the
+ * one a confirmation email carries) is made again and mailed to the row's own
+ * address, only while the row holds `when`.
  */
-const newLinkSchema = z.object({ column: refSchema, kind: z.string().min(1).max(40) }).strict();
+const newLinkSchema = z
+  .object({ column: refSchema, kind: z.string().min(1).max(40), when: z.object({ where: z.array(stateConditionSchema).min(1).max(8) }).strict().optional() })
+  .strict();
 
 export const publicAccessSchema = z
   .object({
@@ -666,7 +671,7 @@ interface PublicAccessContext {
   roles: readonly { key: string; screensOnly?: boolean | undefined; cloneFrom?: string | undefined; permissions?: readonly string[] | undefined }[];
   /** The app's outbox, for a new link it emails (absent: the app has none). */
   outbox?:
-    | { table: string; kinds: Readonly<Record<string, string>>; columns: { repeatKey?: string | undefined }; links?: Readonly<Record<string, string>> | undefined; recipient?: { table: string } | undefined }
+    | { table: string; kinds: Readonly<Record<string, string>>; columns: { repeatKey?: string | undefined }; links?: Readonly<Record<string, string>> | undefined; recipient?: ResendOutbox['recipient'] | undefined; producers?: ResendOutbox['producers'] }
     | undefined;
 }
 
@@ -698,6 +703,62 @@ export function ownLinksOfPerson(entries: readonly PublicAccess[], identityTable
     if (people.size > 0) out.push({ table: entry.table, column: claim.column, people: [...people].sort() });
   }
   return out;
+}
+
+/** The outbox as a resend reads it: its recipient, its links and the producers that declare a kind's recipient. */
+export interface ResendOutbox {
+  table: string;
+  recipient: { table: string; via: string; email: string; fallback?: { via: string; email: string } | undefined };
+  producers?:
+    | readonly { kind: string; link: string; hold?: boolean | undefined; repeatBy?: string | undefined; recipient?: { setting: unknown } | { column: string; name?: string | undefined; language?: string | undefined } | undefined }[]
+    | undefined;
+}
+
+/** Where a resend of a row's own link is read from: the kind's column recipient, or none (the outbox's own), and the columns the address comes from. */
+export interface ResendAddress {
+  /** The kind's own producer mails an address a column of the row holds. */
+  recipient?: { column: string; name?: string | undefined; language?: string | undefined } | undefined;
+  /** The row's columns the address is read from (or through). */
+  columns: string[];
+  /** The person's table and address column, when the address is read from the person the row links. */
+  person?: { table: string; column: string } | undefined;
+}
+
+/** A table's columns as a resend reads them: each name, and the table it references (null: no link). */
+export type ResendColumns = (table: string) => readonly { name: string; references: string | null }[] | undefined;
+
+/**
+ * How a message of `kind` about a row of `table` is addressed when it is
+ * sent again through the row's own link — as the kind's own producer
+ * declares it (the first producer of the kind, as the sender reads it), and
+ * only from the row: a column of the row, the person it links (the column
+ * named as the outbox's recipient link, else its one key to the recipient's
+ * table), or the outbox's fallback through this table. Null when nothing on
+ * the row addresses it (a setting's address, a column of another row, two
+ * keys to the recipient). The validator and the server ask this one function.
+ */
+export function resendAddressOf(outbox: ResendOutbox, kind: string, table: string, columnsOf: ResendColumns): ResendAddress | null {
+  const find = (at: string, name: string) => columnsOf(at)?.find((c) => c.name === name);
+  const declared = (outbox.producers ?? []).find((producer) => producer.kind === kind);
+  const own = declared?.recipient;
+  if (own !== undefined && 'setting' in own) return null;
+  if (own !== undefined) {
+    // The producing row is the one the producer links: it must be this row.
+    if (find(outbox.table, declared!.link)?.references !== table || find(table, own.column) === undefined) return null;
+    return { recipient: { ...own }, columns: [own.column] };
+  }
+  const columns: string[] = [];
+  let person: ResendAddress['person'];
+  const keys = (columnsOf(table) ?? []).filter((c) => c.references === outbox.recipient.table);
+  const link = find(table, outbox.recipient.via) !== undefined ? outbox.recipient.via : keys.length === 1 ? keys[0]!.name : undefined;
+  if (link !== undefined) {
+    columns.push(link);
+    person = { table: outbox.recipient.table, column: outbox.recipient.email };
+  }
+  const fallback = outbox.recipient.fallback;
+  if (fallback !== undefined && find(outbox.table, fallback.via)?.references === table && find(table, fallback.email) !== undefined) columns.push(fallback.email);
+  if (columns.length === 0) return null;
+  return { columns, ...(person === undefined ? {} : { person }) };
 }
 
 /** Everything in `publicAccess` and `publicKeys` that names something undeclared, or breaks a rule. */
@@ -1343,6 +1404,10 @@ function pictureIssues(
   }
   // A picture is fetched by an <img>, which carries no session: rows only a code opens are no rows it can show.
   if (entry.unlockBy !== undefined) out.push({ path: at('pictures'), message: 'pictures are for every visitor; rows a code unlocks are read only by whoever gave the code' });
+  // Nor rows read by a session's holder alone (an entry with a level and no claim of its own).
+  if (entry.level !== undefined && entry.claim === undefined && entry.claimedBy === undefined && entry.visibleWith === undefined) {
+    out.push({ path: at('pictures'), message: "pictures are for every visitor; rows read by a signed-in session alone are no picture an <img> can show" });
+  }
   if ((entry.key ?? CUSTOMER_KEY) !== CUSTOMER_KEY) out.push({ path: at('key'), message: "pictures are served through the app's customer key" });
   const writes = new Set([...(entry.writable ?? []), ...Object.keys(entry.defaults ?? {})]);
   const shareCodes = shareCodeColumns(entries, entry.table);
@@ -2002,8 +2067,18 @@ function personIssues(
       const here = (...rest: Path) => at('newLink', ...rest);
       const signIn = identities.get(key)?.entry;
       const verifies = signIn?.claim !== undefined && (claimKind(signIn.claim) === 'link' || ('verify' in signIn.claim && signIn.claim.verify === 'email-code'));
-      if (!entry.methods.includes('GET') || entry.claimedBy === undefined || entry.claimedBy.optional === true || !verifies) {
-        out.push({ path: at('newLink'), message: 'a new link is made for a row a person reads signed in by email (claimedBy), and nowhere else' });
+      // A row's own link asks for another link of its row again: never its own code, which the asking session opened by.
+      const ownLink = entry.claim !== undefined && 'by' in entry.claim && entry.claim.own === true ? entry.claim : undefined;
+      if (ownLink !== undefined) {
+        const others = entries.filter((other) => other.table === entry.table && (other.key ?? CUSTOMER_KEY) !== key && other.claim !== undefined && 'by' in other.claim && other.claim.own === true);
+        if (!entry.methods.includes('GET')) out.push({ path: at('newLink'), message: 'a new link is asked for through a row\'s own link that reads the row (GET)' });
+        if (entry.newLink.column === ownLink.column) {
+          out.push({ path: here('column'), message: `"${entry.table}.${ownLink.column}" is the code this link opens the row by: the session asking would be closed by its own new link` });
+        } else if (!others.some((other) => (other.claim as { column: string }).column === entry.newLink!.column)) {
+          out.push({ path: here('column'), message: `"${entry.table}.${entry.newLink.column}" is no own link another key opens "${entry.table}" by (a token claim with own: true)` });
+        }
+      } else if (!entry.methods.includes('GET') || entry.claimedBy === undefined || entry.claimedBy.optional === true || !verifies) {
+        out.push({ path: at('newLink'), message: 'a new link is made for a row a person reads signed in by email (claimedBy), or through a row\'s own link, and nowhere else' });
       } else if (!ownLinksOfPerson(entries, signIn!.table).some((link) => link.table === entry.table && link.column === entry.newLink!.column)) {
         out.push({ path: here('column'), message: `"${entry.table}.${entry.newLink.column}" is no own link of a row this person holds (a token claim with own: true)` });
       }
@@ -2012,13 +2087,48 @@ function personIssues(
       else {
         if (box.kinds[entry.newLink.kind] === undefined) out.push({ path: here('kind'), message: `"${entry.newLink.kind}" is not one of the outbox's kinds` });
         if (box.columns.repeatKey === undefined) out.push({ path: here('kind'), message: 'each new link is its own message, so the outbox keeps a repeatKey column' });
+        // Sent by the kind's own rules: never past a person's approval, and never skipped at send as a message already sent.
+        const declared = (box.producers ?? []).find((producer) => producer.kind === entry.newLink!.kind);
+        if (declared?.hold === true) out.push({ path: here('kind'), message: `"${entry.newLink.kind}" waits for a person to approve it, so it is never sent again from a link` });
+        if (declared?.repeatBy !== undefined && declared.repeatBy !== entry.newLink.column) {
+          out.push({ path: here('kind'), message: `"${entry.newLink.kind}" is sent once per "${declared.repeatBy}", so one sent again for a new "${entry.newLink.column}" would be skipped: its producer repeats by "${entry.newLink.column}" or by nothing` });
+        }
         const linked = Object.values(box.links ?? {}).some((column) => index.column(box.table, column)?.references === entry.table);
         if (!linked) out.push({ path: here('kind'), message: `the outbox links no message to "${entry.table}", so the new link could not be sent about its row` });
         // Sent to the person who asked for it: the outbox addresses the people this entry's rows are claimed by.
         if (entry.claimedBy !== undefined && box.recipient !== undefined && box.recipient.table !== entry.claimedBy.table) {
           out.push({ path: here('kind'), message: `the outbox writes to "${box.recipient.table}", not "${entry.claimedBy.table}" who asks for the new link` });
         }
+        // Through a row's own link, sent to the row's own address: as the kind's own producer addresses it, from the row alone.
+        if (entry.claimedBy === undefined && entry.claim !== undefined && 'by' in entry.claim && box.recipient !== undefined) {
+          const columnsOf = (at: string) => index.table(at)?.columns.map((c) => ({ name: c.ref, references: c.references ?? null }));
+          const address = resendAddressOf({ table: box.table, recipient: box.recipient, producers: box.producers }, entry.newLink.kind, entry.table, columnsOf);
+          if (address === null) {
+            out.push({ path: here('kind'), message: `"${entry.newLink.kind}" is not addressed from a "${entry.table}" row (its producer's recipient, the person the row links, or the outbox's fallback through "${entry.table}"), so it cannot be sent again to the row's own address` });
+          } else {
+            // Nobody changes online where it goes: else a link holder could send it to any address in turn.
+            const writers = entries.filter((other) => other.methods.includes('PATCH'));
+            const onRow = writers.filter((other) => other.table === entry.table).flatMap((other) => other.writable ?? []).filter((ref) => address.columns.includes(ref));
+            const onPerson = address.person === undefined ? [] : writers.filter((other) => other.table === address.person!.table && (other.writable ?? []).includes(address.person!.column)).map(() => `${address.person!.table}.${address.person!.column}`);
+            for (const ref of [...new Set([...onRow.map((c) => `${entry.table}.${c}`), ...onPerson])]) {
+              out.push({ path: here('kind'), message: `"${ref}" is where it is sent again, and an entry lets a guest change it: nothing a guest writes may say where it goes` });
+            }
+          }
+        }
       }
+      // What the row must hold: through a row's own link, always said (a confirm email only while it is still to confirm).
+      if (entry.claimedBy === undefined && entry.claim !== undefined && 'by' in entry.claim && entry.claim.own === true && entry.newLink.when === undefined) {
+        out.push({ path: here('when'), message: 'sent again through a row\'s own link only while the row holds a when (an order still to confirm)' });
+      }
+      // Only columns the guest sees: a refusal must tell nothing about one they do not.
+      const shown = entry.select ?? (table.columns.filter((c) => c.rules?.code === undefined && c.rules?.secret !== true).map((c) => c.ref));
+      const withheld = new Set(entry.withhold?.columns ?? []);
+      (entry.newLink.when?.where ?? []).forEach((condition, w) => {
+        out.push(...conditionIssues(entry.table, condition, index, here('when', 'where', w)));
+        if (!shown.includes(condition.column) || withheld.has(condition.column)) {
+          out.push({ path: here('when', 'where', w), message: `"${entry.table}.${condition.column}" is not a column this entry shows, so a new link is never asked for by it` });
+        }
+      });
     }
 
     // A read for the holder of a session alone (no claim of its own): the settings a signed-in guest may see.

@@ -170,6 +170,12 @@ export const stateMoveSchema = z.union([
        * stamps of the state it returns to keep what they had.
        */
       undo: z.literal(true).optional(),
+      /**
+       * An undo's further columns it empties, beside its stamps (how a hand-over
+       * taken back was paid): emptied by the move, and open to the table's lock
+       * for that move only. Only on a move marked `undo`.
+       */
+      clears: z.array(refSchema).min(1).max(8).optional(),
     })
     .strict(),
 ]);
@@ -419,6 +425,54 @@ interface StatesContext<C extends ColumnShape> {
   outboxTable?: string | undefined;
 }
 
+/** A column of the table as the judge of an undo's `clears` needs it. */
+export interface UndoColumn {
+  /** The table's key. */
+  key: boolean;
+  nullable: boolean;
+}
+
+/**
+ * Everything wrong with what a table's undo moves empty (`clears`), and with a
+ * move that another move to the same state comes before — the judge takes the
+ * first, so a later one marked `undo` or naming `clears` would never be made.
+ * Paths are relative to the states. The one judge for an app's manifest and a
+ * states rule saved in Studio (the server's `statesRuleIssue`).
+ */
+export function undoMoveIssues(
+  states: { column: string; moves: Readonly<Record<string, readonly StateMove[]>> },
+  table: string,
+  lookup: { column: (ref: string) => UndoColumn | undefined; decided: (ref: string) => boolean },
+): { path: (string | number)[]; message: string }[] {
+  const out: { path: (string | number)[]; message: string }[] = [];
+  for (const [from, moves] of Object.entries(states.moves)) {
+    const marked = (candidate: StateMove | undefined) => typeof candidate === 'object' && (candidate.undo === true || candidate.clears !== undefined);
+    moves.forEach((move, m) => {
+      const to = moveTarget(move);
+      // The judge takes the first move to a state: a second one, when either is an undo or empties columns, is never made.
+      const first = moves.slice(0, m).find((other) => moveTarget(other) === to);
+      if (first !== undefined && (marked(first) || marked(move))) {
+        out.push({ path: ['moves', from, m], message: `another move from "${from}" to "${to}" comes first, so this one is never made` });
+      }
+      if (typeof move === 'string') return;
+      if (move.clears !== undefined && move.undo !== true) {
+        out.push({ path: ['moves', from, m, 'clears'], message: 'only a move marked undo empties columns as it goes' });
+      }
+      (move.clears ?? []).forEach((ref, c) => {
+        const path = ['moves', from, m, 'clears', c];
+        const found = lookup.column(ref);
+        if (found === undefined) out.push({ path, message: `"${table}" has no column "${ref}"` });
+        else if (ref === states.column) out.push({ path, message: 'the state moves by the move itself, not by what it empties' });
+        else if (found.key) out.push({ path, message: `"${table}.${ref}" is the key, which never changes` });
+        else if (!found.nullable) out.push({ path, message: `"${table}.${ref}" is not nullable, so an undo cannot empty it` });
+        else if (lookup.decided(ref)) out.push({ path, message: `"${table}.${ref}" is written by another rule already` });
+        if (move.clears!.indexOf(ref) !== c) out.push({ path, message: `"${ref}" is named twice` });
+      });
+    });
+  }
+  return out;
+}
+
 /** Everything wrong with one table's `states` against the manifest's tables. */
 export function statesIssues<C extends ColumnShape>(
   table: string,
@@ -467,6 +521,16 @@ export function statesIssues<C extends ColumnShape>(
         out.push({ path: at('moves', from, m, 'undo'), message: `no listed move goes from "${to}" to "${from}", so this move takes nothing back` });
       }
     });
+  }
+  // What an undo empties besides its stamps, and a move another to the same state hides: one judge with a states rule saved in Studio.
+  for (const issue of undoMoveIssues(states, table, {
+    column: (ref) => {
+      const found = index.column(table, ref);
+      return found === undefined ? undefined : { key: found.role === 'pk', nullable: found.nullable === true };
+    },
+    decided: (ref) => ctx.decided?.(ref) === true,
+  })) {
+    out.push({ path: at(...issue.path), message: issue.message });
   }
   if (states.lock !== undefined) {
     states.lock.when.forEach((value, i) => known(value, at('lock', 'when', i)));
