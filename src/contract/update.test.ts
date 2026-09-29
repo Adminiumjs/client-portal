@@ -789,8 +789,8 @@ describe.skipIf(why !== null)(`the update of a live ${FROM} install to ${TO}${wh
          * paid into or voided). Adminium refuses an add that would repeat a
          * one-of-a-kind value such a row holds (a client's email), in ONE
          * transaction: nothing of the add is written. An Adminium that takes
-         * kept rows back instead may let it through; either way no row is ever
-         * there twice.
+         * kept rows back instead (0.3.6) may let it through, or refuse it whole
+         * where a kept row is locked; either way no row is ever there twice.
          */
         const counts = async () => Object.fromEntries(Object.entries(await raw()).map(([name, t]) => [name, t.rows.length]));
         const was = await counts();
@@ -805,7 +805,9 @@ describe.skipIf(why !== null)(`the update of a live ${FROM} install to ${TO}${wh
         );
         console.info(`[sample again, ${engine}] ${done.status}: ${String(done.lastError)}`);
         if (done.status === "failed") {
-          expect(done.lastError).toMatch(/clashes with a record already there/);
+          // Up to 0.3.5 the clash with a kept row stopped the add; from 0.3.6 the add takes kept rows back, and the
+          // kept clauses of an in-force terms version refuse that under their lock. Either way: refused whole.
+          expect(done.lastError).toMatch(/clashes with a record already there|cannot change while their \S+ is in_force/);
           const now = await counts();
           expect(Object.fromEntries(Object.entries(now).filter(([name]) => name !== `${prefix}sample_data`))).toEqual(Object.fromEntries(Object.entries(was).filter(([name]) => name !== `${prefix}sample_data`)));
           expect((await sample()).loaded).toBe(false);
