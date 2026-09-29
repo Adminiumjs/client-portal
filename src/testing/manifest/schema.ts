@@ -34,7 +34,7 @@ import { appDocumentIssues, appDocumentSchema, mappingIssues, type AppDocument }
 import { formulaColumns, formulaExprSchema, tableFormulaIssues } from './formula.ts';
 import { pageCalendarIssues } from './page-calendar.ts';
 import { emailTemplateSchema, outboxIssues, outboxProducerSchema, outboxSchema } from './outbox.ts';
-import { codeWhereSchema, publicAccessIssues, publicAccessSchema, publicKeysSchema, shareCodeColumns, unlistedColumn, type PublicAccess } from './public-access.ts';
+import { codeWhereSchema, personalColumn, publicAccessIssues, publicAccessSchema, publicKeysSchema, shareCodeColumns, unlistedColumn, type PublicAccess } from './public-access.ts';
 import { roleLimitIssues, roleLimitsSchema, type RoleShape } from './roles.ts';
 import { statesIssues, statesSchema, type States } from './states.ts';
 import { MOMENT_LIMITS, clockTimeSchema, momentIssues, momentSchema, settingRefSchema } from './refs.ts';
@@ -1537,7 +1537,7 @@ function perNightIssues(
   table: ShapeTable,
   column: ShapeColumn,
   rule: z.infer<typeof perNightSchema>,
-  keptFromReaders: (table: string, column: string, into: ColumnRules | undefined) => string | null,
+  keptFromReaders: (table: string, column: string, into: ColumnRules | undefined, intoAt?: { table: string; column: string }) => string | null,
   here: RulePath,
 ): ReferenceIssue[] {
   const out: ReferenceIssue[] = [];
@@ -1562,7 +1562,7 @@ function perNightIssues(
     if (rate === undefined) out.push({ path: at('rate', 'column'), message: `"${target}" has no column "${rule.rate.column}"` });
     else if (!NUMERIC_TYPES.includes(rate.type) || rate.type === 'float') out.push({ path: at('rate', 'column'), message: `"${target}.${rule.rate.column}" is not a price` });
     else {
-      const kept = keptFromReaders(target, rule.rate.column, column.rules);
+      const kept = keptFromReaders(target, rule.rate.column, column.rules, { table: table.ref, column: column.ref });
       if (kept !== null) out.push({ path: at('rate', 'column'), message: `"${target}.${rule.rate.column}" is ${kept}, so no price reads it` });
     }
   }
@@ -1580,7 +1580,7 @@ function perNightIssues(
   if (name === undefined) out.push({ path: at('adjust', 'name'), message: `"${adjust.table}" has no column "${adjust.name}"` });
   else if (name.type !== 'text') out.push({ path: at('adjust', 'name'), message: `"${adjust.table}.${adjust.name}" is not a text column` });
   else {
-    const kept = keptFromReaders(adjust.table, adjust.name, column.rules);
+    const kept = keptFromReaders(adjust.table, adjust.name, column.rules, { table: table.ref, column: column.ref });
     if (kept !== null) out.push({ path: at('adjust', 'name'), message: `"${adjust.table}.${adjust.name}" is ${kept}, so no night is tagged with it` });
   }
   const match = adjust.match;
@@ -1667,13 +1667,29 @@ export function appReferenceIssues(
    * over one, would show it where it is not kept, past the audit's and the
    * outbox's redaction and the public refusals. A shared link's code is never
    * landed anywhere.
+   *
+   * Personal data is told as the install tells it: by its mark, or guessed by
+   * its name (`email`, a guest's `first_name` beside an address), and so is
+   * the column it lands in when `intoAt` names it. Told by the mark alone, a
+   * formula over a guessed column into an unmarked one passed here and was
+   * then skipped by the install, leaving the column empty.
    */
-  const keptFromReaders = (tableRef: string, columnRef: string, into: ColumnRules | undefined): string | null => {
+  const keptFromReaders = (
+    tableRef: string,
+    columnRef: string,
+    into: ColumnRules | undefined,
+    intoAt?: { table: string; column: string },
+  ): string | null => {
     if (shareCodeColumns(m.publicAccess ?? [], tableRef).includes(columnRef)) return 'the code a shared link opens its row with';
     const source = tables.get(tableRef)?.columns.find((x) => x.ref === columnRef)?.rules;
     if (source?.secret === true && into?.secret !== true) return 'a secret';
-    if (source?.personal === true && into?.personal !== true && into?.secret !== true) return 'personal data';
-    return null;
+    const personal = (t: string, c: string): boolean => {
+      const doc = tables.get(t);
+      return doc !== undefined && personalColumn(doc as Parameters<typeof personalColumn>[0], c) !== null;
+    };
+    if (!personal(tableRef, columnRef) || into?.secret === true) return null;
+    const intoPersonal = intoAt === undefined ? into?.personal === true : personal(intoAt.table, intoAt.column);
+    return intoPersonal ? null : 'personal data';
   };
   /** The tables the app's signed-in people are rows of (its claim identities). */
   const identityTables = new Set((m.publicAccess ?? []).filter((e) => e.claim !== undefined).map((e) => e.table));
@@ -1804,7 +1820,7 @@ export function appReferenceIssues(
         } else if (!has(via.references, rules.copy.from)) {
           out.push({ path: here('copy', 'from'), message: `"${via.references}" has no column "${rules.copy.from}"` });
         } else {
-          const kept = keptFromReaders(via.references, rules.copy.from, column.rules);
+          const kept = keptFromReaders(via.references, rules.copy.from, column.rules, { table: table.ref, column: column.ref });
           if (kept !== null) out.push({ path: here('copy', 'from'), message: `"${via.references}.${rules.copy.from}" is ${kept}, so no column copies it` });
         }
         if (rules.copy.follow === true) out.push(...followIssues(m.requiredSchema.tables, table, column.ref, rules.copy, here));
@@ -1816,12 +1832,12 @@ export function appReferenceIssues(
       // The same of a stamp that copies a column of its row, and of a formula's inputs.
       const stamped = rules.stamp?.set;
       if (typeof stamped === 'object' && 'copy' in stamped) {
-        const kept = keptFromReaders(table.ref, stamped.copy, column.rules);
+        const kept = keptFromReaders(table.ref, stamped.copy, column.rules, { table: table.ref, column: column.ref });
         if (kept !== null) out.push({ path: here('stamp', 'set', 'copy'), message: `"${table.ref}.${stamped.copy}" is ${kept}, so no column copies it` });
       }
       if (rules.formula !== undefined) {
         for (const input of formulaColumns(rules.formula)) {
-          const kept = keptFromReaders(table.ref, input, column.rules);
+          const kept = keptFromReaders(table.ref, input, column.rules, { table: table.ref, column: column.ref });
           if (kept !== null) out.push({ path: here('formula'), message: `"${table.ref}.${input}" is ${kept}, so no formula reads it` });
         }
       }
