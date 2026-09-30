@@ -22,9 +22,10 @@ import { TABLES } from "./tables.ts";
 /**
  * This release. The version moved 0.1.3 → 0.2.0 once (its tables were new);
  * 0.2.1 adds the back office to 0.2.0's tables and updates an install of it in
- * place (`updatesFrom` below; proved by `contract/update.test.ts`).
+ * place (`updatesFrom` below; proved by `contract/update.test.ts`). 0.2.2
+ * changes no table: it asks for Adminium 0.3.7 (`MIN_ADMINIUM`).
  */
-export const VERSION = "0.2.1";
+export const VERSION = "0.2.2";
 
 /**
  * The Adminium release that first reads everything below: formulas, numbers
