@@ -19,7 +19,7 @@
     "crm"
   ],
   "compatibility": {
-    "minAdminiumVersion": "0.3.4",
+    "minAdminiumVersion": "0.3.7",
     "engines": [
       "sqlite",
       "postgres",

@@ -30,8 +30,10 @@ export const VERSION = "0.2.1";
  * The Adminium release that first reads everything below: formulas, numbers
  * without gaps, states, sign-in links, held emails, and apps built on an
  * add-on's shape. Written from the version actually released, never guessed.
+ * 0.3.7 is the first that adds the sample again after a removal kept terms a
+ * sent proposal uses: it keeps their clauses, and writes none under them.
  */
-export const MIN_ADMINIUM = "0.3.4";
+export const MIN_ADMINIUM = "0.3.7";
 
 const ENV = {
   VITE_ADMINIUM_API_BASE_URL: { required: false, example: "https://admin.example.com" },
