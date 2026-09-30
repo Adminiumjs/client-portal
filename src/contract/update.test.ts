@@ -22,7 +22,7 @@
  *      every table of the app read straight from the database (each value as
  *      the engine spells it, each column as the engine declares it) and over
  *      HTTP: the snapshot;
- *   5. THIS build (0.2.1) uploaded; the update's plan is new tables and new
+ *   5. THIS build (0.2.2) uploaded; the update's plan is new tables and new
  *      columns only — nothing dropped, renamed or rewritten — and it applies;
  *   6. every row that was there is unchanged, byte for byte, and every column
  *      declaration too, but for what the plan said it adds; the new tables
@@ -117,7 +117,7 @@ const NEW_PAGES = ["clients-expenses", "clients-running-costs", "clients-studio-
 
 const released = why === null ? releasedBundle() : null;
 const FROM = released?.version ?? "0.2.0";
-const TO = why === null ? appBundle().version : "0.2.1";
+const TO = why === null ? appBundle().version : "0.2.2";
 
 describe.skipIf(why !== null)(`the update of a live ${FROM} install to ${TO}${why === null ? "" : ` — skipped: ${why}`}`, () => {
   ENGINES.forEach(([engine, available], index) => {
