@@ -380,7 +380,7 @@ export async function publishObject({ config, kind, key, version, bytes, waitMs,
   return { objectKey, url, integrity, status, lastModified: served.lastModified, cache: served.cache };
 }
 
-// ─── The minimum Adminium a release may claim (48 A17) ──────────────────────
+// ─── The minimum Adminium a release may claim ───────────────────────────────
 //
 // Every file released before 2026-09-16 claims `compatibility.minAdminiumVersion:
 // "1.0.0"`, while the newest Adminium was 0.2.8. Nothing enforced the field, so

@@ -98,8 +98,8 @@ export default defineConfig({
     noPdfWorkerForClients(process.env["VITE_ADMINIUM_SURFACE_SIDE"]),
     react(),
     /*
-     * `surface.json` beside `index.html`, on surface builds only
-     * (29-app-surfaces.md D7). Adminium reads it to offer this app's sections
+     * `surface.json` beside `index.html`, on surface builds only.
+     * Adminium reads it to offer this app's sections
      * in its own sidebar; a build without `VITE_ADMINIUM_SURFACE_SIDE` writes
      * nothing, so the demo and standalone artifacts stay byte-identical.
      *

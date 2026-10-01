@@ -67,8 +67,8 @@ if (typeof key !== 'string' || typeof version !== 'string') throw new Error('man
 const objectKey = objectKeyFor({ kind: 'app', key, version });
 const config = dryRun ? undefined : r2ConfigFromEnv(process.env);
 if (config?.test) console.log(`TEST ENDPOINTS — bucket ${config.endpoint}, read-back ${config.publicBase}`);
-// A minimum no published Adminium meets would sit in the released file forever
-// (48 A17). Checked in a dry run too, so a rehearsal says what the release would.
+// A minimum no published Adminium meets would sit in the released file forever.
+// Checked in a dry run too, so a rehearsal says what the release would.
 const newest = await newestAdminium();
 const minimum = assertMinimumReleased(manifest, newest);
 console.log(`${key}@${version} needs Adminium ${minimum}; the newest published is ${newest}`);

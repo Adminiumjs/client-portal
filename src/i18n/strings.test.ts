@@ -44,7 +44,7 @@ const NEVER = [
   /partner since/i,
 ];
 
-/** A private reference: the plan's ids and section marks never reach a screen. */
+/** A private reference: planning ids and section marks never reach a screen. */
 const PRIVATE = [/§/, /\bplan 5\d\b/i, /\b(?:DP|OF|N|F|K|D|U|W|E)-?\d{1,3}\b/, /O-fix/i, /\bOCP\b/, /57-T\d+/];
 
 describe("every area's keys", () => {
