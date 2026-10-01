@@ -115,6 +115,12 @@ const NEW_COLUMNS: Record<string, string[]> = { invoice_lines: ["expense_id", "t
 const NEW_ENUM_VALUES: Record<string, Record<string, string[]>> = { messages: { kind: ["new-enquiry"] } };
 const NEW_PAGES = ["clients-expenses", "clients-running-costs", "clients-studio-dates", "clients-suppliers", "clients-time"];
 
+/** The yes/no columns of a table, as the manifest being installed declares them. */
+const yesNoColumns = (ref: string): string[] => {
+  const columns = ((TABLES as unknown as { ref: string; columns: { ref: string; type: string }[] }[]).find((t) => t.ref === ref)?.columns ?? []);
+  return columns.filter((c) => c.type === "bool").map((c) => c.ref);
+};
+
 const released = why === null ? releasedBundle() : null;
 const FROM = released?.version ?? "0.2.0";
 const TO = why === null ? appBundle().version : "0.2.2";
@@ -520,7 +526,10 @@ describe.skipIf(why !== null)(`the update of a live ${FROM} install to ${TO}${wh
         for (const [ref, list] of Object.entries(beforeHttp)) {
           const extra = NEW_COLUMNS[ref] ?? [];
           const trimmed = nowHttp[ref]!.map((row) => Object.fromEntries(Object.entries(row).filter(([column]) => !extra.includes(column))));
-          expect(trimmed, `${ref} over HTTP`).toEqual(list);
+          // A yes/no: SQLite answered 1 or 0 until the update marked the column, and answers true or false since.
+          const bools = yesNoColumns(ref);
+          const said = (rows: Row[]) => rows.map((row) => Object.fromEntries(Object.entries(row).map(([column, value]) => [column, bools.includes(column) && (value === 1 || value === 0) ? value === 1 : value])));
+          expect(said(trimmed as Row[]), `${ref} over HTTP`).toEqual(said(list));
         }
         // The new tables, with the manifest's columns, and nothing in them.
         for (const ref of NEW_TABLES) {
