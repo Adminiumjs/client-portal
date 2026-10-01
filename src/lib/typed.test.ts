@@ -18,6 +18,17 @@ describe("a number typed on an Arabic or Persian keyboard", () => {
 
   it("is taken by every field that reads an amount, a rate or hours", () => {
     expect(decimalText("٧٥٠")).toBe("750");
+    // "1,200" typed as a cost was saved as 1.2: the first comma was read as the point.
+    expect(decimalText("1,200")).toBe("1200");
+    expect(decimalText("1,250.50")).toBe("1250.50");
+    expect(decimalText("1.250,50")).toBe("1250.50");
+    expect(decimalText("1,234,567")).toBe("1234567");
+    expect(decimalText("12,5")).toBe("12.5");
+    expect(decimalText("0,125")).toBe("0.125");
+    // A single point stays a point (three decimals are for the server, or the form, to refuse).
+    expect(decimalText("1.255")).toBe("1.255");
+    expect(decimalText(" 300 ")).toBe("300");
+    expect(decimalText("")).toBeNull();
     expect(positive("٤٠٫٥", 2)).toBe("40.5");
     expect(rateAmount("٧٥٠")).toBe("750.00");
     expect(readAmount("١٬٢٥٠٫٥")).toBe("1250.5");

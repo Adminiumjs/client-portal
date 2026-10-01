@@ -102,6 +102,16 @@ export function refusalOf<T = never>(error: unknown, unfinished: Unfinished<T> |
   const base = { ok: false as const, code: e.code, field: e.field, details: e.details, unfinished };
   if (e.kind === "signed-out") return { ...base, reason: "signed-out" };
   if (e.kind === "offline") return { ...base, reason: e.status === 429 || e.code === "NUMBER_BUSY" || e.code === "WRITE_CONFLICT" ? "busy" : "offline" };
+  /*
+   * A message refused for what it carries, not for where its row stands: the
+   * outbox answers `STATE_MOVE_REFUSED` naming a column and no move (an
+   * address that is not the one on file, a wording it does not take). Nobody
+   * "changed this a moment ago" — that sentence sent the desk round in circles
+   * on a reply that could never be saved.
+   */
+  if (e.code === "STATE_MOVE_REFUSED" && e.details["from"] === undefined && typeof e.details["column"] === "string" && e.details["requires"] === undefined) {
+    return { ...base, field: e.field ?? String(e.details["column"]), reason: "invalid" };
+  }
   // A document sent with no line, or no total: Adminium refuses the move and names what it requires.
   if (e.code === "STATE_MOVE_REFUSED" && isEmptyDocument(e.details["requires"])) return { ...base, reason: "empty" };
   const byCode = BY_CODE[e.code] ?? BY_CODE[String(e.details["reason"] ?? "")];

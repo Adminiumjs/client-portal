@@ -78,6 +78,25 @@ describe("the clients' endpoints, by what each does", () => {
     const { clients_proposals_3: _sign, ...rest } = SCOPE.refs;
     expect(() => portalRefs({ ...SCOPE, refs: rest }, {})).toThrow(/sign/);
   });
+
+  it("writes through the door that takes the write, whatever a read-only door lists as writable", () => {
+    /*
+     * An Adminium before 0.3.9 listed columns as writable on the read-only
+     * door of the same table. The portal took the first door that listed
+     * `client_paid`, sent "I've sent a payment" to the read-only one, and was
+     * told the invoice did not exist.
+     */
+    const older: PublicConfigLike = {
+      ...SCOPE,
+      refs: {
+        ...SCOPE.refs,
+        clients_invoices: r(["read"], ["id", "number", "balance"], ["number", "client_paid", "client_paid_note", "client_paid_amount", "client_paid_on"]),
+        clients_deliverables: r(["read"], ["id", "title", "status"], ["title", "status"]),
+      },
+    };
+    const refs = portalRefs(older, {});
+    expect([refs.invoices, refs.sentPayment, refs.review]).toEqual(["clients_invoices", "clients_invoices_2", "clients_deliverables_2"]);
+  });
 });
 
 describe("each client write sends only what its endpoint may write", () => {

@@ -226,6 +226,11 @@ export const DEMO_RULES: DemoRules = {
           {
             "to": "approved"
           }
+        ],
+        "approved": [
+          {
+            "to": "pending"
+          }
         ]
       }
     },

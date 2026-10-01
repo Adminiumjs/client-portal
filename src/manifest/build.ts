@@ -23,9 +23,11 @@ import { TABLES } from "./tables.ts";
  * This release. The version moved 0.1.3 → 0.2.0 once (its tables were new);
  * 0.2.1 adds the back office to 0.2.0's tables and updates an install of it in
  * place (`updatesFrom` below; proved by `contract/update.test.ts`). 0.2.2
- * changes no table: it asks for Adminium 0.3.7 (`MIN_ADMINIUM`).
+ * changes no table: it asks for Adminium 0.3.7 (`MIN_ADMINIUM`). 0.2.3
+ * changes no table either: approved work may go back to review, and it asks
+ * for Adminium 0.3.9.
  */
-export const VERSION = "0.2.2";
+export const VERSION = "0.2.3";
 
 /**
  * The Adminium release that first reads everything below: formulas, numbers
@@ -33,8 +35,10 @@ export const VERSION = "0.2.2";
  * add-on's shape. Written from the version actually released, never guessed.
  * 0.3.7 is the first that adds the sample again after a removal kept terms a
  * sent proposal uses: it keeps their clauses, and writes none under them.
+ * 0.3.9 is the first that lets a reply to an enquiry carry its own words, and
+ * that offers a client only the door their "I've sent a payment" may use.
  */
-export const MIN_ADMINIUM = "0.3.7";
+export const MIN_ADMINIUM = "0.3.9";
 
 const ENV = {
   VITE_ADMINIUM_API_BASE_URL: { required: false, example: "https://admin.example.com" },

@@ -44,11 +44,33 @@ export function invalid<T>(code: string, field: string): Outcome<T> {
   return refusalOf<T>(new SinkError(code, "refused", 422, code, field));
 }
 
-/** Typed decimal text, trimmed (a comma read as the point); null when empty. */
+/**
+ * A number as typed, as plain decimal text; null when empty.
+ *
+ * The last separator is the decimal mark when one or two digits follow it
+ * ("12,5", "1.250,50"); a comma before exactly three digits is grouping
+ * ("1,200", "1,234,567", and "1.234.567") — unless the whole part is zero ("0,125").
+ * It used to turn the FIRST comma into a point and nothing else, so a cost
+ * typed "1,200" was saved as 1.2. Text that is not a number is passed on as
+ * typed, for the server to refuse by name.
+ */
 export function decimalText(value: string | null | undefined): string | null {
   if (value === null || value === undefined) return null;
-  const text = latinDigits(value).trim().replace(",", ".");
-  return text === "" ? null : text;
+  const text = latinDigits(value).trim().replace(/[\s\u00A0\u202F']/g, "");
+  if (text === "") return null;
+  if (!/^-?[\d.,]+$/.test(text)) return text;
+  const marks = text.match(/[.,]/g) ?? [];
+  if (marks.length === 0) return text;
+  const at = Math.max(text.lastIndexOf("."), text.lastIndexOf(","));
+  const head = text.slice(0, at);
+  const tail = text.slice(at + 1);
+  const oneKind = new Set(marks).size === 1;
+  // "1,234,567": the same mark more than once, three digits after the last, is grouping throughout.
+  if (marks.length > 1 && oneKind && tail.length === 3) return text.replace(/[.,]/g, "");
+  // "1,200": one comma, three digits after it, a whole part that is not zero. (A point there stays a
+  // point — "1.255" hours is refused for its decimals, never read as 1,255.)
+  if (marks.length === 1 && marks[0] === "," && tail.length === 3 && /^-?[1-9]\d{0,2}$/.test(head)) return head + tail;
+  return `${head.replace(/[.,]/g, "")}.${tail}`;
 }
 
 /** Typed text, trimmed; null when empty. */

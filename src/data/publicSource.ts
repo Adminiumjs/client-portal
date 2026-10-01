@@ -144,7 +144,10 @@ export function portalRefs(config: PublicConfigLike, tables: Record<string, stri
   const real = realTables(tables);
   const of = (table: TableRef) => entries.filter(([ref]) => ref === real[table] || ref.startsWith(`${real[table]}_`));
   const reads = (table: TableRef, column?: string) => of(table).filter(([, r]) => r.actions.includes("read") && (column === undefined || r.expose.includes(column)));
-  const writes = (table: TableRef, column: string, not?: string) => of(table).filter(([, r]) => r.writable.includes(column) && (not === undefined || !r.writable.includes(not)));
+  // A door to WRITE through takes a write: an Adminium before 0.3.9 listed columns as writable on a read-only door of the same table.
+  const takesWrite = (r: PublicRefLike) => r.actions.some((action) => action === "create" || action === "update" || action === "batch");
+  const writes = (table: TableRef, column: string, not?: string) =>
+    of(table).filter(([, r]) => takesWrite(r) && r.writable.includes(column) && (not === undefined || !r.writable.includes(not)));
   const pick = (label: string, found: [string, unknown][]): string => {
     const ref = found[0]?.[0];
     if (ref === undefined) throw new PortError("PUBLIC_SETUP", `the portal's key has no ${label} endpoint`);

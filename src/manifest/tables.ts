@@ -664,7 +664,8 @@ export const TABLES: Table[] = [
       column: "status",
       initial: "unshared",
       // A version sent back goes to review again; the studio may still mark the current one approved.
-      moves: { unshared: ["pending"], pending: ["approved", "changes", "unshared"], changes: ["pending", "approved"] },
+      // A new version posted on approved work opens its review again.
+      moves: { unshared: ["pending"], pending: ["approved", "changes", "unshared"], changes: ["pending", "approved"], approved: ["pending"] },
     },
   },
   {
