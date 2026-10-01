@@ -27,6 +27,7 @@ import {
   manifestSchema,
   type Manifest,
 } from './schema.ts';
+import { plainTextLengthWarnings } from './public-access.ts';
 import { tableShapeIssues } from './table-shapes.ts';
 
 export interface ManifestIssue {
@@ -99,6 +100,8 @@ export function manifestWarnings(manifest: Manifest): ManifestIssue[] {
       }
     });
   });
+  // A plain-text column longer than its plain text takes: the end of what a guest types is refused.
+  out.push(...plainTextLengthWarnings(manifest.publicAccess ?? [], manifest.requiredSchema?.tables ?? []));
   // A capped balance worked out from a formula whose columns stay open while the capped rows exist.
   for (const warning of cappedFormulaWarnings(manifest.requiredSchema?.tables ?? [])) out.push({ path: warning.path.map(String).join('.'), message: warning.message });
   /*
@@ -146,7 +149,7 @@ export function validateManifest(
     });
   }
 
-  // D17 — apps and add-ons share one key namespace, and these keys shadow a
+  // Apps and add-ons share one key namespace, and these keys shadow a
   // storefront route or a data file.
   if ((RESERVED_KEYS as readonly string[]).includes(manifest.key)) {
     issues.push({

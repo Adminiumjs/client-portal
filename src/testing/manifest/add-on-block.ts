@@ -29,7 +29,7 @@ import { slotIdSchema } from './slots.ts';
 import { BUILTIN_NAV_GROUP_KEYS, type BuiltinNavGroupKey } from './nav-groups.ts';
 
 /**
- * Add-ons get their OWN closed category vocabulary (D2), because an add-on is
+ * Add-ons get their OWN closed category vocabulary, because an add-on is
  * not a vertical and forcing it into the app facet set would make a carrier a
  * "commerce" product. Wave 4 uses two of the five; the other three exist so a
  * second add-on wave does not have to reopen the vocabulary.
@@ -64,7 +64,7 @@ export function isSemverRange(range: string): boolean {
 }
 
 /**
- * Exact hostname — no wildcards, no bare IPs, no ports, no scheme (D14).
+ * Exact hostname — no wildcards, no bare IPs, no ports, no scheme.
  *
  * The final label is alphabetic on purpose: it is what makes `203.0.113.10`
  * fail. Every real TLD is alphabetic, and an egress allow-list that quietly
@@ -256,9 +256,9 @@ export const addOnBlockSchema = z
     /** Grants over host + own tables, checked against SCOPE_OUT_OF_RANGE. */
     scopes: z.array(z.string().min(1)).optional(),
     network: addOnNetworkSchema.optional(),
-    /** D15 — the only settings the client bundle may read. */
+    /** The only settings the client bundle may read. */
     publicSettings: z.array(z.string().min(1)).optional(),
-    /** D11 — required to ship a demo that makes no real third-party call. */
+    /** Required to ship a demo that makes no real third-party call. */
     demoTransport: z.string().min(1).optional(),
     /**
      * Dashboard pages this add-on renders itself, and the groups it brings for

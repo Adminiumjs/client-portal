@@ -135,6 +135,8 @@ export const appDocumentSchema = z
      * not listed here is refused.
      */
     requestValues: z.array(slotId).min(1).max(8).optional(),
+    /** Only rows whose column holds one of the values have this document (a receipt for money taken, not given back). */
+    where: whereSchema.optional(),
   })
   .strict();
 export type AppDocument = z.infer<typeof appDocumentSchema>;
@@ -271,6 +273,7 @@ export function appDocumentIssues(
       return;
     }
     out.push(...mappingIssues(doc.table, doc.mapping, ctx.index, at, ctx.perNight ?? (() => new Map()), ctx.unlisted));
+    if (doc.where !== undefined && !ctx.index.has(doc.table, doc.where.column)) out.push({ path: at('where', 'column'), message: `"${doc.table}" has no column "${doc.where.column}"` });
     (doc.requestValues ?? []).forEach((slot, n) => {
       if (doc.requestValues!.indexOf(slot) !== n) out.push({ path: at('requestValues', n), message: `"${slot}" is listed twice` });
       // A mapped slot prints the row; a value sent for it would print something the row does not say.

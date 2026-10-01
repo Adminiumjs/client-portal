@@ -15,8 +15,7 @@
 /**
  * Manifest spec v1, frozen at `manifestVersion: 1` for all of Adminium 1.x.
  * Pure Zod v4 + types — no `node:` imports — so the storefront and the
- * Electron shell can validate a manifest in the browser (the
- * `@adminium/manifest` package row).
+ * Electron shell can validate a manifest in the browser.
  *
  * This module is the envelope: every block's shape and the cross-block rules.
  * The install PLANNER (planInstall / requiredSchema → create-or-map diff) and
@@ -36,7 +35,7 @@ import { pageCalendarIssues } from './page-calendar.ts';
 import { emailTemplateSchema, outboxIssues, outboxProducerSchema, outboxSchema } from './outbox.ts';
 import { codeWhereSchema, personalColumn, publicAccessIssues, publicAccessSchema, publicKeysSchema, shareCodeColumns, unlistedColumn, type PublicAccess } from './public-access.ts';
 import { roleLimitIssues, roleLimitsSchema, type RoleShape } from './roles.ts';
-import { statesIssues, statesSchema, type States } from './states.ts';
+import { conditionIssues, stateConditionSchema, statesIssues, statesSchema, type States } from './states.ts';
 import { MOMENT_LIMITS, clockTimeSchema, momentIssues, momentSchema, settingRefSchema } from './refs.ts';
 import {
   NUMERIC_TYPES,
@@ -111,7 +110,7 @@ export type Publisher = z.infer<typeof publisherSchema>;
 
 /**
  * Everything both kinds share. `categories` is deliberately NOT here: it splits
- * by kind (an add-on is not a vertical — D2), so each branch adds its own.
+ * by kind (an add-on is not a vertical), so each branch adds its own.
  */
 export const identityShape = {
   key: z.string().regex(/^[a-z][a-z0-9-]{1,79}$/, 'key must be ^[a-z][a-z0-9-]{1,79}$'),
@@ -132,7 +131,7 @@ export const identitySchema = z
 
 /**
  * Keys no app or add-on may ever take, because they would shadow a storefront
- * route or a data file (D17). Apps and add-ons share one key namespace.
+ * route or a data file. Apps and add-ons share one key namespace.
  *
  * `dashboard` joined them for a different reason: it is the HOST KEY a stock
  * Adminium deployment attaches an add-on under, so an add-on `attaches:
@@ -217,7 +216,7 @@ export const compatibilitySchema = z
 
 // ── requiredSchema (create-or-map) ───────────────────────────────────────────
 
-/** Abstract column types the introspection engine emits (research). */
+/** Abstract column types the introspection engine emits. */
 export const COLUMN_TYPES = [
   'id',
   'text',
@@ -391,6 +390,14 @@ export const perNightSchema = z
     to: refSchema,
     /** A foreign key of this row, and the number column of the row it points at. */
     rate: z.object({ via: refSchema, column: refSchema }).strict(),
+    /**
+     * A part of another row's price by the night (a credit for the nights a
+     * stay did not use): `via` a foreign key of this row, `column` that row's
+     * price by the night. The nights are priced as that row's are; when its
+     * stored price no longer matches today's rates (they changed since it was
+     * priced), the part is scaled to what it was charged, and never more.
+     */
+    of: z.object({ via: refSchema, column: refSchema }).strict().optional(),
     adjust: z
       .object({
         /** The table of adjustments. */
@@ -415,6 +422,24 @@ export const perNightSchema = z
       })
       .strict()
       .optional(),
+  })
+  .strict();
+
+/**
+ * A date kept on one side of another date: a column of the same row, or —
+ * with `via`, a foreign key of this row — a column of the row it points at.
+ * `when`: held only while the row, as the write leaves it, meets these (a
+ * credit bounded by its stay's departure only once it is for nights not
+ * stayed). `strict`: the dates may not be the same day — always, or only
+ * while the row meets these (a guest who left early is credited from the day
+ * after the arrival; a guest who never came, from the arrival itself).
+ */
+const dateBoundSchema = z
+  .object({
+    column: refSchema,
+    via: refSchema.optional(),
+    when: z.array(stateConditionSchema).min(1).max(8).optional(),
+    strict: z.union([z.literal(true), z.array(stateConditionSchema).min(1).max(8)]).optional(),
   })
   .strict();
 
@@ -520,6 +545,13 @@ export const columnRulesSchema = z
          * accepted): the old code stops working as the write commits.
          */
         renew: z.object({ on: z.union([codeRenewTriggerSchema, z.array(codeRenewTriggerSchema).min(2).max(3)]) }).strict().optional(),
+        /**
+         * A code no desk hands out (an online order's own link): left out of
+         * every staff read — rows, exports, live frames, the audit — for
+         * every role, Super Admin too. The link it opens and the emails
+         * that carry it to the row's holder still use it.
+         */
+        hiddenFromStaff: z.literal(true).optional(),
       })
       .strict()
       .optional(),
@@ -618,15 +650,22 @@ export const columnRulesSchema = z
     secret: z.boolean().optional(),
     /**
      * A date that may never be later than today, on the venue's calendar — a
-     * payment is recorded when it came in, not when it might.
+     * payment is recorded when it came in, not when it might — or than another
+     * date, as `notBefore` says it (a credit's nights end by the stay's departure).
      */
-    notAfter: z.literal('today').optional(),
+    notAfter: z.union([z.literal('today'), dateBoundSchema]).optional(),
     /**
      * A date that may never be earlier than another: a column of the same row,
      * or — with `via`, a foreign key of this row — a column of the row it
      * points at (a payment is never dated before its invoice was issued).
      */
-    notBefore: z.object({ column: refSchema, via: refSchema.optional() }).strict().optional(),
+    notBefore: dateBoundSchema.optional(),
+    /**
+     * The column a staff create keeps its retry key in, as a hash: a desk's
+     * save sent again after a lost reply answers the row the first one made
+     * (`clientKey`), on a table no public entry creates rows of.
+     */
+    retryKey: z.literal(true).optional(),
   })
   .strict();
 export type ColumnRules = z.infer<typeof columnRulesSchema>;
@@ -1144,7 +1183,7 @@ export const frontendSchema = z
   .object({
     /**
      * REQUIRED, and the whole point of the array form. Without it the split
-     * lives only in prose and nothing can enforce rule.
+     * lives only in prose and nothing can enforce it.
      */
     side: z.enum(FRONTEND_SIDES),
     kind: z.enum(FRONTEND_KINDS),
@@ -1157,7 +1196,7 @@ export const frontendSchema = z
      * this key and the `.strict()` schema rejected every one of them — while
      * being, per the fleet audit, "the only machine-readable record of the
      * staff/customer split anywhere in the fleet". Deleting it during
-     * normalization was the tempting move and would have made rule
+     * normalization was the tempting move and would have made the split
      * permanently uncheckable.
      */
     routes: z.record(z.string(), z.string()).optional(),
@@ -1230,8 +1269,8 @@ export const sampleDataSchema = z
  * The two envelope-wide rules, as plain predicates over the shape both branches
  * share. They are attached to EACH BRANCH below rather than to the union: a
  * `.refine()` on a `z.discriminatedUnion` would run against the union type and
- * lose the narrowing, and moving them up there is how they get silently dropped
- * (first implementer note).
+ * lose the narrowing, and moving them up there is how they get silently
+ * dropped.
  */
 interface SharedEnvelope {
   capabilities?: Capability[] | undefined;
@@ -1553,6 +1592,17 @@ function perNightIssues(
     else if (found.type !== 'date') out.push({ path: at(name), message: `"${table.ref}.${rule[name]}" is not a date` });
   }
   if (rule.from === rule.to) out.push({ path: at('to'), message: 'the nights run between two different dates' });
+  if (rule.of !== undefined) {
+    const link = index.column(table.ref, rule.of.via);
+    const parent = link?.type === 'fk' ? link.references : undefined;
+    if (parent === undefined) out.push({ path: at('of', 'via'), message: `"${rule.of.via}" is not a foreign key of "${table.ref}"` });
+    else {
+      const priced = index.table(parent)?.columns.find((c) => c.ref === rule.of!.column);
+      if (priced === undefined) out.push({ path: at('of', 'column'), message: `"${parent}" has no column "${rule.of.column}"` });
+      else if (priced.rules?.perNight === undefined) out.push({ path: at('of', 'column'), message: `"${parent}.${rule.of.column}" is not priced by the night` });
+      else if (priced.rules.perNight.of !== undefined) out.push({ path: at('of', 'column'), message: `"${parent}.${rule.of.column}" is itself a part of another price; a part is of a whole` });
+    }
+  }
   const via = index.column(table.ref, rule.rate.via);
   const target = via?.type === 'fk' ? via.references : undefined;
   if (target === undefined) {
@@ -1725,6 +1775,14 @@ export function appReferenceIssues(
       if (racing.length > 1 && rules.stamp === undefined) {
         out.push({ path: here(), message: `a column is decided by one rule, and this one has ${racing.join(', ')}` });
       }
+      if (rules.retryKey === true) {
+        // A 43-letter hash that finds its one row, sent by nobody but the save it keeps.
+        if (column.type !== 'text') out.push({ path: here('retryKey'), message: 'a retry key is kept in text' });
+        if (column.unique !== true) out.push({ path: here('retryKey'), message: 'a retry key finds one row by its key, so it is unique' });
+        if (column.nullable !== true) out.push({ path: here('retryKey'), message: 'a save sent without a retry key keeps none, so the column is nullable' });
+        if (typeof column.maxLength === 'number' && column.maxLength < 43) out.push({ path: here('retryKey'), message: 'a retry key is kept as 43 letters, so maxLength is at least 43' });
+        if (table.columns.some((other) => other !== column && other.rules?.retryKey === true)) out.push({ path: here('retryKey'), message: `"${table.ref}" keeps its retry key in one column` });
+      }
       if (rules.normalize !== undefined && column.type !== 'text') {
         out.push({ path: here('normalize'), message: 'only text is stored trimmed or in lower case' });
       }
@@ -1732,13 +1790,14 @@ export function appReferenceIssues(
       if ((rules.notAfter !== undefined || rules.notBefore !== undefined) && !dated(column.type)) {
         out.push({ path: here(rules.notAfter !== undefined ? 'notAfter' : 'notBefore'), message: 'only a date is kept within dates' });
       }
-      if (rules.notBefore !== undefined) {
-        const bound = rules.notBefore;
+      for (const side of ['notBefore', 'notAfter'] as const) {
+        const bound = rules[side];
+        if (bound === undefined || bound === 'today') continue;
         let owner = table.ref;
         if (bound.via !== undefined) {
           const via = index.column(table.ref, bound.via);
           if (via?.type !== 'fk' || via.references === undefined) {
-            out.push({ path: here('notBefore', 'via'), message: `"${table.ref}.${bound.via}" is not a foreign key` });
+            out.push({ path: here(side, 'via'), message: `"${table.ref}.${bound.via}" is not a foreign key` });
             owner = '';
           } else {
             owner = via.references;
@@ -1746,10 +1805,13 @@ export function appReferenceIssues(
         }
         if (owner !== '') {
           const other = index.column(owner, bound.column);
-          if (other === undefined) out.push({ path: here('notBefore', 'column'), message: `"${owner}" has no column "${bound.column}"` });
-          else if (!dated(other.type)) out.push({ path: here('notBefore', 'column'), message: `"${owner}.${bound.column}" is not a date` });
-          else if (bound.via === undefined && other.ref === column.ref) out.push({ path: here('notBefore', 'column'), message: 'a date is bounded by another column' });
+          if (other === undefined) out.push({ path: here(side, 'column'), message: `"${owner}" has no column "${bound.column}"` });
+          else if (!dated(other.type)) out.push({ path: here(side, 'column'), message: `"${owner}.${bound.column}" is not a date` });
+          else if (bound.via === undefined && other.ref === column.ref) out.push({ path: here(side, 'column'), message: 'a date is bounded by another column' });
         }
+        // The conditions read this row, as the write leaves it.
+        (bound.when ?? []).forEach((condition, w) => out.push(...conditionIssues(table.ref, condition, index, here(side, 'when', w))));
+        if (Array.isArray(bound.strict)) bound.strict.forEach((condition, w) => out.push(...conditionIssues(table.ref, condition, index, here(side, 'strict', w))));
       }
       if (rules.requiredWhen !== undefined) {
         const when = rules.requiredWhen;
@@ -1824,6 +1886,15 @@ export function appReferenceIssues(
           if (kept !== null) out.push({ path: here('copy', 'from'), message: `"${via.references}.${rules.copy.from}" is ${kept}, so no column copies it` });
         }
         if (rules.copy.follow === true) out.push(...followIssues(m.requiredSchema.tables, table, column.ref, rules.copy, here));
+        // A copy may read through a link another copy fills, never round in a loop.
+        const seen = new Set([column.ref]);
+        for (let via: string | undefined = rules.copy.via; via !== undefined; via = table.columns.find((x) => x.ref === via)?.rules?.copy?.via) {
+          if (seen.has(via)) {
+            out.push({ path: here('copy', 'via'), message: `"${column.ref}" is copied through a loop of copies: "${via}" comes round again` });
+            break;
+          }
+          seen.add(via);
+        }
       }
       if (rules.perNight !== undefined) {
         if (shapeOf !== undefined) out.push({ path: here('perNight'), message: 'a shape does not price by the night' });
@@ -2493,7 +2564,7 @@ export const appManifestSchema = z
     navGroups: z.array(navGroupSchema).max(12).optional(),
     /** Keyed by a kebab-case name; a column names one with `options: {list: name}`. */
     optionLists: z.record(z.string().regex(/^[a-z][a-z0-9-]*$/, 'a list name is kebab-case'), optionListSchema).optional(),
-    publicAccess: z.array(publicAccessSchema).max(32).optional(),
+    publicAccess: z.array(publicAccessSchema).max(64).optional(),
     /** Browser keys besides the app's own `customer` key (see `public-access.ts`). */
     publicKeys: publicKeysSchema.optional(),
     /** The app's emails: its outbox table and what queues rows in it (see `outbox.ts`). */
@@ -2544,7 +2615,7 @@ export const addOnManifestSchema = z
     categories: z.array(addOnCategorySchema).min(1),
     compatibility: compatibilitySchema,
     addOn: addOnBlockSchema,
-    // An add-on may bring its own tables — kept on disconnect (D16).
+    // An add-on may bring its own tables — kept on disconnect.
     requiredSchema: requiredSchemaSchema.optional(),
     settings: z.array(settingSchema).optional(),
     capabilities: z.array(capabilitySchema).optional(),

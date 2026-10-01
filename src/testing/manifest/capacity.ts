@@ -84,8 +84,13 @@ const holdSchema = z
   })
   .strict();
 
-/** States whose places still count against the public, and are left for staff to hand on. */
-const reservedSchema = z.object({ states: z.array(z.string().min(1)).min(1).max(8), ...ownerVia }).strict();
+/**
+ * States whose places still count against the public, and are left for staff
+ * to hand on. `releaseTo`: a row leaving its hold (a waitlist offer claimed)
+ * takes these very places, so as many kept rows of its pool as it takes move
+ * to that state in the same write — the public then counts what is truly left.
+ */
+const reservedSchema = z.object({ states: z.array(z.string().min(1)).min(1).max(8), ...ownerVia, releaseTo: z.string().min(1).max(64).optional() }).strict();
 
 /**
  * A number, a setting, or a column of the row the rule points at (empty
@@ -563,6 +568,12 @@ function ruleIssues(
       const reserved = rule.reserved;
       ownerOf(reserved.via, here('reserved', 'via'));
       statesCount(reserved.states, reserved.via, here('reserved', 'states'), 'it keeps no place');
+      if (reserved.releaseTo !== undefined) {
+        // The pool's own rows move, so the state is theirs, and one they may be moved to from each state kept.
+        if (reserved.via !== undefined) out.push({ path: here('reserved', 'releaseTo'), message: 'only a pool row\'s own state is released; keep the places by its own state' });
+        if (rule.hold === undefined) out.push({ path: here('reserved', 'releaseTo'), message: 'places are released by a row leaving a hold, and this limit holds none' });
+        if (reserved.states.includes(reserved.releaseTo)) out.push({ path: here('reserved', 'releaseTo'), message: `"${reserved.releaseTo}" is kept back, so a place moved to it is still kept` });
+      }
       if (rule.hold !== undefined && (rule.hold.via ?? '') === (reserved.via ?? '')) {
         for (const state of reserved.states) {
           if (rule.hold.states.includes(state)) out.push({ path: here('reserved', 'states'), message: `"${state}" is held, so it is not also kept back` });

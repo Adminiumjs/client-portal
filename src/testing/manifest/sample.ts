@@ -174,7 +174,16 @@ export const sampleBundleSchema = z
       .record(label, z.object({ file: z.string().regex(/^seeds\/[a-z0-9][a-z0-9._/-]*$/), sha256: z.string().regex(/^[a-f0-9]{64}$/) }).strict())
       .default({}),
     tables: z
-      .array(z.object({ ref: z.string().min(1), rows: z.array(sampleRowSchema).min(1).max(5000) }).strict())
+      .array(
+        z
+          .object({
+            ref: z.string().min(1),
+            /** The table's rows go in only when it holds none (a kitchen's opening hours, set before the sample). */
+            onlyIfEmpty: z.literal(true).optional(),
+            rows: z.array(sampleRowSchema).min(1).max(5000),
+          })
+          .strict(),
+      )
       .min(1),
   })
   .strict();
@@ -275,6 +284,8 @@ export function sampleBundleIssues(bundle: SampleBundle, manifest: Manifest): Sa
   }
   const declared = new Map((manifest.requiredSchema?.tables ?? []).map((table) => [table.ref, table]));
   const seen = new Set<string>();
+  // The labels of a table whose rows may all be left out: nothing may point at them.
+  const mayBeLeftOut = new Set(bundle.tables.filter((table) => table.onlyIfEmpty === true).flatMap((table) => table.rows.map((row) => row['@label']).filter((l): l is string => typeof l === 'string')));
   for (const [t, table] of bundle.tables.entries()) {
     const shape = declared.get(table.ref);
     if (shape === undefined) {
@@ -313,6 +324,7 @@ export function sampleBundleIssues(bundle: SampleBundle, manifest: Manifest): Sa
         }
         if (column === '@onlyIfEmpty') {
           if (value !== true) issues.push({ path: `${at}.@onlyIfEmpty`, message: '"@onlyIfEmpty" is true, or absent.' });
+          else if (table.onlyIfEmpty === true) issues.push({ path: `${at}.@onlyIfEmpty`, message: `"${table.ref}" is only for an empty table as a whole; a row of it says nothing more.` });
           continue;
         }
         if (column === '@byStay') {
@@ -394,6 +406,8 @@ export function sampleBundleIssues(bundle: SampleBundle, manifest: Manifest): Sa
             path: `${at}.${column}`,
             message: `"${found.label}" is not an earlier row: a referenced row must come first.`,
           });
+        } else if (found?.kind === 'ref' && mayBeLeftOut.has(found.label)) {
+          issues.push({ path: `${at}.${column}`, message: `"${found.label}" is in a table only for an empty table, so it may not be written: nothing points at it.` });
         }
         if (found?.kind === 'asset' && bundle.assets[found.label] === undefined) {
           issues.push({ path: `${at}.${column}`, message: `"${found.label}" is not one of the bundle’s assets.` });

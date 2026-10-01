@@ -52,9 +52,15 @@ export const roleLimitSchema = z
     writableValues: z.record(refSchema, z.array(scalarSchema).min(1).max(32)).optional(),
     /** The only columns the read shows (with the key and the links to other rows). */
     readable: z.array(refSchema).min(1).max(200).optional(),
+    /** The only columns a new row it creates may be given (the rest take their defaults). */
+    creatable: z.array(refSchema).min(1).optional(),
+    /** For some of those columns, the only values a new row may be given. */
+    creatableValues: z.record(refSchema, z.array(scalarSchema).min(1).max(32)).optional(),
   })
   .strict()
-  .refine((limit) => limit.writable !== undefined || limit.readable !== undefined, { message: 'a limit names what the role may write (writable) or read (readable)' });
+  .refine((limit) => limit.writable !== undefined || limit.readable !== undefined || limit.creatable !== undefined, {
+    message: 'a limit names what the role may write (writable), read (readable) or create with (creatable)',
+  });
 export type RoleLimit = z.infer<typeof roleLimitSchema>;
 
 /** Per table ref, the limit on the role's update there. */
@@ -108,6 +114,24 @@ export function roleLimitIssues<C extends ColumnShape>(roles: readonly RoleShape
         if (found === undefined) continue;
         for (const value of values) {
           if (!valueFits(found, value)) out.push({ path: at('writableValues', column), message: `${JSON.stringify(value)} is not a value of "${ref}.${column}"` });
+        }
+      }
+      if (limit.creatable !== undefined && !grants.has(`table:@${ref}:create`)) {
+        out.push({ path: at('creatable'), message: `the role does not grant table:@${ref}:create, so there is nothing to limit` });
+      }
+      if (limit.creatable === undefined && limit.creatableValues !== undefined) {
+        out.push({ path: at('creatableValues'), message: 'values are limited for the columns a new row may be given: name them (creatable)' });
+      }
+      for (const column of limit.creatable ?? []) {
+        if (index.column(ref, column) === undefined) out.push({ path: at('creatable'), message: `"${ref}" has no column "${column}"` });
+      }
+      const creatable = new Set(limit.creatable ?? []);
+      for (const [column, values] of Object.entries(limit.creatableValues ?? {})) {
+        if (!creatable.has(column)) out.push({ path: at('creatableValues', column), message: `"${column}" is not creatable` });
+        const found = index.column(ref, column);
+        if (found === undefined) continue;
+        for (const value of values) {
+          if (!valueFits(found, value)) out.push({ path: at('creatableValues', column), message: `${JSON.stringify(value)} is not a value of "${ref}.${column}"` });
         }
       }
     }

@@ -239,6 +239,8 @@ export const lateMoveSchema = z
     mode: z.enum(['flag', 'refuse']),
     flag: refSchema.optional(),
     refuse: z.enum(['public', 'everyone']).optional(),
+    /** Only a move whose row, as the write leaves it, meets these (a cancellation by the house is never late). */
+    where: z.array(stateConditionSchema).min(1).max(8).optional(),
   })
   .strict()
   .refine((l) => (l.mode === 'flag') === (l.flag !== undefined), {
@@ -371,7 +373,12 @@ export const statesSchema = z
       .max(4)
       .optional(),
     noDelete: z.object({ when: z.union([z.literal('numbered'), z.array(stateName).min(1).max(16)]) }).strict().optional(),
-    onlyLater: z.array(refSchema).min(1).max(8).optional(),
+    /** Dates that may move later and never earlier: always, or (`{column, in}`) only while the row is in one of `in`. */
+    onlyLater: z
+      .array(z.union([refSchema, z.object({ column: refSchema, in: z.array(stateName).min(1).max(16) }).strict()]))
+      .min(1)
+      .max(8)
+      .optional(),
     /** A move to the state a row already holds is refused, naming when it got there (see {@link strictStatesSchema}). */
     strict: strictStatesSchema.optional(),
     /** A move made close to a moment sets a flag, or is refused (see {@link lateMoveSchema}). */
@@ -379,7 +386,7 @@ export const statesSchema = z
     /** Moves Adminium makes on its own when a moment passes (see {@link timedMoveSchema}). */
     timed: z.array(timedMoveSchema).min(1).max(8).optional(),
     /** A move that moves the row one of its links points at too (see {@link stateEffectSchema}). */
-    effects: z.array(stateEffectSchema).min(1).max(4).optional(),
+    effects: z.array(stateEffectSchema).min(1).max(8).optional(),
     /** What a new row must meet to be created (see {@link createRequiresSchema}). */
     create: createRequiresSchema.optional(),
   })
@@ -614,11 +621,13 @@ export function statesIssues<C extends ColumnShape>(
       states.noDelete.when.forEach((value, i) => known(value, at('noDelete', 'when', i)));
     }
   }
-  for (const ref of states.onlyLater ?? []) {
+  (states.onlyLater ?? []).forEach((entry, i) => {
+    const ref = typeof entry === 'string' ? entry : entry.column;
     const found = index.column(table, ref);
-    if (found === undefined) out.push({ path: at('onlyLater'), message: `"${table}" has no column "${ref}"` });
-    else if (found.type !== 'date' && found.type !== 'timestamptz') out.push({ path: at('onlyLater'), message: `"${table}.${ref}" is not a date` });
-  }
+    if (found === undefined) out.push({ path: at('onlyLater', i), message: `"${table}" has no column "${ref}"` });
+    else if (found.type !== 'date' && found.type !== 'timestamptz') out.push({ path: at('onlyLater', i), message: `"${table}.${ref}" is not a date` });
+    if (typeof entry !== 'string') entry.in.forEach((state, s) => known(state, at('onlyLater', i, 'in', s)));
+  });
   out.push(...conditionedMoveIssues(table, states, ctx, at, values));
   return out;
 }
@@ -708,6 +717,7 @@ function conditionedMoveIssues<C extends ColumnShape>(
     });
     if (late.from === undefined && !reached(late.to)) out.push({ path: here('to'), message: `no listed move goes to "${late.to}"` });
     out.push(...momentIssues(table, late.moment, index, here('moment')));
+    (late.where ?? []).forEach((condition, w) => out.push(...conditionIssues(table, condition, index, here('where', w))));
     if (late.flag !== undefined) {
       const flag = index.column(table, late.flag);
       if (flag === undefined) out.push({ path: here('flag'), message: `"${table}" has no column "${late.flag}"` });

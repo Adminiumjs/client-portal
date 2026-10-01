@@ -103,7 +103,7 @@ export const SLOT_REGISTRY = [
     renders: 'a read-only tracking view',
   },
   {
-    // Renamed from `job.dispatch.actions` on 2026-08-05 (D21): the id names a
+    // Renamed from `job.dispatch.actions` on 2026-08-05: the id names a
     // surface, not the print shop's domain, so a second host can fill it.
     id: 'order.dispatch.actions',
     surface: 'staff',
@@ -299,7 +299,7 @@ export const SLOT_REGISTRY = [
      * ── THE ALTERNATIVE THAT WAS REJECTED, AND IS STILL ON FILE ─────────────
      *
      * Adminium injecting a script into every hosted customer surface, with no
-     * slot at all. Rejected for v1 (D3): demo mode needs the seam regardless —
+     * slot at all. Rejected for v1: demo mode needs the seam regardless —
      * an example app running on fixtures has no Adminium to inject anything —
      * and a second mount mechanism is the duplication this layer exists to
      * prevent. It stays on file as the way to reach OPERATOR-BUILT customer
