@@ -25,9 +25,10 @@ import { TABLES } from "./tables.ts";
  * place (`updatesFrom` below; proved by `contract/update.test.ts`). 0.2.2
  * changes no table: it asks for Adminium 0.3.7 (`MIN_ADMINIUM`). 0.2.3
  * changes no table either: approved work may go back to review, and it asks
- * for Adminium 0.3.9.
+ * for Adminium 0.3.9. 0.2.4 changes no table: a client's invoice stays on
+ * screen once they say they paid, and it asks for Adminium 0.3.11.
  */
-export const VERSION = "0.2.3";
+export const VERSION = "0.2.4";
 
 /**
  * The Adminium release that first reads everything below: formulas, numbers
@@ -37,8 +38,10 @@ export const VERSION = "0.2.3";
  * sent proposal uses: it keeps their clauses, and writes none under them.
  * 0.3.9 is the first that lets a reply to an enquiry carry its own words, and
  * that offers a client only the door their "I've sent a payment" may use.
+ * 0.3.11 is the first that takes that payment from a client added after the
+ * install (one with no tax rate of their own) instead of refusing it.
  */
-export const MIN_ADMINIUM = "0.3.9";
+export const MIN_ADMINIUM = "0.3.11";
 
 const ENV = {
   VITE_ADMINIUM_API_BASE_URL: { required: false, example: "https://admin.example.com" },

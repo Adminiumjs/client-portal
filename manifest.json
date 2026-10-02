@@ -3,7 +3,7 @@
   "manifestVersion": 1,
   "key": "clients",
   "name": "Client Portal",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "publisher": {
     "id": "adminium",
     "name": "Adminium",
@@ -19,7 +19,7 @@
     "crm"
   ],
   "compatibility": {
-    "minAdminiumVersion": "0.3.9",
+    "minAdminiumVersion": "0.3.11",
     "engines": [
       "sqlite",
       "postgres",

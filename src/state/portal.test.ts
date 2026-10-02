@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { PortalPort } from "../data/ports.ts";
 import { fakeStudio, type FakeStudio } from "../testing/fakeStudio.ts";
-import { attachPortalRefresh, loadClientProposal, loadPortal, previewFromDesk, setPortalPort, usePortal } from "./portal.ts";
+import { attachPortalRefresh, loadClientProposal, loadPortal, previewFromDesk, setPortalPort, upsertPortal, usePortal } from "./portal.ts";
 import { useDesk } from "./desk.ts";
 import { open, useUi } from "./ui.ts";
 
@@ -35,6 +35,24 @@ describe("the signed-in client's rows", () => {
     await loadClientProposal(3);
     expect(Object.values(usePortal.getState().rows.proposal_lines)).toHaveLength(3);
     expect(Object.values(usePortal.getState().rows.terms_clauses)).toHaveLength(4);
+  });
+});
+
+describe("a write's reply", () => {
+  it("is laid over the row held: the columns it does not carry stay", async () => {
+    /*
+     * "I've sent a payment" answers six columns of the invoice. Held in place
+     * of the row, it left an invoice with no status, and the page took it for
+     * gone the moment the studio had been told.
+     */
+    await loadPortal();
+    const before = usePortal.getState().rows.invoices[6]!;
+    upsertPortal("invoices", [{ id: 6, client_paid: true, client_paid_on: "2026-07-27", client_paid_amount: null, client_paid_note: null, client_paid_at: "2026-07-27T10:00:00.000Z" } as never]);
+    const after = usePortal.getState().rows.invoices[6]!;
+    expect(after).toMatchObject({ status: before.status, number: before.number, issued_on: before.issued_on, client_paid_on: "2026-07-27" });
+    // A row not held yet is held as it came.
+    upsertPortal("invoices", [{ id: 999, client_paid_on: "2026-07-27" } as never]);
+    expect(usePortal.getState().rows.invoices[999]).toEqual({ id: 999, client_paid_on: "2026-07-27" });
   });
 });
 

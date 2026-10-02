@@ -51,9 +51,18 @@ export function portalPort(): PortalPort {
   return port;
 }
 
+/**
+ * Lay rows over the ones held. A row already held keeps the columns the new
+ * one does not carry: a write's reply holds only what its endpoint shows (the
+ * "I've sent a payment" endpoint answers six columns of an invoice), and held
+ * whole it left an invoice with no status — a page that "doesn't exist" the
+ * moment the client had told the studio they paid.
+ */
 export function upsertPortal<R extends TableRef>(ref: R, rows: readonly Tables[R][]): void {
   if (rows.length === 0) return;
-  usePortal.setState((s) => ({ rows: { ...s.rows, [ref]: { ...s.rows[ref], ...Object.fromEntries(rows.map((row) => [row.id, row])) } } }));
+  usePortal.setState((s) => ({
+    rows: { ...s.rows, [ref]: { ...s.rows[ref], ...Object.fromEntries(rows.map((row) => [row.id, { ...s.rows[ref][row.id], ...row }])) } },
+  }));
 }
 
 /** Replace a table's rows with a fresh read (a row no longer returned is gone, or no longer the client's). */

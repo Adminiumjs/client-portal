@@ -1,7 +1,7 @@
 {
   "name": "client-portal",
   "private": true,
-  "version": "0.2.3",
+  "version": "0.2.4",
   "type": "module",
   "description": "Client Portal — an open-source client-portal and invoicing example app for Adminium.",
   "license": "AGPL-3.0-only",
