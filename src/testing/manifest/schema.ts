@@ -99,6 +99,13 @@ export const categorySchema = z.enum(MANIFEST_CATEGORIES);
 /** The one publisher id v1 accepts unless `third-party-publishers` is on. */
 export const FIRST_PARTY_PUBLISHER_ID = 'adminium';
 
+/**
+ * The publisher id of an app made on the install it runs on: written in a
+ * project folder and installed from a file, never from a catalogue. Accepted
+ * only where the caller says so, and only for an app.
+ */
+export const LOCAL_PUBLISHER_ID = 'local';
+
 export const publisherSchema = z
   .object({
     id: z.string().regex(/^[a-z][a-z0-9-]{1,39}$/, 'publisher id must be ^[a-z][a-z0-9-]{1,39}$'),

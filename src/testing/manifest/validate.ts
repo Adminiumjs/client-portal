@@ -21,6 +21,7 @@
 
 import {
   FIRST_PARTY_PUBLISHER_ID,
+  LOCAL_PUBLISHER_ID,
   RESERVED_KEYS,
   addOnIssues,
   cappedFormulaWarnings,
@@ -49,6 +50,13 @@ export interface ValidateManifestOptions {
    * in front of it.
    */
   allowThirdPartyPublishers?: boolean;
+  /**
+   * Allow the publisher `local`: an app made on this install and installed
+   * from a file. Narrower than the option above on purpose — it lets exactly
+   * one id through, and never for an add-on, whose server half would run in
+   * the host process.
+   */
+  allowLocalPublisher?: boolean;
   /** Installed app keys, so an add-on's `attaches` can be checked. */
   knownAppKeys?: readonly string[];
   /** The host app's table refs, so an add-on's `scopes` can be bounded. */
@@ -142,7 +150,21 @@ export function validateManifest(
   const manifest = parsed.data;
   const issues: ManifestIssue[] = [];
 
-  if (!(opts.allowThirdPartyPublishers ?? false) && manifest.publisher.id !== FIRST_PARTY_PUBLISHER_ID) {
+  const publisher = manifest.publisher.id;
+  if (publisher === LOCAL_PUBLISHER_ID && manifest.kind === 'add-on') {
+    // Before the third-party option, which would otherwise let it through.
+    issues.push({
+      path: 'publisher.id',
+      message: `an add-on cannot carry the publisher "${LOCAL_PUBLISHER_ID}"`,
+    });
+  } else if (publisher === LOCAL_PUBLISHER_ID && !(opts.allowThirdPartyPublishers ?? false)) {
+    if (!(opts.allowLocalPublisher ?? false)) {
+      issues.push({
+        path: 'publisher.id',
+        message: `"${LOCAL_PUBLISHER_ID}" is a self-made app: it installs from a file you upload, not from a catalogue`,
+      });
+    }
+  } else if (!(opts.allowThirdPartyPublishers ?? false) && publisher !== FIRST_PARTY_PUBLISHER_ID) {
     issues.push({
       path: 'publisher.id',
       message: `third-party publishers are not accepted in v1 (expected "${FIRST_PARTY_PUBLISHER_ID}")`,
@@ -172,6 +194,15 @@ export function validateManifest(
   const warnings = manifestWarnings(manifest);
   if (issues.length > 0) return { ok: false, issues, warnings };
   return { ok: true, manifest, warnings };
+}
+
+/**
+ * An app that declares no screen of its own: every `frontends` entry is
+ * `kind: "none"`. Its tables and pages are the whole app, and a package of it
+ * carries no built side.
+ */
+export function isManifestOnly(manifest: Manifest): boolean {
+  return manifest.kind === 'app' && manifest.frontends.every((frontend) => frontend.kind === 'none');
 }
 
 /** `sampleData.skipWhenShared` names the app's own tables, its `table` is one it shares, and no table left in links to a skipped one. */
