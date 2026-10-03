@@ -229,7 +229,7 @@ export function shapeConformanceIssues(
 }
 
 /** A part's rules with the part names they read replaced by the app's tables. */
-function mapRules(rules: ColumnRules | undefined, map: (ref: string) => string): Record<string, unknown> {
+export function mapRules(rules: ColumnRules | undefined, map: (ref: string) => string): Record<string, unknown> {
   if (rules === undefined) return {};
   const out: Record<string, unknown> = { ...rules };
   if (rules.rollup !== undefined) out['rollup'] = { ...rules.rollup, from: map(rules.rollup.from) };
@@ -252,7 +252,8 @@ function mapRules(rules: ColumnRules | undefined, map: (ref: string) => string):
   return out;
 }
 
-function mapStates(states: States, map: (ref: string) => string): States {
+/** A part's states with the part names they read replaced by the app's tables. */
+export function mapStates(states: States, map: (ref: string) => string): States {
   return {
     ...states,
     moves: Object.fromEntries(
