@@ -1732,7 +1732,7 @@ function boundIssues(index: TableIndex, ctx: PublicAccessContext, table: string,
     if (bounds?.min === undefined || bounds.min < 0 || bounds.max === undefined) {
       out.push({
         path: at,
-        message: `"${table}.${ref}" is written by a guest and feeds a price Adminium works out, so it declares validation.min (at least 0) and validation.max`,
+        message: `"${table}.${ref}" is written by a guest and feeds a price Adminium works out, so it declares validation.min (at least 0) and validation.max — on the column itself, in the table's own definition (e.g. "validation": { "min": 1, "max": 50 }), not in the access entry`,
       });
     }
   }
@@ -1782,7 +1782,7 @@ function treeIssues(
       if (!creates && !changes) out.push({ path: at('expect'), message: 'a price check belongs to a create or a change' });
       if (column === undefined) out.push({ path: at('expect'), message: `"${entry.table}" has no column "${entry.expect}"` });
       else if (column.type !== 'decimal' && column.type !== 'money') out.push({ path: at('expect'), message: `"${entry.table}.${entry.expect}" is not a money column` });
-      else if (!ctx.decided(entry.table).has(entry.expect)) out.push({ path: at('expect'), message: `"${entry.table}.${entry.expect}" is not a figure Adminium works out, so there is nothing to check` });
+      else if (!ctx.decided(entry.table).has(entry.expect)) out.push({ path: at('expect'), message: `"${entry.table}.${entry.expect}" is not a figure Adminium works out, so there is nothing to check: take "expect" out of the entry, or first declare how the figure is worked out (a line total and a parent total, as the guide "orders with lines" shows)` });
       if (!(entry.select ?? []).includes(entry.expect)) out.push({ path: at('expect'), message: `"${entry.expect}" is checked, so the entry shows it (select)` });
     }
 

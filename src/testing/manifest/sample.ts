@@ -310,7 +310,12 @@ export function sampleBundleIssues(bundle: SampleBundle, manifest: Manifest): Sa
       const at = `tables.${String(t)}.rows.${String(r)}`;
       for (const column of gapless) {
         if (row[column] !== null) {
-          issues.push({ path: `${at}.${column}`, message: `"${column}" is numbered without gaps: a sample row spells it null, so it stays off the real series.` });
+          // Said as what to write: a model given only the reason left the key out, eight times running.
+          const now = row[column] === undefined ? 'this row leaves it out' : 'this row gives it a value';
+          issues.push({
+            path: `${at}.${column}`,
+            message: `"${column}" is numbered without gaps, and ${now}. Write "${column}": null in every sample row of "${table.ref}", so the sample stays off the real series.`,
+          });
         }
       }
       for (const [column, value] of Object.entries(row)) {
