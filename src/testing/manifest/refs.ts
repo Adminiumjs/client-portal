@@ -37,6 +37,12 @@ export const labelsSchema = z
 /** A text that is either one string, or the same text in several languages. */
 export const textOrLabels = z.union([z.string().min(1).max(256), labelsSchema]);
 
+/** A sentence or two a person reads before they act: one string, or the same in several languages. */
+export const wordsOrLabels = z.union([
+  z.string().min(1).max(300),
+  z.record(bcp47TagSchema, z.string().min(1).max(300)).refine((labels) => labels['en-US'] !== undefined, { message: 'labels must include en-US' }),
+]);
+
 /** One column of the app's one-row settings table, read when the rule runs. */
 export const settingRefSchema = z.object({ table: refSchema, column: refSchema }).strict();
 

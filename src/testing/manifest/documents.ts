@@ -77,6 +77,28 @@ const tableSourceSchema = z
   .strict();
 
 /**
+ * Rows of an add-on's table that belong to the document's row: found not by
+ * a foreign key (the add-on's table has none into this manifest) but by the
+ * pair the add-on keeps — a table's stored name and a row's key (what was
+ * applied to an order). `table` and `match` are the add-on's own short
+ * names; the rows are read only while that add-on is there.
+ */
+export const pairSourceSchema = z
+  .object({
+    addOn: z.string().regex(/^[a-z][a-z0-9-]{1,79}$/, 'an add-on key'),
+    table: refSchema,
+    match: z.object({ table: refSchema, row: refSchema }).strict(),
+    orderBy: refSchema.optional(),
+    columns: z.record(slotId, refSchema),
+    /** Slot columns whose amount is printed as taken off: what the add-on keeps as 4.85 reads −4.85 (a reduction among charges). */
+    takenOff: z.array(slotId).min(1).max(4).optional(),
+    where: whereSchema.optional(),
+    unless: refSchema.optional(),
+  })
+  .strict();
+export type PairSource = z.infer<typeof pairSourceSchema>;
+
+/**
  * The nights a price-by-the-night column of the document's row is made of,
  * worked out when the document is drawn: one line per night. A column is one
  * of the night's own (`date`, `rate`, `base`, `qty`, `tags`) or a column of
@@ -98,9 +120,9 @@ const formSchema = z.literal('grouped').optional();
 export const slotMappingSchema = z.union([
   z.object({ column: refSchema, form: formSchema }).strict(),
   z.object({ via: refSchema, column: refSchema, form: formSchema }).strict(),
-  z.object({ collection: z.union([tableSourceSchema, nightlySourceSchema]) }).strict(),
+  z.object({ collection: z.union([tableSourceSchema, nightlySourceSchema, pairSourceSchema]) }).strict(),
   /** One list from several sources, in order (a folio's nights, extras and charges). */
-  z.object({ collections: z.array(z.union([tableSourceSchema, nightlySourceSchema])).min(1).max(4) }).strict(),
+  z.object({ collections: z.array(z.union([tableSourceSchema, nightlySourceSchema, pairSourceSchema])).min(1).max(6) }).strict(),
 ]);
 export type SlotMapping = z.infer<typeof slotMappingSchema>;
 
@@ -150,6 +172,20 @@ type NightlySource = z.infer<typeof nightlySourceSchema>;
  * nothing can be priced by the night (an add-on's shapes).
  */
 export type PerNightOf = (table: string) => ReadonlyMap<string, { rateVia: string }>;
+
+/**
+ * Rows of an add-on's table found by a table-and-row pair: the add-on is one
+ * this manifest names. Its table and columns are the add-on's own, so they
+ * are checked where its manifest is at hand — at install.
+ */
+function pairSourceIssues(c: PairSource, named: ReadonlySet<string>, here: (...rest: (string | number)[]) => (string | number)[]): ReferenceIssue[] {
+  const out: ReferenceIssue[] = [];
+  if (!named.has(c.addOn)) out.push({ path: here('addOn'), message: `"${c.addOn}" is not an add-on this manifest names: add it to addOns.requires or addOns.suggests` });
+  (c.takenOff ?? []).forEach((slotColumn, n) => {
+    if (!Object.hasOwn(c.columns, slotColumn)) out.push({ path: here('takenOff', n), message: `"${slotColumn}" is not one of this list's columns` });
+  });
+  return out;
+}
 
 /** A child-row source of one list: the table, its link to the row, and each column it reads. */
 function tableSourceIssues(table: string, c: TableSource, index: TableIndex, here: (...rest: (string | number)[]) => (string | number)[], unlisted?: Unlisted): ReferenceIssue[] {
@@ -227,6 +263,8 @@ export function mappingIssues(
   perNight?: PerNightOf,
   /** The app's columns no list may print; absent for an add-on's shapes, which list nothing of an app's. */
   unlisted?: Unlisted,
+  /** The add-ons whose rows a list may read by a table-and-row pair: the ones the manifest names, and itself when it is one. */
+  named: ReadonlySet<string> = new Set(),
 ): ReferenceIssue[] {
   const out: ReferenceIssue[] = [];
   for (const [slot, source] of Object.entries(mapping)) {
@@ -234,12 +272,12 @@ export function mappingIssues(
     if ('collections' in source) {
       source.collections.forEach((one, k) => {
         const there = (...rest: (string | number)[]) => here('collections', k, ...rest);
-        out.push(...('nightly' in one ? nightlySourceIssues(table, one, index, perNight, there) : tableSourceIssues(table, one, index, there, unlisted)));
+        out.push(...('addOn' in one ? pairSourceIssues(one, named, there) : 'nightly' in one ? nightlySourceIssues(table, one, index, perNight, there) : tableSourceIssues(table, one, index, there, unlisted)));
       });
     } else if ('collection' in source) {
       const c = source.collection;
       const there = (...rest: (string | number)[]) => here('collection', ...rest);
-      out.push(...('nightly' in c ? nightlySourceIssues(table, c, index, perNight, there) : tableSourceIssues(table, c, index, there, unlisted)));
+      out.push(...('addOn' in c ? pairSourceIssues(c, named, there) : 'nightly' in c ? nightlySourceIssues(table, c, index, perNight, there) : tableSourceIssues(table, c, index, there, unlisted)));
     } else if ('via' in source) {
       const via = index.column(table, source.via);
       if (via?.type !== 'fk' || via.references === undefined) {
@@ -272,7 +310,7 @@ export function appDocumentIssues(
       out.push({ path: at('table'), message: `"${doc.table}" is not a table of this app` });
       return;
     }
-    out.push(...mappingIssues(doc.table, doc.mapping, ctx.index, at, ctx.perNight ?? (() => new Map()), ctx.unlisted));
+    out.push(...mappingIssues(doc.table, doc.mapping, ctx.index, at, ctx.perNight ?? (() => new Map()), ctx.unlisted, ctx.addOns));
     if (doc.where !== undefined && !ctx.index.has(doc.table, doc.where.column)) out.push({ path: at('where', 'column'), message: `"${doc.table}" has no column "${doc.where.column}"` });
     (doc.requestValues ?? []).forEach((slot, n) => {
       if (doc.requestValues!.indexOf(slot) !== n) out.push({ path: at('requestValues', n), message: `"${slot}" is listed twice` });

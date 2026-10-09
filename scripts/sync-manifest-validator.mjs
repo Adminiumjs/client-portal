@@ -82,10 +82,32 @@ const FILES = [
   ['packages/manifest/src/shapes.ts', 'shapes.ts'],
   // The core's own table shapes (a menu shared with Point of Sale), checked by `validate.ts`.
   ['packages/manifest/src/table-shapes.ts', 'table-shapes.ts'],
+  // What an add-on with its own tables brought: the words only a newer Adminium
+  // reads, ledgers and what posts into them, a price an add-on lowers, the rules
+  // an app ships, a record page's buttons, a records page's own config, and
+  // what a typed code may find. Each is imported by `schema.ts` or `states.ts`.
+  ['packages/manifest/src/words.ts', 'words.ts'],
+  ['packages/manifest/src/ledgers.ts', 'ledgers.ts'],
+  ['packages/manifest/src/ledger-indexes.ts', 'ledger-indexes.ts'],
+  // `ledger-indexes.ts` measures a unique set against MySQL's key limit with the planner's own sum.
+  ['packages/manifest/src/plan-context.ts', 'plan-context.ts'],
+  ['packages/manifest/src/plan-model.ts', 'plan-model.ts'],
+  // The planner and `ledger-indexes.ts` both count a key's bytes with this; its own file so neither imports the other.
+  ['packages/manifest/src/key-bytes.ts', 'key-bytes.ts'],
+  ['packages/manifest/src/plan-types.ts', 'plan-types.ts'],
+  ['packages/manifest/src/adjust.ts', 'adjust.ts'],
+  ['packages/manifest/src/automations.ts', 'automations.ts'],
+  ['packages/manifest/src/state-actions.ts', 'state-actions.ts'],
+  ['packages/manifest/src/page-config.ts', 'page-config.ts'],
+  ['packages/manifest/src/look-up.ts', 'look-up.ts'],
   ['packages/add-on-contracts/src/add-on-block.ts', 'add-on-block.ts'],
   ['packages/add-on-contracts/src/contracts.ts', 'contracts.ts'],
   ['packages/add-on-contracts/src/slots.ts', 'slots.ts'],
   ['packages/add-on-contracts/src/nav-groups.ts', 'nav-groups.ts'],
+  // The message shape (`{key, fallback}`) the block and its tabs share.
+  ['packages/add-on-contracts/src/common.ts', 'common.ts'],
+  // A tab that lists an add-on's rows on another table's record page: checked by `schema.ts`.
+  ['packages/add-on-contracts/src/record-tabs.ts', 'record-tabs.ts'],
 ];
 const VENDORED = new Set(FILES.map(([, base]) => base));
 

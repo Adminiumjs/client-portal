@@ -24,7 +24,9 @@
 
 import { z } from 'zod';
 
+import { i18nMessageSchema, wordsByLanguageSchema } from './common.ts';
 import { contractIdSchema, hasContractVersion } from './contracts.ts';
+import { recordTabsSchema } from './record-tabs.ts';
 import { slotIdSchema } from './slots.ts';
 import { BUILTIN_NAV_GROUP_KEYS, type BuiltinNavGroupKey } from './nav-groups.ts';
 
@@ -131,7 +133,8 @@ export const addOnNetworkSchema = z
 
 /**
  * An i18n message: a catalog key plus the English fallback rendered when the
- * key is absent.
+ * key is absent. Defined in `common.ts`, where a record tab reads it too, and
+ * exported from here as it always was.
  *
  * MOVED HERE FROM `@adminium/manifest` by 51a, which now re-exports it under
  * the same name. One definition rather than two, because both ends need it: a
@@ -141,13 +144,7 @@ export const addOnNetworkSchema = z
  * field nobody reads — `max(400)` here and `max(200)` there — and then the
  * stricter copy refuses first, for a reason no message names.
  */
-export const i18nMessageSchema = z
-  .object({
-    key: z.string().min(1).max(120),
-    fallback: z.string().min(1).max(400),
-  })
-  .strict();
-export type I18nMessage = z.infer<typeof i18nMessageSchema>;
+export { i18nMessageSchema, wordsByLanguageSchema, type I18nMessage, type WordsByLanguage } from './common.ts';
 
 /**
  * THE RAIL'S BUILT-IN GROUPS now live in `nav-groups.ts`, re-exported here so
@@ -185,11 +182,18 @@ export const navGroupKeySchema = z
  * A version rather than a boolean because publishing `Modal` and `useNavigate`
  * to code the engine did not build makes them public API: the day that surface
  * changes shape, an add-on built against the old one must be REFUSED with its
- * version named, not mounted into a blank screen. `z.literal(1)` becomes a
- * union the first time there is a 2 — and there is deliberately no `"*"`.
+ * version named, not mounted into a blank screen. There is deliberately no
+ * `"*"`.
  */
-export const hostApiVersionSchema = z.literal(1);
+export const hostApiVersionSchema = z.union([z.literal(1), z.literal(2)]);
 export const HOST_API_VERSION = 1;
+/**
+ * `addOn.hostApi: 2` — "this add-on's pages also need the data kit"
+ * (`host.data`). The host's own published version stays 1 for good: every
+ * page built against it checks for exactly that, so the kit is a namespace
+ * the host adds beside the others, with a version of its own.
+ */
+export const HOST_API_WITH_DATA = 2;
 
 /**
  * A rail row. Omit `nav` entirely and the page is routable but unlisted —
@@ -219,6 +223,8 @@ export const addOnPageSchema = z
     /** The last segment of `/add-ons/<key>/<ref>`. */
     ref: z.string().regex(/^[a-z][a-z0-9-]*$/, 'page ref must be a kebab-case identifier'),
     title: i18nMessageSchema,
+    /** The title in the other languages (see `wordsByLanguageSchema`): what the sidebar and the page's head show a reader. */
+    titles: wordsByLanguageSchema.optional(),
     icon: z.string().min(1).max(60),
     /** A path the bundle route will serve; its default export is the page. */
     client: z.string().min(1),
@@ -239,6 +245,8 @@ export const addOnNavGroupSchema = z
   .object({
     key: navGroupKeySchema,
     label: i18nMessageSchema,
+    /** The label in the other languages (see `wordsByLanguageSchema`). */
+    labels: wordsByLanguageSchema.optional(),
     /** Orders the trailing add-on band only; built-in groups do not move. */
     order: z.number().int(),
   })
@@ -286,6 +294,48 @@ export const addOnBlockSchema = z
       .min(1)
       .max(8)
       .optional(),
+    /**
+     * One of the add-on's own tables that holds a single row: its settings.
+     * Adminium makes the row from the columns' defaults at install and hands
+     * it to the add-on's deciding code. `@adminium/manifest` checks the table.
+     */
+    settingsTable: z.string().regex(/^[a-z][a-z0-9_]*$/, 'a table ref').optional(),
+    /**
+     * Ledgers: tables of the add-on's own that only Adminium writes, from
+     * rows the add-on's `posting-rows` provider works out. Only the id is
+     * typed here: the rest is the manifest's own vocabulary, which this
+     * package cannot import, so `@adminium/manifest` checks each entry.
+     */
+    ledgers: z
+      .array(z.looseObject({ id: z.string().regex(/^[a-z][a-z0-9-]{0,39}$/, 'a ledger id is kebab-case') }))
+      .min(1)
+      .max(4)
+      .optional(),
+    /**
+     * What the add-on reads to answer a price question (offers, codes, what
+     * was applied), served by its `price-adjust` provider. Its words are the
+     * manifest's own, so `@adminium/manifest` checks the whole of it.
+     */
+    adjuster: z.record(z.string(), z.unknown()).optional(),
+    /**
+     * Stock words: a question a page may ask of a ledger without writing
+     * anything — "is this in, low or out?". Only the id is typed here; the
+     * rest names the manifest's own ledgers and settings, which
+     * `@adminium/manifest` checks.
+     */
+    words: z
+      .array(z.looseObject({ id: z.string().regex(/^[a-z][a-z0-9-]{0,39}$/, 'a words id is kebab-case') }))
+      .min(1)
+      .max(4)
+      .optional(),
+    /** Tabs on other tables' record pages that list this add-on's rows for the record (see `record-tabs.ts`). */
+    recordTabs: recordTabsSchema.optional(),
+    /**
+     * What a typed or scanned code may find: the tables that hold codes and
+     * the columns an answer may carry. Typed loosely here: it names the
+     * manifest's own tables, so `@adminium/manifest` checks the whole of it.
+     */
+    lookUp: z.record(z.string(), z.unknown()).optional(),
   })
   .strict()
   // A ref is a URL segment, so two pages sharing one is two screens at one
@@ -343,6 +393,11 @@ export const addOnBlockSchema = z
   // Pages are code the host runs against a published API surface. An add-on
   // that does not say which version it was built against cannot be refused
   // later on version grounds, which is the entire point of having a version.
+  // The data kit is for pages: an add-on with none has nothing to build with it.
+  .refine((b) => b.hostApi !== 2 || b.pages !== undefined, {
+    message: 'hostApi 2 says the add-on\'s pages need the data kit: it declares pages',
+    path: ['hostApi'],
+  })
   .refine((b) => b.pages === undefined || b.hostApi !== undefined, {
     message: 'an add-on that declares pages must declare the hostApi version it is built against',
     path: ['hostApi'],
