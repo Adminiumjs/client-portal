@@ -35,6 +35,7 @@
  */
 import { z } from 'zod';
 
+import { placeholderNames, requiredNamesOfEmail, showWhenNames } from './placeholders.ts';
 import { bcp47TagSchema, refSchema, type ReferenceIssue } from './refs.ts';
 
 /** The most rules one manifest ships, and the most steps one rule holds. */
@@ -148,6 +149,18 @@ export const manifestActionSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('notification'), to: z.object({ roles: z.array(roleKey).min(1).max(20) }).strict(), title: localized(200), body: localized(2000).optional() }).strict(),
   z.object({ kind: z.literal('record.create'), table: refSchema, values }).strict(),
   z.object({ kind: z.literal('record.update'), values }).strict(),
+  /**
+   * A step an add-on gives (its `addOn.steps`): which add-on, which step, and
+   * what fills each of the step's inputs: text, which may carry `{{record.<column>}}`.
+   */
+  z
+    .object({
+      kind: z.literal('add-on.step'),
+      addOn: z.string().regex(/^[a-z][a-z0-9-]{1,39}$/, 'an add-on key'),
+      step: z.string().regex(/^[a-z][a-z0-9-]{0,39}$/, 'a step key'),
+      inputs: z.record(z.string().regex(/^[a-z][a-z0-9-]{0,39}$/), z.string().max(2000)).refine((value) => Object.keys(value).length <= 8, 'at most 8 inputs'),
+    })
+    .strict(),
 ]);
 export type ManifestAction = z.infer<typeof manifestActionSchema>;
 
@@ -244,8 +257,17 @@ export const RULE_EMAIL_VARS = ['now', 'ruleName', 'recordLabel', 'appName'] as 
  * them. A `{{row.*}}` is left out: it belongs to the rows a list block draws.
  */
 export function templatePlaceholdersOf(content: { subject: string; preheader?: string | undefined; blocks: readonly unknown[]; footer?: string | undefined }): string[] {
-  const text = JSON.stringify([content.subject, content.preheader, content.blocks, content.footer]);
-  return [...new Set([...text.matchAll(/\{\{\s*([A-Za-z0-9_.-]+)\s*\}\}/g)].map((match) => match[1] as string))].filter((name) => !name.startsWith('row.'));
+  return [...new Set([...placeholderNames([content.subject, content.preheader, content.blocks, content.footer]), ...showWhenNames(content.blocks)])].filter((name) => !name.startsWith('row.'));
+}
+
+/**
+ * The placeholders of a template that must be given a value: written
+ * somewhere with no backup. One that says its own backup (`{{first_name|there}}`),
+ * that only decides whether a block is shown, or that is read only inside the
+ * block it decides, is asked of nobody.
+ */
+export function templateRequiredPlaceholdersOf(content: { subject: string; preheader?: string | undefined; blocks: readonly unknown[]; footer?: string | undefined }): string[] {
+  return requiredNamesOfEmail(content).filter((name) => !name.startsWith('row.'));
 }
 
 const NUMBERS = ['int', 'bigint', 'decimal', 'money', 'float'];
@@ -266,6 +288,8 @@ export function automationIssues(m: {
   templates: readonly AutomationTemplateShape[];
   /** The columns Adminium decides beyond a column's own rule (a balance, what a posting fills), by table. */
   decided?: (table: string) => ReadonlySet<string>;
+  /** An add-on's own steps, when the manifest is one that gives any: a rule of its own that names one is checked against them. */
+  steps?: { addOn: string; steps: readonly { key: string; inputs: readonly { key: string; required?: boolean | undefined }[] }[] } | undefined;
 }): ReferenceIssue[] {
   const out: ReferenceIssue[] = [];
   const tables = new Map(m.tables.map((table) => [table.ref, table]));
@@ -345,7 +369,7 @@ export function automationIssues(m: {
     const tokens = (text: unknown, path: (string | number)[]) => {
       const texts = typeof text === 'string' ? [text] : typeof text === 'object' && text !== null ? Object.values(text as Record<string, unknown>).filter((value): value is string => typeof value === 'string') : [];
       for (const each of texts) {
-        for (const match of each.matchAll(/\{\{\s*record\.([A-Za-z0-9_]+)\s*\}\}/g)) {
+        for (const match of each.matchAll(/\{\{\s*record\.([A-Za-z0-9_]+)\s*(?:\|[^{}]*)?\}\}/g)) {
           if (record === undefined) out.push({ path, message: `{{record.${match[1] as string}}}: this rule runs for no record (a clock with no rows to visit)` });
           else if (!record.columns.some((candidate) => candidate.ref === match[1])) out.push({ path, message: `{{record.${match[1] as string}}}: "${record.ref}" has no column "${match[1] as string}"` });
         }
@@ -392,6 +416,23 @@ export function automationIssues(m: {
           }
           return;
         }
+        if (action.kind === 'add-on.step') {
+          for (const [name, value] of Object.entries(action.inputs)) tokens(value, here('inputs', name));
+          // Another add-on's step is checked where the rule is installed: this manifest cannot see it.
+          if (m.steps === undefined || m.steps.addOn !== action.addOn) return;
+          const step = m.steps.steps.find((candidate) => candidate.key === action.step);
+          if (step === undefined) {
+            out.push({ path: here('step'), message: `"${action.step}" is not one of this add-on's steps` });
+            return;
+          }
+          for (const name of Object.keys(action.inputs)) {
+            if (!step.inputs.some((input) => input.key === name)) out.push({ path: here('inputs', name), message: `the step "${step.key}" has no input "${name}"` });
+          }
+          for (const input of step.inputs) {
+            if (input.required === true && (action.inputs[input.key] ?? '').trim() === '') out.push({ path: here('inputs'), message: `the step "${step.key}" needs its input "${input.key}"` });
+          }
+          return;
+        }
         // An email: one of the manifest's own templates, to a column of the record, and only one a rule can fill.
         if (record === undefined) out.push({ path: here(), message: 'this rule runs for no record, so there is no address to send to' });
         column(record, action.to.column, here('to', 'column'));
@@ -413,7 +454,7 @@ export function automationIssues(m: {
           }
           const names = templatePlaceholdersOf(content);
           for (const name of names) everywhere.add(name);
-          const unfilled = names.filter((name) => !filled(name));
+          const unfilled = templateRequiredPlaceholdersOf(content).filter((name) => !filled(name));
           if (unfilled.length > 0) {
             const first = unfilled[0] as string;
             out.push({

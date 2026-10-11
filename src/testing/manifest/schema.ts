@@ -26,6 +26,7 @@ import { addOnBlockSchema, addOnCategorySchema, type AddOnBlock } from './add-on
 import { i18nMessageSchema, type I18nMessage } from './common.ts';
 import { recordTabIssues, type RecordTabTable } from './record-tabs.ts';
 import { isSlotId } from './slots.ts';
+import type { AddOnStep } from './add-on-steps.ts';
 import { z } from 'zod';
 
 import { addOnNeedsIssues, addOnsSchema, requiresAddOn, type AddOnNeeds } from './add-ons.ts';
@@ -55,6 +56,8 @@ import {
   type TableIndex,
 } from './refs.ts';
 import { compareSemver, parseSemverRange } from './semver.ts';
+import { assistantIssues, type AssistantTableShape } from './assistant.ts';
+import { stepsIssues, type StepTableShape } from './steps.ts';
 import { WORD_FLOORS, installFloorWords } from './words.ts';
 import { automationIssues, manifestAutomationsSchema, type AutomationTableShape, type ManifestAutomation } from './automations.ts';
 import { adjustDecidedColumns, adjustIssues, adjustSchema, adjusterIssues, adjusterSchema, type Adjuster, type AdjustTableShape } from './adjust.ts';
@@ -1302,7 +1305,8 @@ export const manifestWidgetSchema = z
 
 // ── frontend ─────────────────────────────────────────────────────────────────
 
-export const FRONTEND_KINDS = ['spa', 'electron', 'none'] as const;
+/** `expo` is a phone app's: built by Expo, never by the server's bundler, and only for the side `mobile`. */
+export const FRONTEND_KINDS = ['spa', 'electron', 'none', 'expo'] as const;
 
 export const frontendEnvVarSchema = z
   .object({
@@ -1319,7 +1323,16 @@ export const frontendEnvVarSchema = z
  * plus a staff side, a customer side, or both. At least one, or it is not a
  * micro-SaaS but somebody's own build.
  */
-export const FRONTEND_SIDES = ['staff', 'customer'] as const;
+export const FRONTEND_SIDES = ['staff', 'customer', 'mobile'] as const;
+
+/**
+ * The phone side: a phone app for customers, in `apps/<key>/mobile/`. It is a
+ * side of the app and not a web side: a server never serves it to the public,
+ * a package carries nothing of it, and it has no address, no placement and no
+ * switch. What it has is a key of its own kind for the public API.
+ */
+export const PHONE_SIDE = 'mobile';
+export const PHONE_KIND = 'expo';
 
 export const frontendSchema = z
   .object({
@@ -1466,6 +1479,26 @@ function sidesAreDistinct(m: { frontends: readonly { side: string }[] }): boolea
     seen.add(f.side);
   }
   return true;
+}
+
+/**
+ * The phone side is `kind: "expo"` and nothing else, and `expo` is the phone
+ * side's alone. It names no entry, routes, placement or switch: those are a
+ * served web side's.
+ */
+function phoneSideIssues(m: { frontends: readonly Record<string, unknown>[] }): { path: (string | number)[]; message: string }[] {
+  const out: { path: (string | number)[]; message: string }[] = [];
+  m.frontends.forEach((frontend, index) => {
+    const phone = frontend['side'] === PHONE_SIDE;
+    if (phone !== (frontend['kind'] === PHONE_KIND)) {
+      out.push({ path: ['frontends', index, 'kind'], message: `the side "${PHONE_SIDE}" is kind "${PHONE_KIND}", and "${PHONE_KIND}" is that side's alone` });
+    }
+    if (!phone) return;
+    for (const word of ['entry', 'env', 'routes', 'placement', 'enabled']) {
+      if (frontend[word] !== undefined) out.push({ path: ['frontends', index, word], message: `a phone side has no "${word}": it is not served by Adminium` });
+    }
+  });
+  return out;
 }
 
 const SIDES_MESSAGE = {
@@ -2501,6 +2534,9 @@ export function appReferenceIssues(
     }
   }
   // The rules it ships: about its own tables, roles and templates, and only what a rule can do.
+  // An add-on's rule may use the add-on's own steps, which this manifest can check; another add-on's are checked where the rule is installed.
+  const declared = (m as { addOn?: { steps?: readonly AddOnStep[] | undefined } }).addOn?.steps;
+  const ownSteps = declared === undefined ? undefined : { addOn: m.key, steps: declared };
   if (m.automations !== undefined) {
     out.push(
       ...automationIssues({
@@ -2509,6 +2545,7 @@ export function appReferenceIssues(
         roles: (m.roles ?? []).map((role) => role.key),
         templates: m.emailTemplates ?? [],
         decided: (table) => decided.get(table) ?? new Set<string>(),
+        ...(ownSteps === undefined ? {} : { steps: ownSteps }),
       }),
     );
   }
@@ -2980,6 +3017,7 @@ export const appManifestSchema = z
   .refine(compatibilityWindowOrdered, { ...WINDOW_MESSAGE, path: [...WINDOW_MESSAGE.path] })
   .refine(sidesAreDistinct, { ...SIDES_MESSAGE, path: [...SIDES_MESSAGE.path] })
   .superRefine((m, ctx) => {
+    for (const issue of phoneSideIssues(m)) ctx.addIssue({ code: 'custom', message: issue.message, path: issue.path });
     for (const issue of installFloorIssues(m)) ctx.addIssue({ code: 'custom', message: issue.message, path: issue.path });
     for (const issue of appReferenceIssues(m)) {
       ctx.addIssue({ code: 'custom', message: issue.message, path: issue.path });
@@ -3121,7 +3159,7 @@ const ADD_ON_BLOCKS = ['pages', 'roles', 'seeds', 'navGroups', 'optionLists', 'p
 export function installsLikeAnApp(m: Manifest): boolean {
   if (m.kind !== 'add-on') return false;
   if (ADD_ON_BLOCKS.some((block) => m[block] !== undefined)) return true;
-  if (m.requiredSchema?.prefixed === true || m.addOn.settingsTable !== undefined || m.addOn.ledgers !== undefined || m.addOn.adjuster !== undefined || m.addOn.words !== undefined || m.addOn.recordTabs !== undefined) return true;
+  if (m.requiredSchema?.prefixed === true || m.addOn.settingsTable !== undefined || m.addOn.ledgers !== undefined || m.addOn.adjuster !== undefined || m.addOn.words !== undefined || m.addOn.recordTabs !== undefined || m.addOn.steps !== undefined || m.addOn.assistant !== undefined) return true;
   return (m.requiredSchema?.tables ?? []).some(
     (table) =>
       table.states !== undefined ||
@@ -3241,6 +3279,14 @@ function addOnInstallIssues(m: AddOnManifest): { path: (string | number)[]; mess
       out.push(...wordsIssues({ words: parsed.data, ledgers, tables: tables as readonly LedgerTableShape[], settingsTable: m.addOn.settingsTable }));
     }
   }
+
+  // What it tells the assistant: only of its own tables, columns and pages.
+  if (m.addOn.assistant !== undefined) {
+    out.push(...assistantIssues(m.addOn.assistant, tables as unknown as readonly AssistantTableShape[], [...(m.pages ?? []).map((page) => page.ref), ...(m.addOn.pages ?? []).map((page) => page.ref)]));
+  }
+
+  // Steps the add-on gives to Automations: the row each writes is one of its own tables.
+  if (m.addOn.steps !== undefined) out.push(...stepsIssues(m.addOn.steps, tables as unknown as readonly StepTableShape[]));
 
   // Tabs that list the add-on's rows on other tables' record pages: its own tables, columns and words.
   if (m.addOn.recordTabs !== undefined) {

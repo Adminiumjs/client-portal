@@ -26,6 +26,7 @@
  * It reads the plain document, not the typed manifest, so the schema file may
  * import it without the two files importing each other.
  */
+import { placeholdersIn } from './placeholders.ts';
 
 export interface ManifestWord {
   /** The word as a refusal names it: `pages`, `requiredSchema.prefixed`, `column.addOnLink`. */
@@ -99,6 +100,12 @@ export const INSTALL_FLOOR_WORD_NAMES = [
   'rows.pair',
   'unlockBy.self',
   'availability.words',
+  'addOn.steps',
+  'addOn.assistant',
+  'automations.addOnStep',
+  'email.showWhen',
+  'placeholder.backup',
+  'frontend.mobile',
 ] as const;
 export type ManifestWordName = (typeof INSTALL_FLOOR_WORD_NAMES)[number];
 
@@ -111,6 +118,16 @@ export type ManifestWordName = (typeof INSTALL_FLOOR_WORD_NAMES)[number];
 export const WORD_FLOORS: Readonly<Partial<Record<ManifestWordName, string>>> = {
   'column.addOnLink.default': '0.3.19',
   'roles.writableFrom': '0.3.19',
+  // A step an add-on gives to Automations, and a rule that uses one.
+  'addOn.steps': '0.3.22',
+  // What an add-on tells the assistant: what its tables are, and questions for its pages.
+  'addOn.assistant': '0.3.22',
+  'automations.addOnStep': '0.3.22',
+  // What a template writes when a value is missing: a block tied to a value, a backup after a bar.
+  'email.showWhen': '0.3.22',
+  'placeholder.backup': '0.3.22',
+  // An app with a phone side: the side `mobile`, kind `expo`.
+  'frontend.mobile': '0.3.26',
 };
 
 /** Every word of `document` that needs the install floor, in document order. */
@@ -134,6 +151,8 @@ export function installFloorWords(document: unknown): ManifestWord[] {
     // Pages that also need the data kit.
     if (block['hostApi'] === 2) out.push({ word: 'addOn.hostApi.2', path: 'addOn.hostApi' });
     if (block['lookUp'] !== undefined) out.push({ word: 'addOn.lookUp', path: 'addOn.lookUp' });
+    if (block['steps'] !== undefined) out.push({ word: 'addOn.steps', path: 'addOn.steps' });
+    if (block['assistant'] !== undefined) out.push({ word: 'addOn.assistant', path: 'addOn.assistant' });
     // An amount Adminium decides for a ledger's action (what a card may pay).
     list(block['ledgers']).forEach((ledger, l) => {
       for (const [name, action] of Object.entries(isDoc(ledger) && isDoc(ledger['actions']) ? ledger['actions'] : {})) {
@@ -144,6 +163,10 @@ export function installFloorWords(document: unknown): ManifestWord[] {
     // An app has always had the other blocks: these two it has only since the install floor.
     if (document['automations'] !== undefined) out.push({ word: 'automations', path: 'automations' });
     if (isDoc(document['sampleData']) && document['sampleData']['addOns'] !== undefined) out.push({ word: 'sampleData.addOns', path: 'sampleData.addOns' });
+    // A phone side: a server that does not know the side refuses the whole manifest.
+    list(document['frontends']).forEach((frontend, f) => {
+      if (isDoc(frontend) && frontend['side'] === 'mobile') out.push({ word: 'frontend.mobile', path: `frontends.${String(f)}.side` });
+    });
   }
 
   list(schema['tables']).forEach((table, t) => {
@@ -207,10 +230,28 @@ export function installFloorWords(document: unknown): ManifestWord[] {
       list(isDoc(content) ? content['blocks'] : undefined).forEach((block, b) => {
         const data = isDoc(block) && isDoc(block['data']) ? block['data'] : {};
         const here = `emailTemplates.${String(t)}.locales.${locale}.blocks.${String(b)}.data`;
+        if (isDoc(block) && block['showWhen'] !== undefined) out.push({ word: 'email.showWhen', path: `emailTemplates.${String(t)}.locales.${locale}.blocks.${String(b)}.showWhen` });
         for (const mark of ['onlyWith', 'onlyWithout'] as const) if (data[mark] !== undefined) out.push({ word: `email.${mark}`, path: `${here}.${mark}` });
         if (isDoc(data['from']) && data['from']['addOn'] !== undefined) out.push({ word: 'rows.pair', path: `${here}.from` });
       });
     }
+  });
+  // A placeholder that says its own backup (`{{name|words}}`): in a template, or in a rule's own texts.
+  for (const part of ['emailTemplates', 'automations'] as const) {
+    list(document[part]).forEach((entry, e) => {
+      if (placeholdersIn(JSON.stringify(entry ?? null)).some((placeholder) => placeholder.backup !== undefined)) out.push({ word: 'placeholder.backup', path: `${part}.${String(e)}` });
+    });
+  }
+  // A rule that uses a step an add-on gives.
+  list(document['automations']).forEach((rule, r) => {
+    const steps = (nodes: unknown, at: string): void => {
+      list(nodes).forEach((node, n) => {
+        if (!isDoc(node)) return;
+        if (isDoc(node['action']) && node['action']['kind'] === 'add-on.step') out.push({ word: 'automations.addOnStep', path: `${at}.${String(n)}.action` });
+        list(node['branches']).forEach((branch, b) => steps(isDoc(branch) ? branch['nodes'] : undefined, `${at}.${String(n)}.branches.${String(b)}.nodes`));
+      });
+    };
+    steps(isDoc(rule) && isDoc(rule['graph']) ? rule['graph']['nodes'] : undefined, `automations.${String(r)}.graph.nodes`);
   });
   list(document['documents']).forEach((entry, d) => {
     for (const [slot, source] of Object.entries(isDoc(entry) && isDoc(entry['mapping']) ? entry['mapping'] : {})) {

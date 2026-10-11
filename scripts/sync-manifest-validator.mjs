@@ -27,6 +27,8 @@
  *      exports, not hardcoded, so a symbol that MOVES is followed rather than
  *      silently mis-imported.
  *
+ * Which files are copied is computed too (see "THE FILE LIST" below).
+ *
  * Anything else is a refusal, not a guess: an import this script cannot place
  * inside the vendored set aborts the sync with the specifier named. A copy that
  * is subtly wrong is worse than one that is openly stale.
@@ -36,7 +38,7 @@
  * `--check` writes nothing and exits non-zero if any copy is out of date, which
  * is what CI wants.
  */
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -54,62 +56,27 @@ if (!existsSync(product)) {
   process.exit(0);
 }
 
-/** source path (relative to the product) → vendored basename. */
-const FILES = [
-  ['packages/manifest/src/schema.ts', 'schema.ts'],
-  // The modules `schema.ts` was split into when the manifest learned booking,
-  // the outbox and a person's own rows: each is imported by `schema.ts`, so a
-  // copy without them does not compile.
-  ['packages/manifest/src/refs.ts', 'refs.ts'],
-  ['packages/manifest/src/semver.ts', 'semver.ts'],
-  ['packages/manifest/src/booking.ts', 'booking.ts'],
-  ['packages/manifest/src/public-access.ts', 'public-access.ts'],
-  // Limits by slot, by a parent's pool and by the night: imported by `public-access.ts`.
-  ['packages/manifest/src/capacity.ts', 'capacity.ts'],
-  ['packages/manifest/src/outbox.ts', 'outbox.ts'],
-  // An app role's limits on what its update writes, and a calendar page's columns.
-  ['packages/manifest/src/roles.ts', 'roles.ts'],
-  ['packages/manifest/src/page-calendar.ts', 'page-calendar.ts'],
-  ['packages/manifest/src/validate.ts', 'validate.ts'],
-  ['packages/manifest/src/sample.ts', 'sample.ts'],
-  // What an invoicing app declares: worked-out values, states and locks, the
-  // add-ons it needs, the documents it ships, and tables built on an add-on's
-  // shape (with the pure check that a table really is one).
-  ['packages/manifest/src/formula.ts', 'formula.ts'],
-  ['packages/manifest/src/states.ts', 'states.ts'],
-  ['packages/manifest/src/add-ons.ts', 'add-ons.ts'],
-  ['packages/manifest/src/documents.ts', 'documents.ts'],
-  ['packages/manifest/src/shapes.ts', 'shapes.ts'],
-  // The core's own table shapes (a menu shared with Point of Sale), checked by `validate.ts`.
-  ['packages/manifest/src/table-shapes.ts', 'table-shapes.ts'],
-  // What an add-on with its own tables brought: the words only a newer Adminium
-  // reads, ledgers and what posts into them, a price an add-on lowers, the rules
-  // an app ships, a record page's buttons, a records page's own config, and
-  // what a typed code may find. Each is imported by `schema.ts` or `states.ts`.
-  ['packages/manifest/src/words.ts', 'words.ts'],
-  ['packages/manifest/src/ledgers.ts', 'ledgers.ts'],
-  ['packages/manifest/src/ledger-indexes.ts', 'ledger-indexes.ts'],
-  // `ledger-indexes.ts` measures a unique set against MySQL's key limit with the planner's own sum.
-  ['packages/manifest/src/plan-context.ts', 'plan-context.ts'],
-  ['packages/manifest/src/plan-model.ts', 'plan-model.ts'],
-  // The planner and `ledger-indexes.ts` both count a key's bytes with this; its own file so neither imports the other.
-  ['packages/manifest/src/key-bytes.ts', 'key-bytes.ts'],
-  ['packages/manifest/src/plan-types.ts', 'plan-types.ts'],
-  ['packages/manifest/src/adjust.ts', 'adjust.ts'],
-  ['packages/manifest/src/automations.ts', 'automations.ts'],
-  ['packages/manifest/src/state-actions.ts', 'state-actions.ts'],
-  ['packages/manifest/src/page-config.ts', 'page-config.ts'],
-  ['packages/manifest/src/look-up.ts', 'look-up.ts'],
-  ['packages/add-on-contracts/src/add-on-block.ts', 'add-on-block.ts'],
-  ['packages/add-on-contracts/src/contracts.ts', 'contracts.ts'],
-  ['packages/add-on-contracts/src/slots.ts', 'slots.ts'],
-  ['packages/add-on-contracts/src/nav-groups.ts', 'nav-groups.ts'],
-  // The message shape (`{key, fallback}`) the block and its tabs share.
-  ['packages/add-on-contracts/src/common.ts', 'common.ts'],
-  // A tab that lists an add-on's rows on another table's record page: checked by `schema.ts`.
-  ['packages/add-on-contracts/src/record-tabs.ts', 'record-tabs.ts'],
-];
-const VENDORED = new Set(FILES.map(([, base]) => base));
+/*
+ * ── THE FILE LIST IS COMPUTED, NOT WRITTEN DOWN ─────────────────────────────
+ * [Changed 2026-10-11.] This script used to carry a hand-kept list of the
+ * files to copy. The product's `schema.ts` kept being split into new modules,
+ * the list was never told, and by 0.3.26 `--check` aborted in all fifteen app
+ * repos on the first import it could not place. Two versions of the list
+ * existed, both behind.
+ *
+ * So the list is now the import graph itself: start at the two modules the
+ * suite uses, follow every relative import inside `packages/manifest/src`, and
+ * follow each `@adminium/add-on-contracts` import to the file that defines the
+ * symbol and on through that package's own relative imports. A module the
+ * product adds tomorrow is copied tomorrow, with no edit here.
+ */
+const MANIFEST_SRC = 'packages/manifest/src';
+const CONTRACTS_SRC = 'packages/add-on-contracts/src';
+const CONTRACTS_PACKAGE = '@adminium/add-on-contracts';
+/** Where the walk starts. `index.ts` beside the copies re-exports from these. */
+const ROOTS = ['schema.ts', 'validate.ts'];
+/** Hand-written beside the copies; never a copy itself. */
+const NOT_A_COPY = new Set(['index.ts']);
 
 /**
  * Every module specifier in a source, in all three forms that resolve one.
@@ -131,30 +98,43 @@ function specifiersIn(text) {
   return out;
 }
 
+/** `import { a, type b as c } from '<package>'`, with or without a leading `type`. */
+const PACKAGE_IMPORT = new RegExp(
+  `import\\s+(type\\s+)?\\{([\\s\\S]*?)\\}\\s*from\\s*['"]${CONTRACTS_PACKAGE}['"];?`,
+  'g',
+);
+
+/** The bare names an import list brings in: `type X as Y` gives `X`. */
+function importedNames(list) {
+  const out = [];
+  for (const raw of list.split(',')) {
+    const spec = raw.trim();
+    if (spec === '') continue;
+    out.push({ spec, bare: spec.replace(/^type\s+/, '').split(/\s+as\s+/)[0].trim() });
+  }
+  return out;
+}
+
 /**
- * `symbol -> basename` for everything the add-on-contracts sources export.
+ * `symbol -> file` for everything the add-on-contracts sources DEFINE.
  *
- * -- IT REFUSES A DUPLICATE, BECAUSE THE HEADER PROMISES IT FOLLOWS A MOVE --
+ * -- A DUPLICATE IS REFUSED WHEN IT IS ASKED FOR ----------------------------
+ * [Hardened 2026-08-20 by an adversarial pass.] When two files export the same
+ * name, the copy would import it from whichever was read last, which is a
+ * guess. Every top-level file of the package is scanned now, so two unrelated
+ * files may share a name nobody here imports: the refusal is raised at the
+ * import that needs the name, not at the scan.
  *
- * [Hardened 2026-08-20 by an adversarial pass.] This used to set() blindly, so
- * when two files exported the same name the LAST entry in FILES won and nothing
- * was said. That is exactly the case the header claims is handled - "a symbol
- * that MOVES is followed rather than silently mis-imported" - and it is the
- * commonest way a symbol moves in practice: the new home is added while a
- * deprecated alias is left behind in the old one. The copy would then import
- * from whichever file happened to come later in the list.
- *
- * It also reads `export { a, b as c }` lists, not just declarations. A symbol
- * this cannot place becomes a refusal downstream, which is the safe direction:
- * an openly failed sync beats a subtly wrong copy. A RE-export
+ * It also reads `export { a, b as c }` lists, not just declarations. A RE-export
  * (`export { a } from './b.js'`) is skipped: it names the symbol's home rather
  * than being one, and that home is scanned in its own right.
  */
 function exportIndex() {
   const index = new Map();
-  for (const [src, base] of FILES) {
-    if (!src.includes('add-on-contracts')) continue;
-    const text = readFileSync(join(product, src), 'utf8');
+  const dir = join(product, CONTRACTS_SRC);
+  for (const base of readdirSync(dir).sort()) {
+    if (!base.endsWith('.ts') || base.endsWith('.test.ts') || base === 'index.ts') continue;
+    const text = readFileSync(join(dir, base), 'utf8');
     const names = [];
     const declared =
       /^export\s+(?:declare\s+)?(?:const|let|var|function|type|interface|class|enum)\s+([A-Za-z0-9_$]+)/gm;
@@ -167,18 +147,73 @@ function exportIndex() {
       }
     }
     for (const name of names) {
-      const already = index.get(name);
-      if (already !== undefined && already !== base) {
-        throw new Error(
-          `"${name}" is exported by BOTH ${already} and ${base}. The vendored copy would ` +
-            'import it from whichever came last in FILES, which is a guess. Resolve the ' +
-            'duplicate in the product (or narrow FILES) before syncing.',
-        );
-      }
-      index.set(name, base);
+      const homes = index.get(name) ?? index.set(name, new Set()).get(name);
+      homes.add(base);
     }
   }
   return index;
+}
+
+/** The one file that defines a contracts symbol, or a refusal that names it. */
+function homeOf(symbols, bare, srcRel) {
+  const homes = symbols.get(bare);
+  if (homes === undefined) {
+    throw new Error(
+      `cannot place "${bare}" (imported by ${srcRel}): no top-level file of ${CONTRACTS_SRC} defines it.`,
+    );
+  }
+  if (homes.size > 1) {
+    throw new Error(
+      `"${bare}" (imported by ${srcRel}) is exported by ${[...homes].join(' AND ')}. Picking one ` +
+        'would be a guess. Resolve the duplicate in the product before syncing.',
+    );
+  }
+  return [...homes][0];
+}
+
+/**
+ * The files to copy: `[source path relative to the product, vendored basename]`.
+ *
+ * The copies sit in one flat directory, and the two packages each have a
+ * `steps.ts`. A contracts file whose name a manifest file already has is
+ * written as `add-on-<name>`; `renamed` carries that for the import rewrite.
+ */
+function fileSet(symbols) {
+  const manifest = new Set();
+  const contracts = new Set();
+  const visit = (pkg, base) => {
+    const set = pkg === MANIFEST_SRC ? manifest : contracts;
+    if (set.has(base)) return;
+    const path = join(product, pkg, base);
+    if (!existsSync(path)) throw new Error(`${pkg}/${base} is imported and does not exist.`);
+    set.add(base);
+    const text = readFileSync(path, 'utf8');
+    for (const spec of specifiersIn(text)) {
+      if (spec.startsWith('./')) visit(pkg, spec.slice(2).replace(/\.js$/, '.ts'));
+    }
+    for (const [, , list] of text.matchAll(PACKAGE_IMPORT)) {
+      for (const { bare } of importedNames(list)) {
+        visit(CONTRACTS_SRC, homeOf(symbols, bare, `${pkg}/${base}`));
+      }
+    }
+  };
+  for (const root of ROOTS) visit(MANIFEST_SRC, root);
+  // A copy an earlier sync wrote stays in step even when the roots stopped reaching it.
+  if (existsSync(dest)) {
+    for (const base of readdirSync(dest)) {
+      if (NOT_A_COPY.has(base) || !base.endsWith('.ts')) continue;
+      if (existsSync(join(product, MANIFEST_SRC, base))) visit(MANIFEST_SRC, base);
+    }
+  }
+  const renamed = new Map();
+  const files = [...manifest].sort().map((base) => [`${MANIFEST_SRC}/${base}`, base]);
+  for (const base of [...contracts].sort()) {
+    const as = manifest.has(base) ? `add-on-${base}` : base;
+    if (manifest.has(as)) throw new Error(`no free name for ${CONTRACTS_SRC}/${base}.`);
+    if (as !== base) renamed.set(base, as);
+    files.push([`${CONTRACTS_SRC}/${base}`, as]);
+  }
+  return { files, renamed };
 }
 
 /** A refusal is an ANSWER, not a crash: print it as one. */
@@ -188,11 +223,15 @@ function abort(error) {
 }
 
 let symbols;
+let FILES;
+let RENAMED;
 try {
   symbols = exportIndex();
+  ({ files: FILES, renamed: RENAMED } = fileSet(symbols));
 } catch (error) {
   abort(error);
 }
+const VENDORED = new Set(FILES.map(([, base]) => base));
 
 function vendor(srcRel, base) {
   const text = readFileSync(join(product, srcRel), 'utf8');
@@ -214,29 +253,27 @@ function vendor(srcRel, base) {
   if (out === text) out = `${header}\n${text}`;
 
   // 3. The cross-package import, split by where each symbol is defined.
-  out = out.replace(
-    /import\s*\{([\s\S]*?)\}\s*from\s*['"]@adminium\/add-on-contracts['"];?/g,
-    (_whole, names) => {
-      const byFile = new Map();
-      for (const raw of names.split(',')) {
-        const spec = raw.trim();
-        if (spec === '') continue;
-        const bare = spec.replace(/^type\s+/, '').split(/\s+as\s+/)[0].trim();
-        const file = symbols.get(bare);
-        if (file === undefined) {
-          throw new Error(
-            `cannot place "${bare}" (imported by ${srcRel}) inside the vendored set. ` +
-              `Add the file that exports it to FILES in scripts/sync-manifest-validator.mjs.`,
-          );
-        }
-        (byFile.get(file) ?? byFile.set(file, []).get(file)).push(spec);
-      }
-      return [...byFile.entries()]
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([file, specs]) => `import { ${specs.join(', ')} } from './${file}';`)
-        .join('\n');
-    },
-  );
+  const fromContracts = srcRel.startsWith(CONTRACTS_SRC);
+  out = out.replace(PACKAGE_IMPORT, (_whole, typeOnly, names) => {
+    const byFile = new Map();
+    for (const { spec, bare } of importedNames(names)) {
+      const home = homeOf(symbols, bare, srcRel);
+      const file = RENAMED.get(home) ?? home;
+      (byFile.get(file) ?? byFile.set(file, []).get(file)).push(spec);
+    }
+    const keyword = typeOnly === undefined ? 'import' : 'import type';
+    return [...byFile.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([file, specs]) => `${keyword} { ${specs.join(', ')} } from './${file}';`)
+      .join('\n');
+  });
+  // A contracts file's own neighbour, when that neighbour was written under another name.
+  if (fromContracts) {
+    for (const [from, to] of RENAMED) {
+      const js = from.replace(/\.ts$/, '.js');
+      out = out.split(`'./${js}'`).join(`'./${to.replace(/\.ts$/, '.js')}'`);
+    }
+  }
 
   /*
    * 2. Relative specifiers are not built here, so they carry `.ts`.
