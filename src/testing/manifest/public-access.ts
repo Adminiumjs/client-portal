@@ -540,6 +540,20 @@ export const publicAccessSchema = z
      */
     requires: z.array(refSchema).min(1).max(8).optional(),
     /**
+     * Columns a write must fill only when it sets another column to one of
+     * some values, and may write at no other time: `{accepted_name: {status:
+     * [accepted]}}` — accepting carries the name typed, declining carries
+     * none, and a name sent with a decline is refused, so a declined quote
+     * never holds one a stranger typed.
+     */
+    requiresWhen: z
+      .record(
+        refSchema,
+        z.record(refSchema, valuesSchema).refine((when) => Object.keys(when).length === 1, { message: 'a column is asked for by one other column\'s values' }),
+      )
+      .refine((asked) => Object.keys(asked).length >= 1 && Object.keys(asked).length <= 8, { message: 'requiresWhen names 1 to 8 columns' })
+      .optional(),
+    /**
      * The state a row must be IN to be changed — part of the update itself,
      * never of a read, so a finished visit still lists but cannot be moved.
      * `from-now` on a time: only while it is still ahead. `{within: 60}` on a
@@ -614,6 +628,8 @@ export const publicAccessSchema = z
       .optional(),
     /** Which browser key serves the entry: `customer`, or one of `publicKeys`. */
     key: keyNameSchema.optional(),
+    /** The part of the app the entry belongs to: closed while it is off (see `modules.ts`). */
+    module: z.string().regex(/^[a-z][a-z0-9-]{0,39}$/, 'a module id is kebab-case').optional(),
     /**
      * The confirmation Adminium emails when a guest creates a row here: the
      * column holding their address, the columns the email shows, the app's
@@ -739,7 +755,14 @@ interface PublicAccessContext {
   /** The table's limits, as it declares them (absent: the caller does not say). */
   capacityOf?: (table: string) => Capacity | undefined;
   publicKeys: Readonly<Record<string, PublicKey>> | undefined;
-  roles: readonly { key: string; screensOnly?: boolean | undefined; cloneFrom?: string | undefined; permissions?: readonly string[] | undefined }[];
+  roles: readonly {
+    key: string;
+    screensOnly?: boolean | undefined;
+    cloneFrom?: string | undefined;
+    permissions?: readonly string[] | undefined;
+    /** What the role is limited to, by table: read here only for whether its rows are (`rows`). */
+    limits?: Readonly<Record<string, { rows?: unknown } | undefined>> | undefined;
+  }[];
   /** The app's outbox, for a new link it emails (absent: the app has none). */
   outbox?:
     | { table: string; kinds: Readonly<Record<string, string>>; columns: { repeatKey?: string | undefined }; links?: Readonly<Record<string, string>> | undefined; recipient?: ResendOutbox['recipient'] | undefined; producers?: ResendOutbox['producers'] }
@@ -872,6 +895,26 @@ export function publicAccessIssues(entries: readonly PublicAccess[], ctx: Public
         message: `"${role.key}" signs in a screen anyone can walk up to, so it opens only the app's screens: screensOnly, and no grant but app:@:staff`,
       });
     }
+    /*
+     * A SCREEN'S KEY IS NOT HELD TO A PERSON'S ROWS: its entries show what
+     * they declare to everybody who signs the screen in. The screen's own role
+     * holds no table at all, so the person in front of it is somebody who
+     * also holds another role of the app — and where that role reaches only
+     * some rows of a table, the screen would show them the rest. So a table
+     * any role of the app limits by rows is not served through a screen's
+     * key: it is either shown on the screen to everybody, or limited by rows
+     * and kept off it.
+     */
+    entries.forEach((entry, i) => {
+      if (entry.key !== name) return;
+      const limiting = ctx.roles.find((candidate) => candidate.limits?.[entry.table]?.rows !== undefined);
+      if (limiting !== undefined) {
+        out.push({
+          path: ['publicAccess', i, 'table'],
+          message: `"${name}" shows "${entry.table}" to everybody who signs the screen in, and "${limiting.key}" reaches only some of its rows: a screen's key is not held to a person's rows, so give the table one or the other`,
+        });
+      }
+    });
     if (key.enabledBy !== undefined) {
       const column = index.column(key.enabledBy.table, key.enabledBy.column);
       if (column?.type !== 'bool') {
@@ -984,6 +1027,13 @@ export function publicAccessIssues(entries: readonly PublicAccess[], ctx: Public
     const decided = ctx.decided(entry.table);
     for (const ref of writable) {
       if (decided.has(ref)) out.push({ path: at('writable'), message: `"${ref}" is decided by Adminium and cannot be written publicly` });
+    }
+    // A file column names a file a signed-in staff member uploaded: a browser's key uploads nothing, so it names none.
+    for (const [list, refs] of [['writable', [...writable]], ['defaults', Object.keys(entry.defaults ?? {})]] as const) {
+      for (const ref of refs) {
+        const found = ctx.index.column(entry.table, ref) as { rules?: { file?: unknown } } | undefined;
+        if (found?.rules?.file !== undefined) out.push({ path: at(list), message: `"${entry.table}.${ref}" holds files a signed-in person uploads, so a public write never sets it` });
+      }
     }
     // A filter narrows every read AND write, so a column it names cannot also
     // change: the row would leave the endpoint mid-write — unless both ends
@@ -1192,7 +1242,30 @@ export function publicAccessIssues(entries: readonly PublicAccess[], ctx: Public
     for (const ref of entry.requires ?? []) {
       if (!writable.has(ref)) out.push({ path: at('requires'), message: `"${ref}" is not writable, so a write cannot fill it` });
     }
+    // A column asked for only with some values of another: both written here, and the values among those the other may take.
+    for (const [ref, when] of Object.entries(entry.requiresWhen ?? {})) {
+      const here = at('requiresWhen', ref);
+      if (!writable.has(ref)) out.push({ path: here, message: `"${ref}" is not writable, so a write cannot fill it` });
+      if ((entry.requires ?? []).includes(ref)) out.push({ path: here, message: `"${ref}" is required by every write already (requires): say one or the other` });
+      for (const [other, values] of Object.entries(when)) {
+        if (other === ref) out.push({ path: here, message: `"${ref}" is asked for by another column's values, not its own` });
+        else if (!writable.has(other)) out.push({ path: here, message: `"${other}" is not writable, so a write never sets it` });
+        const pinned = entry.writableValues?.[other];
+        if (pinned === undefined) {
+          if (writable.has(other)) out.push({ path: here, message: `"${other}" decides when "${ref}" is asked for: list the values it may take (writableValues)` });
+          continue;
+        }
+        for (const value of values) {
+          if (!pinned.some((allowed) => allowed === value)) out.push({ path: here, message: `${JSON.stringify(value)} is not a value a write here may give "${other}"` });
+        }
+      }
+    }
     const states = (table as { states?: { column: string; moves: Readonly<Record<string, readonly StateMove[]>> } }).states;
+    // The last day of a move of this table (`requires.notPast`) is the staff's to set: a guest who could write it would move their own deadline, then make the move.
+    const lastDays = new Set(Object.values(states?.moves ?? {}).flatMap((moves) => moves.flatMap((move) => (typeof move === 'string' || move.requires?.notPast === undefined ? [] : [move.requires.notPast]))));
+    for (const lastDay of lastDays) {
+      if (writable.has(lastDay)) out.push({ path: at('writable'), message: `"${lastDay}" is the last day of a move of "${entry.table}", so a write through this entry may not set it` });
+    }
     for (const [ref, values] of Object.entries(entry.writableValues ?? {})) {
       if (!writable.has(ref)) out.push({ path: at('writableValues', ref), message: `"${ref}" is not writable` });
       const found = column(ref);
@@ -2206,6 +2279,7 @@ function personIssues(
         // Sent by the kind's own rules: never past a person's approval, and never skipped at send as a message already sent.
         const declared = (box.producers ?? []).find((producer) => producer.kind === entry.newLink!.kind);
         if (declared?.hold === true) out.push({ path: here('kind'), message: `"${entry.newLink.kind}" waits for a person to approve it, so it is never sent again from a link` });
+        if (declared !== undefined && 'onDelete' in declared) out.push({ path: here('kind'), message: `"${entry.newLink.kind}" is written when a row is removed, so it is never sent from a link of a row that is there` });
         if (declared?.repeatBy !== undefined && declared.repeatBy !== entry.newLink.column) {
           out.push({ path: here('kind'), message: `"${entry.newLink.kind}" is sent once per "${declared.repeatBy}", so one sent again for a new "${entry.newLink.column}" would be skipped: its producer repeats by "${entry.newLink.column}" or by nothing` });
         }

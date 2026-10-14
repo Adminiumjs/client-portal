@@ -217,6 +217,41 @@ export function hasPhoneSide(manifest: Manifest): boolean {
   return manifest.kind === 'app' && manifest.frontends.some((frontend) => frontend.side === PHONE_SIDE);
 }
 
+/** `sampleData.people` and `.teams`: an app's, each key once, each role one of the app's own, each team of the people listed. */
+function samplePeopleIssues(manifest: Manifest): ManifestIssue[] {
+  const out: ManifestIssue[] = [];
+  const sample = manifest.sampleData as { people?: { key: string; role?: string | undefined }[] | undefined; teams?: { name: string; lead?: string | undefined; members: string[] }[] | undefined } | undefined;
+  const people = sample?.people;
+  const teams = sample?.teams;
+  if (people === undefined && teams === undefined) return out;
+  if (manifest.kind !== 'app') {
+    out.push({ path: `sampleData.${people === undefined ? 'teams' : 'people'}`, message: 'sample people are an app\'s: an add-on brings rows, never staff' });
+    return out;
+  }
+  const roles = new Set((manifest.roles ?? []).map((role) => role.key));
+  const keys = new Set<string>();
+  (people ?? []).forEach((person, i) => {
+    if (keys.has(person.key)) out.push({ path: `sampleData.people.${String(i)}.key`, message: `"${person.key}" is listed twice` });
+    keys.add(person.key);
+    if (person.role !== undefined && !roles.has(person.role)) {
+      out.push({ path: `sampleData.people.${String(i)}.role`, message: `"${person.role}" is not one of this app's roles` });
+    }
+  });
+  const names = new Set<string>();
+  (teams ?? []).forEach((team, i) => {
+    if (names.has(team.name)) out.push({ path: `sampleData.teams.${String(i)}.name`, message: `"${team.name}" is listed twice` });
+    names.add(team.name);
+    const seen = new Set<string>();
+    team.members.forEach((member, m) => {
+      if (!keys.has(member)) out.push({ path: `sampleData.teams.${String(i)}.members.${String(m)}`, message: `"${member}" is not one of sampleData.people` });
+      else if (seen.has(member) || member === team.lead) out.push({ path: `sampleData.teams.${String(i)}.members.${String(m)}`, message: `"${member}" is in "${team.name}" twice` });
+      seen.add(member);
+    });
+    if (team.lead !== undefined && !keys.has(team.lead)) out.push({ path: `sampleData.teams.${String(i)}.lead`, message: `"${team.lead}" is not one of sampleData.people` });
+  });
+  return out;
+}
+
 /** `sampleData.skipWhenShared` names the app's own tables, its `table` is one it shares, and no table left in links to a skipped one. */
 function sampleDataIssues(manifest: Manifest): ManifestIssue[] {
   const out: ManifestIssue[] = [];
@@ -232,6 +267,7 @@ function sampleDataIssues(manifest: Manifest): ManifestIssue[] {
       }
     }
   }
+  out.push(...samplePeopleIssues(manifest));
   const rule = manifest.kind === 'app' ? manifest.sampleData?.skipWhenShared : undefined;
   if (rule === undefined) return out;
   const tables = new Map((manifest.requiredSchema?.tables ?? []).map((table) => [table.ref, table]));

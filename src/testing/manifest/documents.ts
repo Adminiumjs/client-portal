@@ -150,6 +150,8 @@ export const appDocumentSchema = z
     statement: z.object({ documents: statementSourceSchema, payments: statementSourceSchema }).strict().optional(),
     /** The feature this document belongs to (see `addOns.features`). */
     feature: z.string().regex(/^[a-z][a-z0-9-]{0,39}$/).optional(),
+    /** The part of the app this document belongs to: not drawn while it is off (see `modules.ts`). */
+    module: z.string().regex(/^[a-z][a-z0-9-]{0,39}$/, 'a module id is kebab-case').optional(),
     /**
      * The slots the app's own screen may fill when it asks for the document
      * (a label sheet's `count`), and no others: a slot nothing maps, with no

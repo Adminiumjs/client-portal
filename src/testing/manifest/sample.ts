@@ -35,6 +35,12 @@
  *   `{"@table": "<table>"}`    that table's stored name, for a column that
  *                               holds one (`rules.tableRef`): the name it has
  *                               on this install, whichever app made the table
+ *   `{"@person": "<key>"}`     one of the manifest's sample people
+ *                               (`sampleData.people`): the staff member made
+ *                               for that key. In a staff column (`rules.staff`)
+ *                               or another text column that holds a staff id,
+ *                               and anywhere inside a json value (a saved
+ *                               filter that names a rep)
  *
  * A `@day` may add `"@workdays": true`: its days count Monday to Friday, and
  * day 0 on a weekend is the Monday after — so "today's" busy day is never a
@@ -75,6 +81,10 @@
  * `"@onlyIfEmpty": true` is for a table that holds one row, the app's own
  * settings: the row is added only when the table has none, and otherwise its
  * `@label` names the row already there — the operator's own settings stay.
+ * With `"@fillEmpty": true` beside it, the row already there takes the
+ * sample's values in the columns it holds nothing in (a depot's name on a
+ * settings row the install wrote with its defaults): never over a value, and
+ * emptied again with the sample where nobody changed them since.
  *
  * AN APP'S ROWS FOR AN ADD-ON. An app that names an add-on may ship a second
  * file of the same format with a top-level `addOn`: rows of that add-on's
@@ -130,6 +140,7 @@ const directive = z.union([
   z.object({ '@t': z.record(z.string().regex(/^[a-z]{2}(-[A-Z]{2})?$/), z.string()).refine((m) => Object.keys(m).length > 0) }).strict(),
   z.object({ '@asset': label }).strict(),
   z.object({ '@table': z.string().regex(/^[a-z][a-z0-9_]*$/, 'a table') }).strict(),
+  z.object({ '@person': z.string().regex(/^[a-z][a-z0-9_-]{0,39}$/, 'a sample person\'s key') }).strict(),
 ]);
 
 const plain = z.union([z.string(), z.number(), z.boolean(), z.null()]);
@@ -172,7 +183,10 @@ export const byStaySchema = z
 export type ByStay = z.infer<typeof byStaySchema>;
 
 /** The keys of a row that are directives about the row, not columns. */
-export const ROW_DIRECTIVES: ReadonlySet<string> = new Set(['@label', '@byClock', '@byStay', '@onlyIfEmpty']);
+export const ROW_DIRECTIVES: ReadonlySet<string> = new Set(['@label', '@byClock', '@byStay', '@onlyIfEmpty', '@fillEmpty']);
+
+/** The most moves one file asks for. */
+export const SAMPLE_MOVES_MAX = 50;
 
 /** The weekdays a bundle's week anchor names. */
 export const SAMPLE_WEEKDAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
@@ -202,6 +216,21 @@ export const sampleBundleSchema = z
           .strict(),
       )
       .min(1),
+    /**
+     * In an app's rows for an add-on: changes of state made once the rows are in, each as a save of its own, in
+     * this order. Such a save is a real one, so what the add-on's ledger hands to a move (a receipt posted: stock
+     * in) is written by the add-on itself. One row by its label (`ref`), or every row this file wrote of a table.
+     */
+    moves: z
+      .array(
+        z
+          .object({ ref: label.optional(), table: z.string().min(1).optional(), to: z.string().min(1).max(80) })
+          .strict()
+          .refine((move) => (move.ref === undefined) !== (move.table === undefined), { message: 'a move names one row (`ref`) or one table (`table`), not both' }),
+      )
+      .min(1)
+      .max(SAMPLE_MOVES_MAX)
+      .optional(),
   })
   .strict();
 
@@ -219,6 +248,7 @@ export function sampleDirective(value: unknown):
   | { kind: 't'; texts: Record<string, string> }
   | { kind: 'asset'; label: string }
   | { kind: 'table'; ref: string }
+  | { kind: 'person'; key: string }
   | null {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
   const record = value as Record<string, unknown>;
@@ -244,7 +274,20 @@ export function sampleDirective(value: unknown):
   }
   if (typeof record['@asset'] === 'string') return { kind: 'asset', label: record['@asset'] };
   if (typeof record['@table'] === 'string') return { kind: 'table', ref: record['@table'] };
+  if (typeof record['@person'] === 'string') return { kind: 'person', key: record['@person'] };
   return null;
+}
+
+/**
+ * Every sample person a value names: itself, or anywhere inside it when it
+ * is a json value (an object or a list that is no directive of its own).
+ */
+export function samplePeopleIn(value: unknown): string[] {
+  const found = sampleDirective(value);
+  if (found !== null) return found.kind === 'person' ? [found.key] : [];
+  if (Array.isArray(value)) return value.flatMap(samplePeopleIn);
+  if (typeof value === 'object' && value !== null) return Object.values(value as Record<string, unknown>).flatMap(samplePeopleIn);
+  return [];
 }
 
 /** An ISO-8601 duration in milliseconds. */
@@ -307,8 +350,10 @@ export function sampleBundleIssues(bundle: SampleBundle, manifest: Manifest): Sa
   bundle.tables.forEach((table, t) => {
     if (table.own === true) issues.push({ path: `tables.${String(t)}.own`, message: '"own" marks a table of the app in its rows for an add-on; a manifest\'s own sample file takes none.' });
   });
+  if (bundle.moves !== undefined) issues.push({ path: 'moves', message: '"moves" are for an app\'s rows for an add-on (sampleData.addOns); a manifest\'s own sample file writes its rows as they should stand.' });
   const declared = new Map<string, DeclaredTable>((manifest.requiredSchema?.tables ?? []).map((table) => [table.ref, table]));
-  issues.push(...rowIssues(bundle, declared, { names: new Set(declared.keys()), what: manifest.kind === 'add-on' ? 'add-on' : 'app', otherLabels: false, known: seedLabelsOf(manifest) }));
+  const people = new Set(((manifest.kind === 'app' ? (manifest.sampleData as { people?: { key: string }[] } | undefined)?.people : undefined) ?? []).map((person) => person.key));
+  issues.push(...rowIssues(bundle, declared, { names: new Set(declared.keys()), what: manifest.kind === 'add-on' ? 'add-on' : 'app', otherLabels: false, known: seedLabelsOf(manifest), people }));
   issues.push(...ledgerOrderIssues(bundle, manifest, declared));
   return issues;
 }
@@ -452,6 +497,37 @@ export function ledgerCatalogueTables(addOn: AddOnManifest): ReadonlySet<string>
 }
 
 /**
+ * The tables a ledger writes that an app's file may still bring ROWS WITH NO
+ * HISTORY of: an item with no stock, an order still a draft. A table is one
+ * when a person may make its rows by hand (a role of the add-on is granted
+ * `create` on it), and it is not the receipt table. The row then leaves out
+ * every column the ledger keeps (`ledgerKeptColumns`) that it can be made
+ * without, and names no receipt.
+ * What only the ledger writes (a movement, a level, a reservation) comes only
+ * from the ledger: the file asks for it with `moves`, and the add-on writes it.
+ */
+export function ledgerBringableTables(addOn: AddOnManifest): ReadonlySet<string> {
+  const byHand = new Set<string>();
+  for (const role of (addOn as { roles?: readonly { permissions?: readonly string[] }[] }).roles ?? []) {
+    for (const permission of role.permissions ?? []) {
+      const [kind, table, action] = permission.split(':');
+      if (kind === 'table' && action === 'create' && table !== undefined) byHand.add(table.replace(/^@/, ''));
+    }
+  }
+  const out = new Set<string>();
+  for (const ledger of ledgersOf(addOn)) for (const ref of Object.keys(ledger.writes)) if (byHand.has(ref)) out.add(ref);
+  for (const ledger of ledgersOf(addOn)) out.delete(ledger.receipts);
+  return out;
+}
+
+/** The columns of a table that an add-on's ledgers keep: what a plan may change of a row that is there (`update.set`). */
+export function ledgerKeptColumns(addOn: AddOnManifest, ref: string): ReadonlySet<string> {
+  const out = new Set<string>();
+  for (const ledger of ledgersOf(addOn)) for (const column of (ledger.writes[ref] as { update?: { set?: readonly string[] } } | undefined)?.update?.set ?? []) out.add(column);
+  return out;
+}
+
+/**
  * An app's rows for an add-on it names (`sampleData.addOns.<key>.file`):
  * the file is for this app and that add-on, the app names the add-on, a
  * table marked `own` is the app's and links into the add-on, and — when the
@@ -475,6 +551,7 @@ export function sampleSectionIssues(bundle: SampleBundle, app: AppManifest, addO
   const theirs = addOn === undefined ? null : new Map<string, DeclaredTable>((addOn.requiredSchema?.tables ?? []).map((table) => [table.ref, table]));
   const declared = new Map<string, DeclaredTable>();
   const catalogue = addOn === undefined ? new Set<string>() : ledgerCatalogueTables(addOn);
+  const bringable = addOn === undefined ? new Set<string>() : ledgerBringableTables(addOn);
   const receipts = new Set(addOn === undefined ? [] : ledgersOf(addOn).map((ledger) => ledger.receipts));
   bundle.tables.forEach((table, t) => {
     const at = `tables.${String(t)}`;
@@ -493,7 +570,7 @@ export function sampleSectionIssues(bundle: SampleBundle, app: AppManifest, addO
     const shape = theirs.get(table.ref);
     // An add-on's history is its own to write: an app brings what a ledger counts, never what it counted.
     // What a ledger writes beside its books (which item a dish uses) is no history, and an app may bring it.
-    const ledger = addOn === undefined || catalogue.has(table.ref) ? undefined : ledgersOf(addOn).find((candidate) => candidate.receipts === table.ref || candidate.writes[table.ref] !== undefined);
+    const ledger = addOn === undefined || catalogue.has(table.ref) || bringable.has(table.ref) ? undefined : ledgersOf(addOn).find((candidate) => candidate.receipts === table.ref || candidate.writes[table.ref] !== undefined);
     if (shape === undefined) issues.push({ path: `${at}.ref`, message: `"${table.ref}" is not a table of "${key}". A table of the app itself is marked "own": true.` });
     else if (ledger !== undefined) issues.push({ path: `${at}.ref`, message: `"${table.ref}" is ${ledger.receipts === table.ref ? 'the receipt table' : 'a table'} of "${key}"'s ledger "${ledger.id}", which only postings write: an app's rows for an add-on hold none of its history.` });
     else {
@@ -505,12 +582,66 @@ export function sampleSectionIssues(bundle: SampleBundle, app: AppManifest, addO
           if (row[column.ref] !== undefined && row[column.ref] !== null) issues.push({ path: `${at}.rows.${String(r)}.${column.ref}`, message: `"${table.ref}.${column.ref}" names the receipt of a posting: an app's rows for an add-on are made by no posting, so leave it out.` });
         });
       }
+      // A row with no history: what the ledger keeps of it (an average cost, a status it moves) is the ledger's to write.
+      // But for a column a row cannot be made without (an order line's quantity, which a receipt later adjusts): that one a person types.
+      const needed = new Set(shape.columns.filter((column) => column.nullable !== true && column.default === undefined).map((column) => column.ref));
+      const kept = addOn === undefined || catalogue.has(table.ref) ? new Set<string>() : new Set([...ledgerKeptColumns(addOn, table.ref)].filter((column) => !needed.has(column)));
+      if (kept.size > 0) {
+        table.rows.forEach((row, r) => {
+          for (const column of kept) {
+            if (row[column] !== undefined) issues.push({ path: `${at}.rows.${String(r)}.${column}`, message: `"${table.ref}.${column}" is kept by "${key}"'s ledger: an app's row brings no history, so leave it out (a move asks the add-on to write it).` });
+          }
+        });
+      }
     }
   });
+  issues.push(...sampleMoveIssues(bundle, theirs));
   const twice = bundle.tables.map((table) => table.ref).filter((ref, i, all) => all.indexOf(ref) !== i);
   for (const ref of new Set(twice)) issues.push({ path: 'tables', message: `"${ref}" is listed twice.` });
   // A `@table` names a table of the app: the add-on's rows say which of the app's rows they belong to.
   issues.push(...rowIssues(bundle, declared, { names: new Set(own.keys()), what: 'app', otherLabels: true }));
+  return issues;
+}
+
+/**
+ * A section's `moves`: each names a labelled row, or a table, of the add-on's
+ * that this file itself writes, and a state that table has. Whether the move
+ * is one the table allows from where the row stands is judged when it is
+ * made, as for anybody's save.
+ */
+function sampleMoveIssues(bundle: SampleBundle, theirs: ReadonlyMap<string, DeclaredTable> | null): SampleIssue[] {
+  const issues: SampleIssue[] = [];
+  const tableOfLabel = new Map<string, string>();
+  const written = new Map<string, boolean>();
+  for (const table of bundle.tables) {
+    written.set(table.ref, table.own === true);
+    for (const row of table.rows) if (typeof row['@label'] === 'string') tableOfLabel.set(row['@label'], table.ref);
+  }
+  (bundle.moves ?? []).forEach((move, m) => {
+    const at = `moves.${String(m)}`;
+    const ref = move.table ?? (move.ref === undefined ? undefined : tableOfLabel.get(move.ref));
+    if (ref === undefined) {
+      issues.push({ path: `${at}.ref`, message: `No row of this file carries the label "${String(move.ref)}".` });
+      return;
+    }
+    if (!written.has(ref)) {
+      issues.push({ path: `${at}.table`, message: `This file writes no row of "${ref}": a move is of a row the file itself brings.` });
+      return;
+    }
+    if (written.get(ref) === true) {
+      issues.push({ path: at, message: `"${ref}" is the app's own table: a move is of a row of the add-on's, whose ledger then writes what follows.` });
+      return;
+    }
+    const shape = theirs?.get(ref);
+    if (shape === undefined) return; // checked when the add-on's manifest is at hand
+    const states = (shape as { states?: { column: string } }).states;
+    if (states === undefined) {
+      issues.push({ path: at, message: `"${ref}" has no states, so its rows make no move.` });
+      return;
+    }
+    const values = shape.columns.find((column) => column.ref === states.column)?.enum ?? [];
+    if (!values.includes(move.to)) issues.push({ path: `${at}.to`, message: `"${ref}" has no state "${move.to}".` });
+  });
   return issues;
 }
 
@@ -529,6 +660,8 @@ function rowIssues(
     otherLabels: boolean;
     /** Labels of rows that are there before the file's first: the manifest's own starting rows. */
     known?: ReadonlySet<string>;
+    /** The manifest's sample people, by key; absent where a file may name none (an app's rows for an add-on). */
+    people?: ReadonlySet<string>;
   },
 ): SampleIssue[] {
   const issues: SampleIssue[] = [];
@@ -556,9 +689,39 @@ function rowIssues(
       }
     }
     // A number Adminium gives without gaps: a sample row names it, empty, or the load numbers it into the real series.
-    const gapless = shape.columns.filter((column) => column.rules?.sequence?.gapless === true).map((column) => column.ref);
+    // One the app opened to its sample (`sequence.sample`) may instead be given its number: checked below, with the text written from it.
+    const gapless = shape.columns.filter((column) => column.rules?.sequence?.gapless === true && column.rules.sequence.sample !== true).map((column) => column.ref);
+    const numberedBySample = shape.columns.filter((column) => column.rules?.sequence?.gapless === true && column.rules.sequence.sample === true);
+    const taken = new Map<string, number>();
     for (const [r, row] of table.rows.entries()) {
       const at = `tables.${String(t)}.rows.${String(r)}`;
+      for (const numbered of numberedBySample) {
+        const column = numbered.ref;
+        const given = row[column];
+        if (given === null) continue;
+        if (typeof given !== 'number' || !Number.isInteger(given) || given < 1) {
+          const now = given === undefined ? 'this row leaves it out' : 'this row gives it something else';
+          issues.push({ path: `${at}.${column}`, message: `"${column}" is a running number, and ${now}. Write the row's number (1, 2, 3 …), or "${column}": null to give it none.` });
+          continue;
+        }
+        // One series per parent row when the number is scoped: the same number under two parents is two numbers.
+        const scope = numbered.rules?.sequence?.scope;
+        const key = `${column}\u0000${scope === undefined ? '' : JSON.stringify(row[scope] ?? null)}\u0000${String(given)}`;
+        const before = taken.get(key);
+        if (before !== undefined) issues.push({ path: `${at}.${column}`, message: `"${column}" ${String(given)} is row ${String(before)}'s number already.` });
+        else taken.set(key, r);
+        // The text people read is written with it: nothing writes it for a sample row.
+        const text = shape.columns.find((other) => other.rules?.format?.from === column);
+        const format = text?.rules?.format;
+        if (text === undefined || format === undefined) continue;
+        const written = row[text.ref];
+        const want = format.prefixSetting === undefined ? `${format.prefix ?? ''}${String(given).padStart(format.pad ?? 0, '0')}` : null;
+        if (typeof written !== 'string' || written === '') {
+          issues.push({ path: `${at}.${text.ref}`, message: `"${text.ref}" is the number as people read it${want === null ? '' : ` ("${want}")`}: a sample row that gives "${column}" writes it too.` });
+        } else if (want !== null && written !== want) {
+          issues.push({ path: `${at}.${text.ref}`, message: `"${text.ref}" is written from "${column}": for ${String(given)} it reads "${want}", not "${written}".` });
+        }
+      }
       for (const column of gapless) {
         if (row[column] !== null) {
           // Said as what to write: a model given only the reason left the key out, eight times running.
@@ -581,6 +744,11 @@ function rowIssues(
         if (column === '@onlyIfEmpty') {
           if (value !== true) issues.push({ path: `${at}.@onlyIfEmpty`, message: '"@onlyIfEmpty" is true, or absent.' });
           else if (table.onlyIfEmpty === true) issues.push({ path: `${at}.@onlyIfEmpty`, message: `"${table.ref}" is only for an empty table as a whole; a row of it says nothing more.` });
+          continue;
+        }
+        if (column === '@fillEmpty') {
+          if (value !== true) issues.push({ path: `${at}.@fillEmpty`, message: '"@fillEmpty" is true, or absent.' });
+          else if (row['@onlyIfEmpty'] !== true) issues.push({ path: `${at}.@fillEmpty`, message: '"@fillEmpty" goes with "@onlyIfEmpty": it says what to do with the row the table already holds.' });
           continue;
         }
         if (column === '@byStay') {
@@ -644,6 +812,11 @@ function rowIssues(
           issues.push({ path: `${at}.${column}`, message: `"${table.ref}" has no column "${column}".` });
           continue;
         }
+        // A file is uploaded by a signed-in person: no sample row brings one.
+        if (value !== null && !(Array.isArray(value) && value.length === 0) && shape.columns.find((c) => c.ref === column)?.rules?.file !== undefined) {
+          issues.push({ path: `${at}.${column}`, message: `"${table.ref}.${column}" holds files a signed-in person uploads, so a sample row leaves it empty.` });
+          continue;
+        }
         // An object that looks like a directive must BE one: a malformed
         // `@ago` would otherwise be written into the column as JSON.
         if (
@@ -657,6 +830,15 @@ function rowIssues(
           continue;
         }
         const found = sampleDirective(value);
+        // A sample person: one the manifest lists, in a column that can hold a staff member's id.
+        for (const key of samplePeopleIn(value)) {
+          if (opts.people === undefined) issues.push({ path: `${at}.${column}`, message: 'A sample person is named in the app\'s own sample file, not in its rows for an add-on.' });
+          else if (!opts.people.has(key)) issues.push({ path: `${at}.${column}`, message: `"${key}" is not one of the manifest's sample people (sampleData.people).` });
+        }
+        if (found?.kind === 'person') {
+          const holds = shape.columns.find((c) => c.ref === column);
+          if (holds?.type !== 'text') issues.push({ path: `${at}.${column}`, message: `"${table.ref}.${column}" is not a text column, so it cannot hold a staff member.` });
+        }
         if (found?.kind === 'table') {
           const holds = shape.columns.find((c) => c.ref === column);
           if (!opts.names.has(found.ref)) issues.push({ path: `${at}.${column}`, message: `"${found.ref}" is not a table this ${opts.what} declares.` });

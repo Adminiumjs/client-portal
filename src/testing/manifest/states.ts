@@ -66,6 +66,9 @@
  *   (`requires.linked`), for a window on the clock (`requires.time`, read from
  *   moments — see `refs.ts`) and for a value of the settings row
  *   (`requires.setting`).
+ * - A move may be refused once a date of the row has passed
+ *   (`requires.notPast`): today on the business's calendar against the date
+ *   the row holds, for every writer; an empty date refuses nothing.
  * - `strict`: a write naming the state the row already holds is refused
  *   (a ticket let in once), repeating up to four columns of the row.
  * - `late`: a move made inside some time before a moment sets a flag, or is
@@ -159,6 +162,15 @@ export const stateMoveSchema = z.union([
           linked: z.array(linkedConditionSchema).min(1).max(4).optional(),
           time: timeConditionSchema.optional(),
           setting: z.array(settingConditionSchema).min(1).max(4).optional(),
+          /**
+           * A date column of the row the move is not made after: once today,
+           * on the business's calendar, is later than the date the row holds,
+           * the move is refused for every writer (`STATE_DATE_PASSED`) — a
+           * quote accepted no later than its last day. The date is the one
+           * the row held before the write, and a row with no date is held to
+           * none.
+           */
+          notPast: refSchema.optional(),
         })
         .strict()
         .optional(),
@@ -312,7 +324,8 @@ const effectSetSchema = z
  * When this row moves to `on.to`, the row its link `via` points at moves too,
  * in the same write: `set` names that table's state column and the state it
  * moves to, one of the moves that table lists (a guest checked out turns the
- * room to cleaning). One link, never a chain.
+ * room to cleaning). One link, never a chain: the state it sets is not one
+ * the linked table's own effects start from.
  */
 export const moveEffectSchema = z
   .object({
@@ -493,6 +506,31 @@ export function undoMoveIssues(
   return out;
 }
 
+/**
+ * Everything wrong with the date a move is not made after (`requires.notPast`):
+ * a date column of the table, never the state, and never on a move no person
+ * makes on a day of their choosing (an undo takes back what was done; a
+ * planned move is a ledger's). Paths are relative to the move. The one judge
+ * for an app's manifest and a states rule saved in Studio.
+ */
+export function notPastIssues(
+  table: string,
+  stateColumn: string,
+  move: StateMove,
+  typeOf: (ref: string) => string | undefined,
+): { path: (string | number)[]; message: string }[] {
+  if (typeof move === 'string' || move.requires?.notPast === undefined) return [];
+  const ref = move.requires.notPast;
+  const path = ['requires', 'notPast'];
+  const type = typeOf(ref);
+  if (type === undefined) return [{ path, message: `"${table}" has no column "${ref}"` }];
+  if (ref === stateColumn) return [{ path, message: 'the state is no date' }];
+  if (type !== 'date') return [{ path, message: `"${table}.${ref}" is not a date, so no day of it can pass` }];
+  if (move.undo === true) return [{ path, message: 'an undo takes back a move already made, whatever the day: take "notPast" out' }];
+  if (move.planned === true) return [{ path, message: 'a planned move is made by a ledger, whatever the day: take "notPast" out' }];
+  return [];
+}
+
 /** Everything wrong with one table's `states` against the manifest's tables. */
 export function statesIssues<C extends ColumnShape>(
   table: string,
@@ -531,6 +569,7 @@ export function statesIssues<C extends ColumnShape>(
       (move.requires?.where ?? []).forEach((condition, w) => {
         out.push(...conditionIssues(table, condition, index, at('moves', from, m, 'requires', 'where', w)));
       });
+      out.push(...notPastIssues(table, states.column, move, (ref) => index.column(table, ref)?.type).map((issue) => ({ path: at('moves', from, m, ...issue.path), message: issue.message })));
       for (const role of move.roles ?? []) {
         if (ctx.roles !== undefined && !ctx.roles.includes(role)) {
           out.push({ path: at('moves', from, m, 'roles'), message: `"${role}" is not one of the app's roles` });
@@ -854,13 +893,16 @@ function conditionedMoveIssues<C extends ColumnShape>(
     }
   };
   /** Everything wrong with the table an effect moves a row of, whatever sets it off. */
-  const effectTargetIssues = (target: string, theirs: States, path: (string | number)[]) => {
+  const effectTargetIssues = (target: string, theirs: States, path: (string | number)[], sets: readonly string[]) => {
     if (target === ctx.outboxTable) out.push({ path, message: `"${target}" is the app's outbox, whose messages move only by the outbox's own moves` });
     // Moved inside this write, after its own rows are held: a lock taken per day, or a parent held first, would come too late.
     if (ctx.bookedOf?.(target) === true) out.push({ path, message: `"${target}" books people by the day, and its lock cannot be taken inside another row's write` });
     const parent = ctx.lineOf?.(target);
     if (parent !== undefined) out.push({ path, message: `"${target}" rows are lines of "${parent}", which would be held after this write's own rows` });
-    if ((theirs.effects?.length ?? 0) > 0) out.push({ path, message: `"${target}" sets off effects of its own; an effect moves one row, never a chain` });
+    // A chain is an effect whose move sets off the moved row's own: a table with effects may still be moved to a state none of them starts from
+    // (a quote sent withdraws the one it replaces; a withdrawn quote sets nothing off).
+    const chained = (theirs.effects ?? []).some((their) => !isChangeEffect(their) && sets.includes(their.on.to));
+    if (chained) out.push({ path, message: `"${target}" sets off effects of its own; an effect moves one row, never a chain` });
   };
 
   (states.effects ?? []).forEach((effect, i) => {
@@ -880,7 +922,7 @@ function conditionedMoveIssues<C extends ColumnShape>(
       }
       if (effect.old !== undefined) effectMoveIssues(target, theirs, effect.old.set, (...rest) => here('old', ...rest));
       if (effect.new !== undefined) effectMoveIssues(target, theirs, effect.new.set, (...rest) => here('new', ...rest));
-      effectTargetIssues(target, theirs, here('on', 'change'));
+      effectTargetIssues(target, theirs, here('on', 'change'), [...Object.values(effect.old?.set ?? {}), ...Object.values(effect.new?.set ?? {})]);
       return;
     }
     known(effect.on.to, here('on', 'to'));
@@ -896,7 +938,7 @@ function conditionedMoveIssues<C extends ColumnShape>(
       return;
     }
     effectMoveIssues(target, theirs, effect.set, here);
-    effectTargetIssues(target, theirs, here('via'));
+    effectTargetIssues(target, theirs, here('via'), Object.values(effect.set));
   });
   return out;
 }

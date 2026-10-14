@@ -55,6 +55,12 @@ export const stateActionSchema = z.union([
       set: setRow.optional(),
       /** Columns typed in the confirm, before the move is made. */
       ask: z.array(refSchema).min(1).max(4).optional(),
+      /**
+       * Hands the row over: a staff column it asks for may be given to any
+       * person, whatever the table lets the role put there otherwise
+       * (`belongs[].set`). The one way a rep gives a deal to a colleague.
+       */
+      handOver: z.literal(true).optional(),
     })
     .strict(),
   z
@@ -66,6 +72,7 @@ export const stateActionSchema = z.union([
       tone: tone.optional(),
       confirm: wordsOrLabels.optional(),
       ask: z.array(refSchema).min(1).max(4).optional(),
+      handOver: z.literal(true).optional(),
     })
     .strict(),
   z

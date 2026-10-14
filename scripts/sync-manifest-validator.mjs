@@ -87,10 +87,16 @@ const NOT_A_COPY = new Set(['index.ts']);
  */
 function specifiersIn(text) {
   const out = [];
+  /*
+   * A keyword that directly follows a quote is the inside of a string, not a
+   * statement. [Added 2026-10-12.] `['export', 'import'] as const` in the
+   * product's `roles.ts` read as a side-effect import whose "specifier" ran to
+   * the next quote in the file, and the sync refused a package of that name.
+   */
   const patterns = [
-    /(?:^|[^\w$.])(?:import|export)\s[^;'"]*?\bfrom\s*['"]([^'"]+)['"]/g,
-    /(?:^|[^\w$.])import\s*['"]([^'"]+)['"]/g,
-    /(?:^|[^\w$.])import\s*\(\s*['"]([^'"]+)['"]\s*\)/g,
+    /(?:^|[^\w$.'"`])(?:import|export)\s[^;'"]*?\bfrom\s*['"]([^'"]+)['"]/g,
+    /(?:^|[^\w$.'"`])import\s*['"]([^'"]+)['"]/g,
+    /(?:^|[^\w$.'"`])import\s*\(\s*['"]([^'"]+)['"]\s*\)/g,
   ];
   for (const pattern of patterns) {
     for (const [, spec] of text.matchAll(pattern)) out.push(spec);

@@ -23,8 +23,8 @@
  * a kind already there for the same source is what stops a second send.
  *
  * Producers queue rows by themselves: when a row is created, when a column
- * changes to a value, or a lead time before a timestamp (a reminder at the
- * time each patient chose).
+ * changes to a value, when a row is removed, or a lead time before a timestamp
+ * (a reminder at the time each patient chose).
  *
  * Templates are stored with the app as their owner. An operator who edits
  * one keeps the edit across the app's updates.
@@ -130,6 +130,8 @@ const producerBase = {
       z.object({ feature: z.string().regex(/^[a-z][a-z0-9-]{0,39}$/, 'a feature id'), setting: settingRefSchema }).strict(),
     ])
     .optional(),
+  /** The part of the app the email belongs to: nothing is queued while it is off (see `modules.ts`). */
+  module: z.string().regex(/^[a-z][a-z0-9-]{0,39}$/, 'a module id is kebab-case').optional(),
   /** Skipped for a recipient whose `recipient.optIn` column is false. */
   optIn: z.literal(true).optional(),
   /** Written `held`: sent only once someone approves it. */
@@ -160,6 +162,15 @@ const producerBase = {
       z.object({ column: refSchema, name: refSchema.optional(), language: refSchema.optional() }).strict(),
     ])
     .optional(),
+  /**
+   * Where a reply to the message goes: to the staff member a staff column of
+   * the row the message is about names (a deal's `owner_id`, its rep), or of
+   * the row one of its links names (`deal_id.owner_id`: a quote's deal's
+   * owner). Adminium looks up that person's own sign-in address when the
+   * message goes. Nobody there, or somebody who cannot sign in: the house's
+   * own `settings.replyTo` if the outbox has one, else no Reply-To.
+   */
+  replyTo: z.object({ staff: z.string().regex(/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)?$/, 'a column, or <link column>.<column>') }).strict().optional(),
   /** One message per linked row in each window of this many minutes. */
   batchMinutes: z.number().int().min(1).max(240).optional(),
   /**
@@ -185,7 +196,9 @@ const producerBase = {
    * The columns of the changed row as they were before the change (a stay's
    * old dates, its old total), kept on the message in the outbox's `was`
    * column and read by its template as `{{was.<column>}}`, in every form the
-   * column has. On a producer that listens for changes (`onChange`).
+   * column has. On a producer that listens for changes (`onChange`), and on
+   * one that listens for a removal (`onDelete`): there they are the removed
+   * row's own values, all a message can still say of it.
    */
   was: z.array(refSchema).min(1).max(8).optional(),
   /**
@@ -234,6 +247,21 @@ export const outboxProducerSchema = z.union([
           })
           .strict(),
       ]),
+    })
+    .strict(),
+  z
+    .object({
+      ...producerBase,
+      /**
+       * A row of the table was removed, by anyone: one message for it, written
+       * once it is gone. Its `link` is the outbox's link to that table, and is
+       * EMPTY on this message (there is no row to name); what the template
+       * says of the row it reads from `was`. `where` is judged on the row as
+       * it was. Every other message that named the row through that link
+       * loses the link as the row goes, and one still waiting is skipped: a
+       * message never stops the row it is about from being removed.
+       */
+      onDelete: z.object({ table: refSchema, where: conditionSchema.optional() }).strict(),
     })
     .strict(),
   z
@@ -460,6 +488,18 @@ export type EmailTemplate = z.infer<typeof emailTemplateSchema>;
 const DECIDING_RULES = ['copy', 'default', 'sequence', 'format', 'code', 'rollup', 'formula', 'stamp', 'perNight'] as const;
 /** The column rules that refuse a value: Adminium's own writes to the column would be refused by them. */
 const REFUSING_RULES = ['options', 'validation', 'required', 'requiredWhen', 'notAfter', 'notBefore'] as const;
+/**
+ * What a producer of a removal (`onDelete`) does not take: each reads the row
+ * again after the message is written (to date it, drop it, overtake it, hold
+ * it for a person, change it, or find who a reply goes to), and the row is gone.
+ */
+export const NOT_ON_REMOVAL = ['hold', 'due', 'batchMinutes', 'holdSeconds', 'dropWhen', 'supersede', 'repeatBy', 'onSent', 'replyTo'] as const;
+
+/** The table whose rows' removal a producer announces, or undefined for any other producer. */
+export function removalTableOf(producer: OutboxProducer): string | undefined {
+  return 'onDelete' in producer ? producer.onDelete.table : undefined;
+}
+
 /** How long a `repeatKey` is: a SHA-256 digest in base64url. */
 export const REPEAT_KEY_LENGTH = 43;
 /** The fewest characters a bounded `was` column holds: the columns a message keeps, as they were. */
@@ -559,7 +599,20 @@ export function outboxIssues(
 
   const box = m.outbox;
   if (box === undefined) {
-    if (templates.size > 0) out.push({ path: ['emailTemplates'], message: 'templates are sent through an outbox, and this app declares none' });
+    // With no outbox, a template is one a rule's own step sends: to an address, or to each person as their summary.
+    const byRules = new Set<string>();
+    const collect = (value: unknown): void => {
+      if (Array.isArray(value)) value.forEach(collect);
+      else if (typeof value === 'object' && value !== null) {
+        for (const [key, inner] of Object.entries(value)) {
+          if (key === 'templateKey' && typeof inner === 'string') byRules.add(inner);
+          else collect(inner);
+        }
+      }
+    };
+    for (const rule of (m as { automations?: { graph?: unknown }[] }).automations ?? []) collect(rule.graph);
+    const unsent = [...templates].filter((key) => !byRules.has(key));
+    if (unsent.length > 0) out.push({ path: ['emailTemplates'], message: `templates are sent through an outbox or by a rule's step, and nothing sends ${unsent.map((key) => `"${key}"`).join(', ')}: this app declares no outbox` });
     return out;
   }
   const at = (...rest: (string | number)[]) => ['outbox', ...rest];
@@ -754,13 +807,25 @@ export function outboxIssues(
     if (producer.optIn === true && r.optIn === undefined) {
       out.push({ path: here('optIn'), message: 'the recipient names no opt-in column' });
     }
-    const source = 'onCreate' in producer ? producer.onCreate : 'onChange' in producer ? producer.onChange : producer.before;
+    const source = 'onCreate' in producer ? producer.onCreate : 'onChange' in producer ? producer.onChange : 'onDelete' in producer ? producer.onDelete : producer.before;
     if (index.table(source.table) === undefined) {
       out.push({ path: here(), message: `"${source.table}" is not a table of this app` });
       return;
     }
+    // A removed row is read once, as it goes: nothing that reads it again later.
+    if ('onDelete' in producer) {
+      for (const word of NOT_ON_REMOVAL) {
+        if (producer[word] !== undefined) out.push({ path: here(word), message: `a message about a removed row takes no ${word}: the row is gone once the message is written, and ${word} reads it again` });
+      }
+      if (source.table === box.table) out.push({ path: here('onDelete', 'table'), message: 'the outbox does not write a message about one of its own messages being removed' });
+      // A message about the row that had not gone yet is skipped as the row goes: the reason column takes that reason.
+      const reason = box.columns.skipReason === undefined ? undefined : index.column(box.table, box.columns.skipReason);
+      if (reason?.type === 'enum' && !(reason.enum ?? []).includes('no-longer-needed')) {
+        out.push({ path: at('columns', 'skipReason'), message: `a message still waiting when its row is removed is skipped as "no-longer-needed", so "${box.table}.${reason.ref}" offers it` });
+      }
+    }
     // A child source links the row its foreign key points at.
-    const via = 'via' in source ? source.via : undefined;
+    const via = 'onCreate' in producer ? producer.onCreate.via : 'onChange' in producer ? producer.onChange.via : undefined;
     let linked = source.table;
     if (via !== undefined) {
       const found = fk(source.table, via, undefined, here('via'));
@@ -830,6 +895,20 @@ export function outboxIssues(
         }
       }
     }
+    // A reply to the rep: a staff column of the row the message is about, or of the row one of its links names, and no other kind of column.
+    if (producer.replyTo !== undefined) {
+      const [first, second] = producer.replyTo.staff.split('.') as [string, string | undefined];
+      const where = here('replyTo', 'staff');
+      // One link further: the table the row's foreign key points at.
+      const of = second === undefined ? linked : col(linked, first, ['fk'], where, 'a link to another table')?.references;
+      const column = second ?? first;
+      const person = of === undefined ? undefined : col(of, column, null, where, '');
+      // Read off the manifest's own table: a table it does not declare has no staff column it can vouch for.
+      const declared = m.requiredSchema.tables.find((candidate) => candidate.ref === of)?.columns.find((candidate) => candidate.ref === column) as { rules?: { staff?: unknown } } | undefined;
+      if (of !== undefined && person !== undefined && declared?.rules?.staff !== true) {
+        out.push({ path: where, message: `"${of}.${column}" is not a staff column ("rules": { "staff": true }): only one names a person a reply can go to` });
+      }
+    }
     // The language read from the row a message is about: every producer's row has it.
     if (typeof r.language === 'object') col(linked, r.language.column, ['text'], here(), 'a text column (the message\'s language)');
     if (producer.batchMinutes !== undefined && 'before' in producer) {
@@ -882,9 +961,9 @@ export function outboxIssues(
     }
     // The changed row's columns as they were: kept on the message, read as {{was.<column>}}.
     if (producer.was !== undefined) {
-      if (!('onChange' in producer)) out.push({ path: here('was'), message: 'a message keeps what a row was before a change on a producer that listens for changes (onChange)' });
+      if (!('onChange' in producer) && !('onDelete' in producer)) out.push({ path: here('was'), message: 'a message keeps what a row was on a producer that listens for changes (onChange) or for a removal (onDelete)' });
       else {
-        const table = producer.onChange.table;
+        const table = 'onChange' in producer ? producer.onChange.table : producer.onDelete.table;
         producer.was.forEach((column, c) => {
           const found = col(table, column, null, here('was', c), '');
           if (producer.was!.indexOf(column) !== c) out.push({ path: here('was', c), message: `"${column}" is listed twice` });
@@ -929,7 +1008,7 @@ export function outboxIssues(
  * nothing else. `empty` is said when there are no rows; without it the block
  * is left out.
  */
-export const emailRowsDataSchema = z
+const outboxRowsDataSchema = z
   .object({
     from: z.union([
       z
@@ -982,6 +1061,28 @@ export const emailRowsDataSchema = z
     empty: z.string().min(1).max(200).optional(),
   })
   .strict();
+/**
+ * The rows of one section of a summary (a rule's `digest` step): `section`
+ * is the section's key, and `row` each line's text, reading `{{row.<column>}}`
+ * of the section's table. `empty` is said to a person the section lists
+ * nothing for; without it the block is left out for them.
+ */
+const sectionRowsDataSchema = z
+  .object({
+    section: z.string().regex(/^[a-z][a-z0-9-]{0,39}$/, 'a section key is kebab-case'),
+    row: z
+      .object({
+        title: z.string().min(1).max(300).optional(),
+        meta: z.string().min(1).max(300).optional(),
+        amount: z.string().min(1).max(300).optional(),
+        note: z.string().min(1).max(300).optional(),
+      })
+      .strict(),
+    empty: z.string().min(1).max(200).optional(),
+  })
+  .strict();
+
+export const emailRowsDataSchema = z.union([outboxRowsDataSchema, sectionRowsDataSchema]);
 export type EmailRowsData = z.infer<typeof emailRowsDataSchema>;
 
 /** A QR code of a code column, as the whole value of an image: `{{ticket.code.qr}}`. */
@@ -1080,6 +1181,11 @@ function emailBlockIssues(
           return;
         }
         const data = parsed.data;
+        // A section of a summary: its table and what its rows read are checked with the rule's step that fills it.
+        if ('section' in data) {
+          rows.push(JSON.stringify({ section: data.section }));
+          return;
+        }
         rows.push(JSON.stringify({ from: data.from, joins: data.joins ?? null }));
         const from = data.from;
         const parent = linkTable(from.link);
@@ -1242,9 +1348,13 @@ export function isCodeColumn(column: { type: string; rules?: { code?: unknown } 
   return column.type === 'text' && column.rules?.code !== undefined;
 }
 
-/** The forms a row's column may be read in: its type's, a text column's `time` only when it keeps a time of day, and a code's groups. */
-export function rowFormsOf(column: Parameters<typeof clockShaped>[0] & { rules?: { code?: unknown } | undefined }): readonly string[] {
+/** The form of a staff column that is the person it names, by the name the people list gives them (`{{visit.rep_id.name}}`). */
+export const STAFF_NAME_FORM = 'name';
+
+/** The forms a row's column may be read in: its type's, a text column's `time` only when it keeps a time of day, a code's groups, and a staff column's person by name. */
+export function rowFormsOf(column: Parameters<typeof clockShaped>[0] & { rules?: { code?: unknown; staff?: unknown } | undefined }): readonly string[] {
   const forms = ROW_FORMS[column.type] ?? [];
   const own = column.type === 'text' && !clockShaped(column) ? forms.filter((form) => form !== 'time') : forms;
-  return isCodeColumn(column) ? [...own, GROUPED_FORM] : own;
+  const coded = isCodeColumn(column) ? [...own, GROUPED_FORM] : own;
+  return column.rules?.staff === true ? [...coded, STAFF_NAME_FORM] : coded;
 }

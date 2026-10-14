@@ -39,7 +39,9 @@ import { placeholderNames, requiredNamesOfEmail, showWhenNames } from './placeho
 import { bcp47TagSchema, refSchema, type ReferenceIssue } from './refs.ts';
 
 /** The most rules one manifest ships, and the most steps one rule holds. */
-export const MANIFEST_AUTOMATIONS_MAX = 12;
+export const MANIFEST_AUTOMATIONS_MAX = 24;
+/** How many a manifest could ship before: one with more says so, so a server that reads only these refuses it by its version. */
+export const MANIFEST_AUTOMATIONS_FIRST_MAX = 12;
 export const AUTOMATION_NODES_MAX = 40;
 
 /** One text, or the same text in several languages (US English always among them). */
@@ -56,7 +58,15 @@ const RELATIVE_OPS: readonly ConditionOp[] = ['within_next', 'within_last', 'mor
 const NO_OPERAND_OPS: readonly ConditionOp[] = ['is_empty', 'not_empty'];
 const COUNT_OPS: readonly ConditionOp[] = ['is', 'is_not', 'gt', 'lt'];
 
-const operand = z.union([z.string().max(2000), z.number(), z.object({ amount: z.number().int().min(1).max(3650), unit: durationUnit }).strict()]);
+/**
+ * An amount of time; `setting` reads it from a whole-number column of the app's settings row when
+ * the conditions are read, and `amount` is used while that holds none.
+ */
+const operand = z.union([
+  z.string().max(2000),
+  z.number(),
+  z.object({ amount: z.number().int().min(1).max(3650), unit: durationUnit, setting: z.object({ table: refSchema, column: refSchema }).strict().optional() }).strict(),
+]);
 const fieldLeft = z.object({ field: refSchema }).strict();
 const leaf = z.object({ left: fieldLeft, op: z.enum(AUTOMATION_CONDITION_OPS), right: operand.optional() }).strict();
 const countLeft = z.object({ count: z.object({ table: refSchema, matchColumn: refSchema, equalsField: refSchema, where: leaf.optional() }).strict() }).strict();
@@ -119,17 +129,56 @@ export const manifestTriggerSchema = z.discriminatedUnion('kind', [
     .object({
       kind: z.literal('schedule'),
       schedule: scheduleSchema,
-      forEach: z.object({ table: refSchema, where: z.array(manifestConditionSchema).max(8), once: z.boolean() }).strict().optional(),
+      /**
+       * The rows a run visits. `once: true` visits a row one time ever;
+       * `once: "per-spell"` one time for each spell the row matches: a row that
+       * stops matching and matches again later is visited again (a deal gone
+       * quiet, worked on, and quiet once more).
+       */
+      forEach: z.object({ table: refSchema, where: z.array(manifestConditionSchema).max(8), once: z.union([z.boolean(), z.literal('per-spell')]) }).strict().optional(),
     })
     .strict(),
 ]);
 export type ManifestTrigger = z.infer<typeof manifestTriggerSchema>;
 
-/** A value a step writes: text, which may carry `{{record.<column>}}`, or the moment it runs. */
-const writeValue = z.union([z.string().max(4000), z.object({ now: z.literal(true) }).strict()]);
+/** A column of the app's settings row: the row of that table with the lowest key. */
+const settingRef = z.object({ table: refSchema, column: refSchema }).strict();
+
+/**
+ * A value a step writes: text, which may carry `{{record.<column>}}`; the
+ * moment it runs; what a column of the app's settings row holds when it runs
+ * (`setting`); or a day so many days after a date of the record, or after
+ * now, on the business's calendar (`daysAfter`), the days read from a
+ * whole-number setting when it holds some.
+ */
+const writeValue = z.union([
+  z.string().max(4000),
+  z.object({ now: z.literal(true) }).strict(),
+  z.object({ setting: settingRef }).strict(),
+  z
+    .object({
+      daysAfter: z
+        .object({
+          column: refSchema.optional(),
+          now: z.literal(true).optional(),
+          days: z.number().int().min(0).max(3650),
+          setting: settingRef.optional(),
+          /** The wall time on that day, for a column that holds a moment. */
+          at: z.string().regex(HHMM, 'a time such as 09:00').optional(),
+        })
+        .strict()
+        .refine((after) => (after.column === undefined) !== (after.now === undefined), { message: 'days after a column of the record ("column") or after now ("now": true): one of the two' }),
+    })
+    .strict(),
+]);
+export type ManifestWriteValue = z.infer<typeof writeValue>;
 const values = z.record(refSchema, writeValue);
 
 const roleKey = z.string().regex(/^[a-z][a-z0-9-]*$/, 'a role key');
+/** A staff column of the record, or one of the row a link of it names: `owner_id`, `deal_id.owner_id`. */
+const staffPath = z.string().regex(/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)?$/, 'a column, or <link column>.<column>');
+/** What later steps call a row a step made. */
+const stepName = z.string().regex(/^[a-z][a-z0-9_]{0,39}$/, 'a step name is snake_case, at most 40 characters');
 
 export const manifestActionSchema = z.discriminatedUnion('kind', [
   z
@@ -137,8 +186,25 @@ export const manifestActionSchema = z.discriminatedUnion('kind', [
       kind: z.literal('email'),
       /** One of the manifest's own templates. */
       templateKey: z.string().regex(/^[a-z][a-z0-9-]{1,79}$/, 'a template key'),
-      /** The record's column that holds the address. */
-      to: z.object({ kind: z.literal('field'), column: refSchema }).strict(),
+      /**
+       * Who it goes to: `field`, the record's column that holds the address;
+       * or `staff`, a staff column of the record (or `<link>.<staff column>`
+       * of the row a link of it names), whose person's address Adminium looks up;
+       * or `listed`, the people a table that lists people against the record
+       * (one of its `belongs` ways `through`) names for it: one mail each, to
+       * those of them who can open the record when it is sent.
+       */
+      to: z.union([
+        z.object({ kind: z.literal('field'), column: refSchema }).strict(),
+        z.object({ kind: z.literal('staff'), column: staffPath }).strict(),
+        z.object({ kind: z.literal('listed'), table: refSchema }).strict(),
+      ]),
+      /**
+       * Where a reply goes: to the person a staff column of the record names
+       * (or `<link>.<staff column>` of the row a link of it names), by the
+       * address they sign in with. Nobody there: no Reply-To.
+       */
+      replyTo: z.object({ staff: staffPath }).strict().optional(),
       /** What fills a placeholder of the template that the record does not. */
       vars: z
         .record(z.string().regex(/^[A-Za-z0-9_.-]{1,120}$/), z.string().max(2000))
@@ -146,8 +212,77 @@ export const manifestActionSchema = z.discriminatedUnion('kind', [
         .optional(),
     })
     .strict(),
-  z.object({ kind: z.literal('notification'), to: z.object({ roles: z.array(roleKey).min(1).max(20) }).strict(), title: localized(200), body: localized(2000).optional() }).strict(),
-  z.object({ kind: z.literal('record.create'), table: refSchema, values }).strict(),
+  z
+    .object({
+      kind: z.literal('notification'),
+      /**
+       * Everybody who holds one of the roles; or the person a staff column of
+       * the record names (or `<link>.<staff column>`). With `lead: true`, not
+       * that person but whoever leads a team they are in (never the person
+       * themselves), and of those only who can open the record. `else`: the
+       * roles told when the column, or its lead, names nobody; a lead always
+       * has one. Or `listed`: the people a table that lists people against the
+       * record (one of its `belongs` ways `through`) names for it, of those
+       * only who can open the record when the step runs.
+       */
+      to: z.union([
+        z.object({ roles: z.array(roleKey).min(1).max(20) }).strict(),
+        z.object({ listed: refSchema }).strict(),
+        z
+          .object({ column: staffPath, lead: z.literal(true).optional(), else: z.object({ roles: z.array(roleKey).min(1).max(20) }).strict().optional() })
+          .strict()
+          .refine((to) => to.lead !== true || to.else !== undefined, { message: 'a notice to a lead says who is told when there is none ("else": { "roles": [...] })', path: ['else'] }),
+      ]),
+      title: localized(200),
+      body: localized(2000).optional(),
+      /** Told at once, also in the person's quiet hours (a change to today's day sheet). */
+      urgent: z.literal(true).optional(),
+    })
+    .strict(),
+  /** `name`: what later steps call the row this one makes, in `{{steps.<name>.<column>}}`. */
+  z.object({ kind: z.literal('record.create'), table: refSchema, values, name: stepName.optional() }).strict(),
+  /**
+   * A summary for each person: one email each, of the rows that are theirs.
+   * Each section lists the rows of a table whose `owner` (a staff column) is
+   * the person, that meet `where` and that the person may read; a block
+   * `email.rows` of the template with `"section": "<key>"` draws it.
+   * `"reach": "team"` adds the rows of the people the person leads when it is
+   * sent; `sum` adds columns up over every such row; `"by": "owner"` lists a
+   * line a person; `target` measures a sum against those people's targets.
+   * Nothing in it is read further than the person's own roles reach.
+   */
+  z
+    .object({
+      kind: z.literal('digest'),
+      templateKey: z.string().regex(/^[a-z][a-z0-9-]{1,79}$/, 'a template key'),
+      to: z.object({ roles: z.array(roleKey).min(1).max(20) }).strict(),
+      sections: z
+        .array(
+          z
+            .object({
+              key: z.string().regex(/^[a-z][a-z0-9-]{0,39}$/, 'a section key is kebab-case'),
+              table: refSchema,
+              owner: refSchema,
+              where: z.array(manifestConditionSchema).max(8).optional(),
+              orderBy: z.object({ column: refSchema, dir: z.enum(['asc', 'desc']).optional() }).strict().optional(),
+              limit: z.number().int().min(1).max(50).optional(),
+              /** `team`: the person's rows and those of the people they lead when it is sent. Never "all". */
+              reach: z.enum(['own', 'team']).optional(),
+              /** Number columns added up over every row of the section: `{{sum.<section>.<column>}}`. */
+              sum: z.array(refSchema).min(1).max(4).optional(),
+              /** One line a person (their name, how many, each sum) instead of one a row. */
+              by: z.literal('owner').optional(),
+              /** What the sum `of` is measured against: `column` of the rows of `table` whose `owner` names the same people. */
+              target: z.object({ table: refSchema, owner: refSchema, column: refSchema, year: refSchema.optional(), of: refSchema }).strict().optional(),
+            })
+            .strict(),
+        )
+        .min(1)
+        .max(6),
+      /** Sent also to a person none of whose sections lists a row. Default: such a person gets no email. */
+      sendEmpty: z.literal(true).optional(),
+    })
+    .strict(),
   z.object({ kind: z.literal('record.update'), values }).strict(),
   /**
    * A step an add-on gives (its `addOn.steps`): which add-on, which step, and
@@ -221,6 +356,8 @@ export const manifestAutomationSchema = z
     enabled: z.boolean(),
     trigger: manifestTriggerSchema,
     graph: manifestGraphSchema,
+    /** The part of the app the rule belongs to: not run while it is off (see `modules.ts`). */
+    module: z.string().regex(/^[a-z][a-z0-9-]{0,39}$/, 'a module id is kebab-case').optional(),
   })
   .strict();
 export type ManifestAutomation = z.infer<typeof manifestAutomationSchema>;
@@ -238,8 +375,14 @@ export interface AutomationTableShape {
   columns: readonly {
     ref: string;
     type: string;
+    /** The table a link column points at. */
+    references?: string | undefined;
     rules?: Readonly<Record<string, unknown>> | undefined;
   }[];
+  /** How people belong to its rows: a way `through` names a table that lists people against them. */
+  belongs?: readonly unknown[] | undefined;
+  /** Read by its own people alone: no rule reads a value of it. */
+  private?: boolean | undefined;
 }
 
 /** What the checks read of an email template: its key and, per language, the text it is made of. */
@@ -251,6 +394,8 @@ export interface AutomationTemplateShape {
 
 /** What every rule's email can read whatever its record is. */
 export const RULE_EMAIL_VARS = ['now', 'ruleName', 'recordLabel', 'appName'] as const;
+/** What a summary's email can read beside its sections' figures: the person's name, and when the figures were read (`readAt`). */
+export const DIGEST_EMAIL_VARS = ['now', 'ruleName', 'appName', 'name', 'readAt'] as const;
 
 /**
  * Every placeholder a template reads in one language, in the order it reads
@@ -320,11 +465,26 @@ export function automationIssues(m: {
         out.push({ path: [...path, 'right'], message: `"${of?.ref ?? ''}.${found.ref}" is a number: compare it with a number (${JSON.stringify(right)} is not one)` });
       }
     };
-    const conditionIssues = (of: AutomationTableShape | undefined, condition: ManifestCondition, path: (string | number)[], inScan: boolean) => {
+    /** An amount read from a setting: a whole-number column of one of the manifest's tables, where the run can read it. */
+    const settingIssues = (condition: ManifestCondition, path: (string | number)[], settingsOk: boolean) => {
+      const right = condition.right;
+      if (typeof right !== 'object' || right === null || right.setting === undefined) return;
+      const at = [...path, 'right', 'setting'];
+      if (!settingsOk) {
+        out.push({ path: at, message: 'an amount read from a setting is read where a rule visits rows by the clock (forEach.where) and in a condition step, not here' });
+        return;
+      }
+      const held = tableAt(right.setting.table, [...at, 'table']);
+      const found = column(held, right.setting.column, [...at, 'column']);
+      if (found !== undefined && !['int', 'bigint'].includes(found.type)) out.push({ path: [...at, 'column'], message: `"${right.setting.table}.${right.setting.column}" is not a whole-number column: it holds an amount of ${right.unit}` });
+    };
+    const conditionIssues = (of: AutomationTableShape | undefined, condition: ManifestCondition, path: (string | number)[], inScan: boolean, settingsOk = false) => {
+      settingIssues(condition, path, settingsOk);
       if ('count' in condition.left) {
         // A scan's filter is one query over the scanned table: it cannot count another table's rows.
         if (inScan) out.push({ path: [...path, 'left'], message: 'a rule that runs by the clock cannot filter the rows it visits by a count: keep the count in a column of the row (a rollup), and compare that' });
         const count = condition.left.count;
+        if (typeof count.where?.right === 'object' && count.where.right.setting !== undefined) out.push({ path: [...path, 'left', 'count', 'where', 'right', 'setting'], message: 'a count reads no setting: write the amount' });
         const counted = tableAt(count.table, [...path, 'left', 'count', 'table']);
         column(counted, count.matchColumn, [...path, 'left', 'count', 'matchColumn']);
         column(of, count.equalsField, [...path, 'left', 'count', 'equalsField']);
@@ -356,8 +516,8 @@ export function automationIssues(m: {
     } else if (trigger.forEach !== undefined) {
       const forEach = trigger.forEach;
       record = tableAt(forEach.table, at('trigger', 'forEach', 'table'));
-      forEach.where.forEach((condition, c) => conditionIssues(record, condition, at('trigger', 'forEach', 'where', c), true));
-      if (forEach.once && forEach.where.length === 0) out.push({ path: at('trigger', 'forEach', 'once'), message: 'a row visited once needs a condition that picks it: without one every row is visited on the first run' });
+      forEach.where.forEach((condition, c) => conditionIssues(record, condition, at('trigger', 'forEach', 'where', c), true, true));
+      if (forEach.once !== false && forEach.where.length === 0) out.push({ path: at('trigger', 'forEach', 'once'), message: 'a row visited once needs a condition that picks it: without one every row is visited on the first run' });
     }
     if (trigger.kind === 'schedule' && trigger.schedule.kind !== 'interval') {
       const schedule = trigger.schedule;
@@ -365,13 +525,111 @@ export function automationIssues(m: {
       if (schedule.kind === 'monthly' && schedule.dayOfMonth === undefined) out.push({ path: at('trigger', 'schedule', 'dayOfMonth'), message: 'a monthly rule names its day (1 to 28)' });
     }
 
-    // Every `{{record.<column>}}` a text carries is a column of the rule's record.
+    /** A staff column of the rule's record, or of the row one of its links names: who a step tells. */
+    const staffAt = (path: string, where: (string | number)[]) => {
+      if (record === undefined) {
+        out.push({ path: where, message: 'this rule runs for no record, so there is no person on it to tell' });
+        return;
+      }
+      const [first, second] = path.split('.') as [string, string | undefined];
+      let of: AutomationTableShape | undefined = record;
+      let ref = first;
+      if (second !== undefined) {
+        const link = column(record, first, where);
+        if (link === undefined) return;
+        if (link.references === undefined) {
+          out.push({ path: where, message: `"${record.ref}.${first}" is not a link to another table` });
+          return;
+        }
+        of = tables.get(link.references);
+        // A link into an add-on's table, or one this manifest cannot see: checked where the rule is installed.
+        if (of === undefined) return;
+        ref = second;
+      }
+      const found = column(of, ref, where);
+      if (found !== undefined && found.rules?.['staff'] !== true) {
+        out.push({ path: where, message: `"${of.ref}.${ref}" is not a staff column ("rules": { "staff": true }): only one names a person to tell` });
+      }
+    };
+
+    /** A table that lists people against the rule's record (a `belongs` way `through` it): who a step to "the people listed" tells. */
+    const listedAt = (ref: string, where: (string | number)[]) => {
+      if (record === undefined) {
+        out.push({ path: where, message: 'this rule runs for no record, so nobody is listed on it to tell' });
+        return;
+      }
+      const lists = (record.belongs ?? []).some((way) => typeof way === 'object' && way !== null && 'through' in way && (way as { through?: { table?: unknown } }).through?.table === ref);
+      if (!lists) out.push({ path: where, message: `"${ref}" lists nobody against "${record.ref}": name a table one of its "belongs" ways reads "through"` });
+    };
+
+    /** `{{was.<column>}}`: a column of the record, in a rule run by its change. */
+    const changing = trigger.kind === 'record' && trigger.event === 'updated';
+    const wasIssue = (ref: string, path: (string | number)[]): void => {
+      if (!changing) out.push({ path, message: `{{was.${ref}}}: only a rule run when its record is updated reads the record as it was` });
+      else if (record !== undefined && !record.columns.some((candidate) => candidate.ref === ref)) out.push({ path, message: `{{was.${ref}}}: "${record.ref}" has no column "${ref}"` });
+    };
+
+    // The rows earlier steps made, by the name each step gave its row.
+    const made = new Map<string, AutomationTableShape | undefined>();
+    // Every `{{record.<column>}}` a text carries is a column of the rule's record; every `{{steps.<name>.<column>}}` a column of a row an earlier step made.
     const tokens = (text: unknown, path: (string | number)[]) => {
       const texts = typeof text === 'string' ? [text] : typeof text === 'object' && text !== null ? Object.values(text as Record<string, unknown>).filter((value): value is string => typeof value === 'string') : [];
       for (const each of texts) {
+        for (const match of each.matchAll(/\{\{\s*steps\.([A-Za-z0-9_]+)\.([A-Za-z0-9_]+)\s*(\|[^{}]*)?\}\}/g)) {
+          const name = match[1] as string;
+          if (!made.has(name)) out.push({ path, message: `{{steps.${name}.${match[2] as string}}}: no earlier step makes a row called "${name}" (give a "record.create" step "name": "${name}")` });
+          else if (made.get(name) !== undefined && !made.get(name)!.columns.some((candidate) => candidate.ref === match[2])) out.push({ path, message: `{{steps.${name}.${match[2] as string}}}: "${made.get(name)!.ref}" has no column "${match[2] as string}"` });
+          // A row that was not made has no value to stand in for: the run stops instead.
+          if (match[3] !== undefined) out.push({ path, message: `{{steps.${name}.${match[2] as string}}} takes no backup: a row that was not made stops the run` });
+        }
+        // The record as it was before the change: only a rule about a change has one.
+        for (const match of each.matchAll(/\{\{\s*was\.([A-Za-z0-9_]+)\s*(?:\|[^{}]*)?\}\}/g)) wasIssue(match[1] as string, path);
         for (const match of each.matchAll(/\{\{\s*record\.([A-Za-z0-9_]+)\s*(?:\|[^{}]*)?\}\}/g)) {
           if (record === undefined) out.push({ path, message: `{{record.${match[1] as string}}}: this rule runs for no record (a clock with no rows to visit)` });
           else if (!record.columns.some((candidate) => candidate.ref === match[1])) out.push({ path, message: `{{record.${match[1] as string}}}: "${record.ref}" has no column "${match[1] as string}"` });
+        }
+      }
+    };
+
+    /** A setting a value reads: a column of one of the manifest's tables that is neither secret nor personal, of a table that is not private. */
+    const settingAt = (setting: { table: string; column: string }, path: (string | number)[]) => {
+      const held = tableAt(setting.table, [...path, 'table']);
+      if (held?.private === true) out.push({ path: [...path, 'table'], message: `"${setting.table}" is private: no rule reads a value of it` });
+      const found = column(held, setting.column, [...path, 'column']);
+      if (found?.rules?.['secret'] === true || found?.rules?.['personal'] === true) {
+        out.push({ path: [...path, 'column'], message: `"${setting.table}.${setting.column}" is ${found.rules['secret'] === true ? 'a secret' : 'a personal'} column: a rule never writes it into another row` });
+      }
+      return found;
+    };
+    /** One value a step writes into `ref` of `into`: its placeholders, the setting it reads, the date it counts from. */
+    const valueIssues = (into: AutomationTableShape | undefined, ref: string, value: ManifestWriteValue, path: (string | number)[]) => {
+      if (typeof value === 'string') {
+        tokens(value, path);
+        return;
+      }
+      const target = into?.columns.find((candidate) => candidate.ref === ref);
+      if ('setting' in value) {
+        const found = settingAt(value.setting, [...path, 'setting']);
+        if (found === undefined || target === undefined) return;
+        // A person is filled from a column that holds one; any other value from a column of its own kind.
+        if (target.rules?.['staff'] === true && found.rules?.['staff'] !== true) out.push({ path: [...path, 'setting', 'column'], message: `"${into?.ref ?? ''}.${ref}" holds a staff member, and "${value.setting.table}.${value.setting.column}" is not a staff column` });
+        else if (found.type !== target.type || found.references !== target.references) out.push({ path: [...path, 'setting', 'column'], message: `"${value.setting.table}.${value.setting.column}" is ${found.type} and "${into?.ref ?? ''}.${ref}" is ${target.type}: a setting fills a column of its own kind` });
+        return;
+      }
+      if ('daysAfter' in value) {
+        const after = value.daysAfter;
+        const at = [...path, 'daysAfter'];
+        if (target !== undefined && !DATES.includes(target.type)) out.push({ path, message: `"${into?.ref ?? ''}.${ref}" is ${target.type}: a day so many days on is written into a date column` });
+        if (after.at !== undefined && target?.type === 'date') out.push({ path: [...at, 'at'], message: `"${into?.ref ?? ''}.${ref}" holds a day, which has no time of day` });
+        if (after.column !== undefined) {
+          if (record === undefined) out.push({ path: [...at, 'column'], message: 'this rule runs for no record, so there is no date of it to count from' });
+          const from = column(record, after.column, [...at, 'column']);
+          if (from !== undefined && !DATES.includes(from.type)) out.push({ path: [...at, 'column'], message: `"${record?.ref ?? ''}.${after.column}" is ${from.type}: days are counted from a date` });
+          if (from?.rules?.['secret'] === true || from?.rules?.['personal'] === true) out.push({ path: [...at, 'column'], message: `"${record?.ref ?? ''}.${after.column}" is a protected column: a day counted from it would tell it` });
+        }
+        if (after.setting !== undefined) {
+          const found = settingAt(after.setting, [...at, 'setting']);
+          if (found !== undefined && !['int', 'bigint'].includes(found.type)) out.push({ path: [...at, 'setting', 'column'], message: `"${after.setting.table}.${after.setting.column}" is not a whole-number column: it holds a number of days` });
         }
       }
     };
@@ -383,14 +641,23 @@ export function automationIssues(m: {
       (node, path) => {
         tokens(node.title, [...path, 'title']);
         tokens(node.sub, [...path, 'sub']);
-        if (node.kind === 'condition' || node.kind === 'branch') conditionIssues(record, node.condition, [...path, 'condition'], false);
+        if (node.kind === 'condition' || node.kind === 'branch') conditionIssues(record, node.condition, [...path, 'condition'], false, true);
         if (node.kind !== 'action') return;
         const action = node.action;
         const here = (...rest: (string | number)[]) => [...path, 'action', ...rest];
         if (action.kind === 'notification') {
-          action.to.roles.forEach((role, i) => {
-            if (!m.roles.includes(role)) out.push({ path: here('to', 'roles', i), message: `"${role}" is not one of this manifest's roles` });
-          });
+          if ('roles' in action.to) {
+            action.to.roles.forEach((role, i) => {
+              if (!m.roles.includes(role)) out.push({ path: here('to', 'roles', i), message: `"${role}" is not one of this manifest's roles` });
+            });
+          } else if ('listed' in action.to) {
+            listedAt(action.to.listed, here('to', 'listed'));
+          } else {
+            staffAt(action.to.column, here('to', 'column'));
+            (action.to.else?.roles ?? []).forEach((role, i) => {
+              if (!m.roles.includes(role)) out.push({ path: here('to', 'else', 'roles', i), message: `"${role}" is not one of this manifest's roles` });
+            });
+          }
           tokens(action.title, here('title'));
           tokens(action.body, here('body'));
           return;
@@ -399,7 +666,104 @@ export function automationIssues(m: {
           const into = tableAt(action.table, here('table'));
           for (const [ref, value] of Object.entries(action.values)) {
             column(into, ref, here('values', ref));
-            tokens(value, here('values', ref));
+            valueIssues(into, ref, value, here('values', ref));
+          }
+          // Named after its own values are read: a step does not read the row it is about to make.
+          if (action.name !== undefined) {
+            if (made.has(action.name)) out.push({ path: here('name'), message: `"${action.name}" already names a row an earlier step makes` });
+            if (['record', 'steps', 'now'].includes(action.name)) out.push({ path: here('name'), message: `"${action.name}" is a word a rule already reads: choose another name` });
+            made.set(action.name, into);
+          }
+          return;
+        }
+        if (action.kind === 'digest') {
+          action.to.roles.forEach((role, i) => {
+            if (!m.roles.includes(role)) out.push({ path: here('to', 'roles', i), message: `"${role}" is not one of this manifest's roles` });
+          });
+          const keys = new Set<string>();
+          action.sections.forEach((section, s) => {
+            if (keys.has(section.key)) out.push({ path: here('sections', s, 'key'), message: `"${section.key}" is the key of an earlier section` });
+            keys.add(section.key);
+            const of = tableAt(section.table, here('sections', s, 'table'));
+            const owner = column(of, section.owner, here('sections', s, 'owner'));
+            if (owner !== undefined && owner.rules?.['staff'] !== true) {
+              out.push({ path: here('sections', s, 'owner'), message: `"${section.table}.${section.owner}" is not a staff column ("rules": { "staff": true }): a section lists the rows whose person is the one written to` });
+            }
+            (section.where ?? []).forEach((condition, c) => conditionIssues(of, condition, here('sections', s, 'where', c), true));
+            if (section.orderBy !== undefined) column(of, section.orderBy.column, here('sections', s, 'orderBy', 'column'));
+            // A sum adds up numbers; the same column twice is one figure with two names.
+            (section.sum ?? []).forEach((ref, n) => {
+              const added = column(of, ref, here('sections', s, 'sum', n));
+              if (added !== undefined && !NUMBERS.includes(added.type)) out.push({ path: here('sections', s, 'sum', n), message: `"${section.table}.${ref}" is not a number column: a sum adds numbers up` });
+              if ((section.sum ?? []).indexOf(ref) !== n) out.push({ path: here('sections', s, 'sum', n), message: `"${ref}" is summed twice` });
+            });
+            // A line a person has no row to sort by.
+            if (section.by !== undefined && section.orderBy !== undefined) out.push({ path: here('sections', s, 'orderBy'), message: 'a section with one line a person ("by": "owner") is listed by name: it has no orderBy' });
+            if (section.target !== undefined) {
+              const target = section.target;
+              if (!(section.sum ?? []).includes(target.of)) out.push({ path: here('sections', s, 'target', 'of'), message: `"${target.of}" is not one of this section's sums ("sum")` });
+              const goals = tableAt(target.table, here('sections', s, 'target', 'table'));
+              const whose = column(goals, target.owner, here('sections', s, 'target', 'owner'));
+              if (whose !== undefined && whose.rules?.['staff'] !== true) out.push({ path: here('sections', s, 'target', 'owner'), message: `"${target.table}.${target.owner}" is not a staff column ("rules": { "staff": true }): a target is somebody's` });
+              const goal = column(goals, target.column, here('sections', s, 'target', 'column'));
+              if (goal !== undefined && !NUMBERS.includes(goal.type)) out.push({ path: here('sections', s, 'target', 'column'), message: `"${target.table}.${target.column}" is not a number column` });
+              if (target.year !== undefined) {
+                const year = column(goals, target.year, here('sections', s, 'target', 'year'));
+                if (year !== undefined && !['int', 'bigint'].includes(year.type)) out.push({ path: here('sections', s, 'target', 'year'), message: `"${target.table}.${target.year}" is not a whole-number column: it holds a calendar year` });
+              }
+            }
+          });
+          const template = templates.get(action.templateKey);
+          if (template === undefined) {
+            out.push({ path: here('templateKey'), message: `"${action.templateKey}" is not one of this manifest's emailTemplates: a shipped rule sends only its own` });
+            return;
+          }
+          if (template.attach !== undefined) out.push({ path: here('templateKey'), message: `"${action.templateKey}" carries a document, which a summary does not` });
+          for (const [locale, content] of Object.entries(template.locales)) {
+            const drawn = new Set<string>();
+            content.blocks.forEach((block) => {
+              if (block.block !== 'email.rows') return;
+              const section = block.data?.['section'];
+              if (typeof section !== 'string' || !keys.has(section)) {
+                out.push({ path: here('templateKey'), message: `"${action.templateKey}" (${locale}) has a rows block that names no section of this step ("section": one of ${[...keys].join(', ')})` });
+                return;
+              }
+              drawn.add(section);
+              const drawing = action.sections.find((one) => one.key === section)!;
+              // A line a person reads the person's name, how many rows, each sum, and the target with its cover.
+              if (drawing.by !== undefined) {
+                const lines = new Set(['row.owner', 'row.count', ...(drawing.sum ?? []).map((ref) => `row.sum.${ref}`), ...(drawing.target === undefined ? [] : ['row.target', 'row.cover'])]);
+                for (const name of placeholderNames([block.data?.['row']])) {
+                  if (name.startsWith('row.') && !lines.has(name)) out.push({ path: here('templateKey'), message: `"${action.templateKey}" (${locale}) reads {{${name}}} in the section "${section}", which lists one line a person: a line reads ${[...lines].map((one) => `{{${one}}}`).join(', ')}` });
+                }
+                return;
+              }
+              // Each line reads the columns of its section's table: {{row.<column>}}, or a form of one ({{row.<column>.money}}).
+              const of = tables.get(drawing.table);
+              for (const name of placeholderNames([block.data?.['row']])) {
+                if (!name.startsWith('row.')) continue;
+                const ref = name.slice('row.'.length).split('.')[0] as string;
+                if (of !== undefined && !of.columns.some((candidate) => candidate.ref === ref)) {
+                  out.push({ path: here('templateKey'), message: `"${action.templateKey}" (${locale}) reads {{${name}}}, and "${of.ref}" has no column "${ref}"` });
+                }
+              }
+            });
+            for (const key of keys) {
+              if (!drawn.has(key)) out.push({ path: here('sections'), message: `"${action.templateKey}" (${locale}) draws no rows block for the section "${key}"` });
+            }
+            // A section's own figures: how many rows, each sum. They are there for everybody who reads the section.
+            const figures = new Set(action.sections.flatMap((one) => [`count.${one.key}`, ...(one.sum ?? []).map((ref) => `sum.${one.key}.${ref}`)]));
+            // A target and its cover are there only for a person who has one: a template that reads either says what it writes without.
+            const sometimes = new Set(action.sections.flatMap((one) => (one.target === undefined ? [] : [`target.${one.key}`, `cover.${one.key}`])));
+            const required = templateRequiredPlaceholdersOf(content);
+            const unfilled = required.filter((name) => !(DIGEST_EMAIL_VARS as readonly string[]).includes(name) && !figures.has(name) && !sometimes.has(name));
+            if (unfilled.length > 0) {
+              out.push({ path: here(), message: `"${action.templateKey}" (${locale}) reads ${unfilled.map((name) => `{{${name}}}`).join(', ')}, which a summary cannot fill: it fills {{name}}, {{appName}}, {{ruleName}}, {{now}}, {{readAt}}, {{count.<section>}}, and {{sum.<section>.<column>}}, {{target.<section>}} and {{cover.<section>}} of a section that asks for them` });
+            }
+            const bare = required.filter((name) => sometimes.has(name));
+            if (bare.length > 0) {
+              out.push({ path: here(), message: `"${action.templateKey}" (${locale}) reads ${bare.map((name) => `{{${name}}}`).join(', ')} with nothing to write for a person who has no target: give it a backup ({{${bare[0]!}|none set}}), or tie its block to it with "showWhen"` });
+            }
           }
           return;
         }
@@ -408,7 +772,7 @@ export function automationIssues(m: {
           const decided = record === undefined ? new Set<string>() : (m.decided?.(record.ref) ?? new Set<string>());
           for (const [ref, value] of Object.entries(action.values)) {
             const found = column(record, ref, here('values', ref));
-            tokens(value, here('values', ref));
+            valueIssues(record, ref, value, here('values', ref));
             const rule2 = DECIDING.find((name) => found?.rules?.[name] !== undefined);
             if (found !== undefined && (rule2 !== undefined || decided.has(ref))) {
               out.push({ path: here('values', ref), message: `"${record?.ref ?? ''}.${ref}" is decided by Adminium${rule2 === undefined ? '' : ` (its ${rule2} rule)`}: a rule cannot write it` });
@@ -435,7 +799,10 @@ export function automationIssues(m: {
         }
         // An email: one of the manifest's own templates, to a column of the record, and only one a rule can fill.
         if (record === undefined) out.push({ path: here(), message: 'this rule runs for no record, so there is no address to send to' });
-        column(record, action.to.column, here('to', 'column'));
+        if (action.to.kind === 'staff') staffAt(action.to.column, here('to', 'column'));
+        else if (action.to.kind === 'listed') listedAt(action.to.table, here('to', 'table'));
+        else column(record, action.to.column, here('to', 'column'));
+        if (action.replyTo !== undefined) staffAt(action.replyTo.staff, here('replyTo', 'staff'));
         const template = templates.get(action.templateKey);
         if (template === undefined) {
           out.push({ path: here('templateKey'), message: `"${action.templateKey}" is not one of this manifest's emailTemplates: a shipped rule sends only its own` });
@@ -444,7 +811,18 @@ export function automationIssues(m: {
         const vars = action.vars ?? {};
         for (const [name, text] of Object.entries(vars)) tokens(text, here('vars', name));
         const columns = new Set((record?.columns ?? []).map((candidate) => candidate.ref));
-        const filled = (name: string): boolean => (RULE_EMAIL_VARS as readonly string[]).includes(name) || Object.hasOwn(vars, name) || columns.has(name) || (name.startsWith('record.') && columns.has(name.slice('record.'.length)));
+        // The name of the person a staff column of the record names; the record's address, in a mail to a person.
+        const people = new Set((record?.columns ?? []).filter((candidate) => candidate.rules?.['staff'] === true).flatMap((candidate) => [`${candidate.ref}.name`, `record.${candidate.ref}.name`]));
+        // A mail to a person, or to each of the people listed on the record: each is somebody the address is worked out for.
+        const toPerson = action.to.kind === 'staff' || action.to.kind === 'listed';
+        const filled = (name: string): boolean =>
+          (RULE_EMAIL_VARS as readonly string[]).includes(name) ||
+          Object.hasOwn(vars, name) ||
+          columns.has(name) ||
+          (name.startsWith('record.') && columns.has(name.slice('record.'.length))) ||
+          people.has(name) ||
+          (toPerson && name === 'recordUrl') ||
+          (changing && name.startsWith('was.') && columns.has(name.slice('was.'.length)));
         const everywhere = new Set<string>();
         if (template.attach !== undefined) out.push({ path: here('templateKey'), message: `"${action.templateKey}" carries a document, which only the outbox draws: send it from the outbox, or give the rule a template with no "attach"` });
         for (const [locale, content] of Object.entries(template.locales)) {
@@ -455,11 +833,15 @@ export function automationIssues(m: {
           const names = templatePlaceholdersOf(content);
           for (const name of names) everywhere.add(name);
           const unfilled = templateRequiredPlaceholdersOf(content).filter((name) => !filled(name));
-          if (unfilled.length > 0) {
-            const first = unfilled[0] as string;
+          if (unfilled.includes('recordUrl') && !toPerson) {
+            out.push({ path: here(), message: `"${action.templateKey}" (${locale}) reads {{recordUrl}}, which only a mail to a person carries ("to": { "kind": "staff", … }): an address of the record is no link for anybody else` });
+          }
+          const others = unfilled.filter((name) => name !== 'recordUrl' || toPerson);
+          if (others.length > 0) {
+            const first = others[0] as string;
             out.push({
               path: here(),
-              message: `"${action.templateKey}" (${locale}) reads ${unfilled.map((name) => `{{${name}}}`).join(', ')}, which a rule cannot fill. Add "vars": { "${first}": "{{record.<column>}}" } to this step, or send this email from the outbox.`,
+              message: `"${action.templateKey}" (${locale}) reads ${others.map((name) => `{{${name}}}`).join(', ')}, which a rule cannot fill. Add "vars": { "${first}": "{{record.<column>}}" } to this step, or send this email from the outbox.`,
             });
           }
         }

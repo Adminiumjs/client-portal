@@ -637,6 +637,7 @@ export function ledgerIssues(m: { tables: readonly LedgerScopeTable[]; ledgers: 
       const table = tables.get(ref)!;
       if (ref === ledger.receipts) out.push({ code: 'LEDGER_OUT_OF_SCOPE', path, message: `"${ref}" is the receipt table, which Adminium alone writes: take it out of "writes"` });
       if (table.booking !== undefined) out.push({ code: 'LEDGER_TABLE_GUARDED', path, message: `"${ref}" carries a booking rule, so it cannot be a ledger table` });
+      if ((table as { occupies?: unknown }).occupies !== undefined) out.push({ code: 'LEDGER_TABLE_GUARDED', path, message: `"${ref}" carries an occupies rule, so it cannot be a ledger table` });
       const kinds = capacityKinds(table.capacity).filter((kind) => kind === 'slot' || kind === 'night');
       if (kinds.length > 0) out.push({ code: 'LEDGER_TABLE_GUARDED', path, message: `"${ref}" carries a ${kinds[0]} limit, so it cannot be a ledger table (a parent limit may stay)` });
       const gapless = table.columns.find((candidate) => candidate.rules?.sequence?.gapless === true);
