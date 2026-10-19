@@ -554,6 +554,8 @@ export function planWithContext(
           }
           continue;
         }
+        // Let be empty by the app, required by the table: nothing here relaxes it, and the person is told.
+        if (column.nullable === true && have.nullable === false && have.isPrimaryKey !== true) (plan.stillRequired ??= []).push(column.ref);
         if (column.role === 'pk' && (column.type === 'int' || column.type === 'bigint') && have.isIdentity === false) {
           plan.edits.push({ kind: 'set-identity', column: column.ref });
         }

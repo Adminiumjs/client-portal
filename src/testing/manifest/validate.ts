@@ -30,7 +30,7 @@ import {
   PHONE_KIND,
   PHONE_SIDE,
 } from './schema.ts';
-import { plainTextLengthWarnings } from './public-access.ts';
+import { plainTextLengthWarnings, type ChildEntry, type PublicAccess } from './public-access.ts';
 import { ledgerIndexIssues } from './ledger-indexes.ts';
 import { tableShapeIssues } from './table-shapes.ts';
 
@@ -82,6 +82,77 @@ const FILLING_RULES = ['copy', 'sequence', 'code', 'rollup', 'stamp', 'formula',
 /** A setting key that reads like bank details (an IBAN, an account or routing number). */
 const BANK_SETTING = /(^|_)(bank|iban|swift|routing)(_|$)|account_?(number|no|name)|sort_?code/i;
 
+/** What a guest types or chooses in a form. */
+const FORM_TYPES: ReadonlySet<string> = new Set(['text', 'enum']);
+
+type AppTable = NonNullable<Extract<Manifest, { kind: 'app' }>['requiredSchema']>['tables'][number];
+
+/** NOT NULL once installed, with nothing to fill it: every insert must give it a value. */
+function requiredAtInstall(column: AppTable['columns'][number]): boolean {
+  if (column.nullable === true || column.default !== undefined || column.role !== undefined) return false;
+  return !FILLING_RULES.some((rule) => column.rules?.[rule] !== undefined);
+}
+
+/**
+ * A guest's create that leaves out a column the table cannot store empty.
+ *
+ * The database refuses it, and what the database says is never named to a
+ * stranger: the guest is told "That write was refused." and nothing else,
+ * whichever column it was. The warning per column above did not say which
+ * create it was about, so a builder whose form left one out guessed at every
+ * column. Found building a shop from a website template.
+ *
+ * A column the entry lets the guest write is named when the entry asks for
+ * it (`requires`); one it neither writes nor fills itself refuses every
+ * create through the entry. Of the columns a guest writes, only what they
+ * type or choose in a form is said (text, a choice): a row they point at or
+ * a day they book is judged by its own rules, which name it.
+ */
+function createEntryWarnings(entries: readonly PublicAccess[], tables: readonly AppTable[]): ManifestIssue[] {
+  const out: ManifestIssue[] = [];
+  const check = (
+    table: string,
+    entry: { writable?: readonly string[] | undefined; defaults?: Readonly<Record<string, unknown>> | undefined; requires?: readonly string[] | undefined },
+    filled: readonly (string | undefined)[],
+    path: string,
+  ) => {
+    const own = tables.find((candidate) => candidate.ref === table);
+    if (own === undefined) return;
+    const writable = new Set(entry.writable ?? []);
+    const asked = new Set(entry.requires ?? []);
+    const given = new Set([...Object.keys(entry.defaults ?? {}), ...filled.filter((ref): ref is string => ref !== undefined)]);
+    for (const column of own.columns) {
+      if (!requiredAtInstall(column) || given.has(column.ref) || asked.has(column.ref)) continue;
+      if (!writable.has(column.ref)) {
+        out.push({
+          path,
+          message: `"${table}.${column.ref}" cannot be empty, and this create neither writes it nor fills it, so every guest's create through it is refused ("That write was refused.", naming no column): make it writable, give it a default here or on the column, or make it nullable`,
+        });
+      } else if (FORM_TYPES.has(column.type)) {
+        const full = asked.size >= 8;
+        out.push({
+          path,
+          message: `"${table}.${column.ref}" cannot be empty, and this create does not ask for it, so a guest who leaves it out is refused without being told which column: ${full ? 'requires lists eight already, so give the column a default or make it nullable' : 'list it in requires, and the guest is told it is missing'}`,
+        });
+      }
+    }
+  };
+  const walk = (children: Readonly<Record<string, Omit<ChildEntry, 'children'> & { children?: ChildEntry['children'] }>> | undefined, base: string) => {
+    for (const [name, child] of Object.entries(children ?? {})) {
+      check(name, child, [child.via, child.position], `${base}.children.${name}`);
+      walk(child.children, `${base}.children.${name}`);
+    }
+  };
+  entries.forEach((entry, e) => {
+    if (!entry.methods.includes('POST')) return;
+    const base = `publicAccess.${String(e)}`;
+    const claim = entry.claim !== undefined && 'by' in entry.claim ? entry.claim.column : undefined;
+    check(entry.table, entry, [entry.claimedBy?.column, entry.identity?.link, entry.shareLink, entry.newLink?.column, entry.clientKey, claim], base);
+    walk(entry.children, base);
+  });
+  return out;
+}
+
 /**
  * Advice about an app that validates: a column with no default that is not
  * nullable is NOT NULL once installed, so every insert must give it a value —
@@ -92,8 +163,7 @@ export function manifestWarnings(manifest: Manifest): ManifestIssue[] {
   const out: ManifestIssue[] = [];
   (manifest.requiredSchema?.tables ?? []).forEach((table, t) => {
     table.columns.forEach((column, c) => {
-      if (column.nullable === true || column.default !== undefined || column.role !== undefined) return;
-      if (FILLING_RULES.some((rule) => column.rules?.[rule] !== undefined)) return;
+      if (!requiredAtInstall(column)) return;
       out.push({
         path: `requiredSchema.tables.${String(t)}.columns.${String(c)}`,
         message: `"${table.ref}.${column.ref}" has no default and is not nullable, so it will be required at install: every new row must give it a value`,
@@ -111,6 +181,8 @@ export function manifestWarnings(manifest: Manifest): ManifestIssue[] {
       }
     });
   });
+  // A guest's create that leaves out a column the table cannot store empty: refused, naming no column.
+  out.push(...createEntryWarnings(manifest.publicAccess ?? [], manifest.requiredSchema?.tables ?? []));
   // A plain-text column longer than its plain text takes: the end of what a guest types is refused.
   out.push(...plainTextLengthWarnings(manifest.publicAccess ?? [], manifest.requiredSchema?.tables ?? []));
   // A capped balance worked out from a formula whose columns stay open while the capped rows exist.

@@ -141,6 +141,24 @@ export interface RoleTableNarrowed {
 }
 
 /** What one app's grant on an add-on's table comes to, against the add-on's words. */
+/** What a settle gave one role of one add-on table: the role's key in the app, and what it holds now. */
+export interface RoleTableResult {
+  /** The role's key in the app. */
+  role: string;
+  addOn: string;
+  table: string;
+  /** What the role holds of the table now by this grant (after any narrowing below). */
+  actions: string[];
+  /** The columns each action reaches; absent, every column (only where the add-on sets no `appGrants`). */
+  readable?: string[];
+  writable?: string[];
+  creatable?: string[];
+  /** What the app asked for and does not get, by name. */
+  narrowed?: RoleTableNarrowed;
+  /** Why the entry, or part of it, was left out. */
+  skipped?: RoleTableSkip;
+}
+
 export interface RoleTableHold {
   /** What the role holds of the table by this grant. */
   actions: RoleAddOnAction[];

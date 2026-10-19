@@ -1877,7 +1877,7 @@ function boundIssues(index: TableIndex, ctx: PublicAccessContext, table: string,
     if (bounds?.min === undefined || bounds.min < 0 || bounds.max === undefined) {
       out.push({
         path: at,
-        message: `"${table}.${ref}" is written by a guest and feeds a price Adminium works out, so it declares validation.min (at least 0) and validation.max — on the column itself, in the table's own definition (e.g. "validation": { "min": 1, "max": 50 }), not in the access entry`,
+        message: `"${table}.${ref}" is written by a guest and feeds a price Adminium works out, so it declares rules.validation.min (at least 0) and rules.validation.max — on the column itself, in the table's own definition (e.g. "rules": { "validation": { "min": 1, "max": 50 } }), not in the access entry`,
       });
     }
   }

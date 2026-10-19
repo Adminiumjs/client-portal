@@ -154,7 +154,13 @@ const settingRef = z.object({ table: refSchema, column: refSchema }).strict();
 const writeValue = z.union([
   z.string().max(4000),
   z.object({ now: z.literal(true) }).strict(),
-  z.object({ setting: settingRef }).strict(),
+  z
+    .object({
+      setting: settingRef,
+      /** Who a staff column is given when the setting names nobody who signs in: a staff column of the record, or one link further. */
+      else: z.object({ staff: z.string().regex(/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)?$/, 'a column, or <link column>.<column>') }).strict().optional(),
+    })
+    .strict(),
   z
     .object({
       daysAfter: z
@@ -614,6 +620,10 @@ export function automationIssues(m: {
         // A person is filled from a column that holds one; any other value from a column of its own kind.
         if (target.rules?.['staff'] === true && found.rules?.['staff'] !== true) out.push({ path: [...path, 'setting', 'column'], message: `"${into?.ref ?? ''}.${ref}" holds a staff member, and "${value.setting.table}.${value.setting.column}" is not a staff column` });
         else if (found.type !== target.type || found.references !== target.references) out.push({ path: [...path, 'setting', 'column'], message: `"${value.setting.table}.${value.setting.column}" is ${found.type} and "${into?.ref ?? ''}.${ref}" is ${target.type}: a setting fills a column of its own kind` });
+        if (value.else !== undefined) {
+          if (target.rules?.['staff'] !== true) out.push({ path: [...path, 'else'], message: `"${into?.ref ?? ''}.${ref}" holds no staff member: "else" names a person, for a staff column only` });
+          else staffAt(value.else.staff, [...path, 'else', 'staff']);
+        }
         return;
       }
       if ('daysAfter' in value) {

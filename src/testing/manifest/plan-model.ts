@@ -302,4 +302,11 @@ export interface InstallTablePlan {
   edits: PlanEdit[];
   /** Columns that cannot be added this way, and why. */
   blocked: { column: string; reason: 'foreign-key' | 'primary-key' | 'unsupported-type' }[];
+  /**
+   * Columns the app lets be empty that the table keeps NOT NULL. No edit
+   * here makes a column of a table that exists nullable, on any engine:
+   * the column stays as it is, and the person is told (Studio's Design
+   * view of the table changes it).
+   */
+  stillRequired?: string[];
 }

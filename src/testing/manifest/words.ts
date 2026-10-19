@@ -141,6 +141,7 @@ export const INSTALL_FLOOR_WORD_NAMES = [
   'automations.settingAmount',
   'automations.settingValue',
   'automations.daysAfter',
+  'automations.settingElse',
   'outbox.replyTo',
   'outbox.onDelete',
   'column.mentions',
@@ -244,6 +245,7 @@ export const WORD_FLOORS: Readonly<Partial<Record<ManifestWordName, string>>> = 
   // A value a step writes read from a column of the app's settings row; a day so many days after a date of the record, or after now.
   'automations.settingValue': '0.3.28',
   'automations.daysAfter': '0.3.28',
+  'automations.settingElse': '0.3.29',
   'outbox.replyTo': '0.3.28',
   'outbox.onDelete': '0.3.28',
   // A text column in which people are mentioned.
@@ -503,6 +505,7 @@ export function installFloorWords(document: unknown): ManifestWord[] {
         // A value read from the settings row, a day so many days on.
         for (const [ref, value] of Object.entries(isDoc(action['values']) ? action['values'] : {})) {
           if (isDoc(value) && value['setting'] !== undefined) out.push({ word: 'automations.settingValue', path: `${at}.${String(n)}.action.values.${ref}` });
+          if (isDoc(value) && value['setting'] !== undefined && value['else'] !== undefined) out.push({ word: 'automations.settingElse', path: `${at}.${String(n)}.action.values.${ref}` });
           if (isDoc(value) && value['daysAfter'] !== undefined) out.push({ word: 'automations.daysAfter', path: `${at}.${String(n)}.action.values.${ref}` });
         }
         list(node['branches']).forEach((branch, b) => steps(isDoc(branch) ? branch['nodes'] : undefined, `${at}.${String(n)}.branches.${String(b)}.nodes`));
