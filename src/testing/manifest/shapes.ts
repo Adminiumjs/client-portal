@@ -363,6 +363,10 @@ function statesDifferences(want: States, have: States, ownColumns: (childRef: st
     }
     const cleared = (rule.clearOnCreate ?? []).filter((col) => !(own.clearOnCreate ?? []).includes(col));
     if (cleared.length > 0) out.push(`creating a "${ref}" row empties ${cleared.join(', ')}, as the shape says`);
+    // A new child that moves the shape's row moves it as the shape says, and no other way: the add-on's own rows rely on it.
+    if (own.moveOnCreate !== rule.moveOnCreate) {
+      out.push(rule.moveOnCreate === undefined ? `creating a "${ref}" row moves no row of the shape` : `creating a "${ref}" row moves the row to "${rule.moveOnCreate}", as the shape says`);
+    }
     // A release or a linked lock the shape keeps is kept as it is; one the app adds names only its own columns.
     const added = ownColumns(ref);
     if (rule.release !== undefined) {

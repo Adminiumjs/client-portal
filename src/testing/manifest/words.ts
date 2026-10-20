@@ -152,6 +152,7 @@ export const INSTALL_FLOOR_WORD_NAMES = [
   'column.file',
   'config.board',
   'states.notPast',
+  'states.moveOnCreate',
   'publicAccess.requiresWhen',
   'frontend.records',
   'nav.offRail',
@@ -263,6 +264,8 @@ export const WORD_FLOORS: Readonly<Partial<Record<ManifestWordName, string>>> = 
   'config.board': '0.3.28',
   // A move refused once a date of its row has passed, for every writer.
   'states.notPast': '0.3.28',
+  // A new child row moves its parent to a state by the parent's own move (a job signed off by the sign-off made on site).
+  'states.moveOnCreate': '0.3.30',
   // A column a public write must fill only with some values of another, and may write at no other time.
   'publicAccess.requiresWhen': '0.3.28',
   // Where a table's record opens on the app's own staff side: read by notices, their e-mails and search.
@@ -351,6 +354,9 @@ export function installFloorWords(document: unknown): ManifestWord[] {
           if (isDoc(move) && move['planned'] === true) out.push({ word: 'states.planned', path: `${at}.states.moves.${from}.${String(m)}.planned` });
           if (isDoc(move) && isDoc(move['requires']) && move['requires']['notPast'] !== undefined) out.push({ word: 'states.notPast', path: `${at}.states.moves.${from}.${String(m)}.requires.notPast` });
         });
+      }
+      for (const [child, rule] of Object.entries(isDoc(table['states']['children']) ? table['states']['children'] : {})) {
+        if (isDoc(rule) && rule['moveOnCreate'] !== undefined) out.push({ word: 'states.moveOnCreate', path: `${at}.states.children.${child}.moveOnCreate` });
       }
     }
     list(table['columns']).forEach((column, c) => {

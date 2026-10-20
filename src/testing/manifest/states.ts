@@ -48,7 +48,10 @@
  *   for a new child and `changeIn` for a change or a delete of one (a payment
  *   taken only on a live stay, and voided on a cancelled one too); `clearOnCreate` empties
  *   columns of this row when one of them is created (a recorded payment
- *   clears the client's "I've sent it"). `release` opens a locked child a
+ *   clears the client's "I've sent it"); `moveOnCreate` moves this row to a
+ *   state when one of them is created, by this table's own listed move (a
+ *   sign-off made on site signs its job off), and leaves a row already there
+ *   as it is. `release` opens a locked child a
  *   little while its parent is in some of the lock's states: a change that
  *   only EMPTIES the listed columns (a void invoice's line letting go of the
  *   time it billed, so the time can be billed again), and only in a state no
@@ -213,6 +216,14 @@ export const stateChildSchema = z
     /** Changed or deleted only while this row is in one of these states (a payment voided on a cancelled stay too). */
     changeIn: z.array(stateName).min(1).max(16).optional(),
     clearOnCreate: z.array(refSchema).min(1).max(8).optional(),
+    /**
+     * A new child moves this row to this state, in the same write, by this
+     * table's own listed move to it — judged as that move, with the new child
+     * already counted (a job signed off by the sign-off made on site). A row
+     * already in the state is left as it is (a correction made later moves
+     * nothing); a row in a state with no listed move to it refuses the write.
+     */
+    moveOnCreate: stateName.optional(),
     /** While this row is in one of `when`, a locked child may still EMPTY these columns of its own, and change nothing else. */
     release: z.object({ when: z.array(stateName).min(1).max(16), columns: z.array(refSchema).min(1).max(8) }).strict().optional(),
     /** A child's link column → the columns of the row it points at that stay as they are while it points there. */
@@ -453,6 +464,8 @@ interface StatesContext<C extends ColumnShape> {
   lineOf?: ((table: string) => string | undefined) | undefined;
   /** The app's outbox table, whose rows move only by the outbox's own moves. */
   outboxTable?: string | undefined;
+  /** Whether a table keeps a limit (`capacity`), whose lock only a write of its own names. */
+  limitedOf?: ((table: string) => boolean) | undefined;
   /** The manifest's generated page refs and, for an add-on, its code page refs: what a state action's link may open. */
   pages?: ReadonlySet<string> | undefined;
   codePages?: ReadonlySet<string> | undefined;
@@ -657,8 +670,8 @@ export function statesIssues<C extends ColumnShape>(
       }
     }
     const tied = rule.parentIn !== undefined || rule.createIn !== undefined || rule.changeIn !== undefined;
-    if (rule.lock === undefined && !tied && rule.clearOnCreate === undefined && rule.lockLinked === undefined) {
-      out.push({ path: here(), message: 'a child says lock, parentIn, clearOnCreate or lockLinked' });
+    if (rule.lock === undefined && !tied && rule.clearOnCreate === undefined && rule.lockLinked === undefined && rule.moveOnCreate === undefined) {
+      out.push({ path: here(), message: 'a child says lock, parentIn, clearOnCreate, moveOnCreate or lockLinked' });
     }
   }
   (states.lockedWhenReferencedBy ?? []).forEach((ref, r) => {
@@ -940,6 +953,31 @@ function conditionedMoveIssues<C extends ColumnShape>(
     effectMoveIssues(target, theirs, effect.set, here);
     effectTargetIssues(target, theirs, here('via'), Object.values(effect.set));
   });
+
+  // A new child moves this row (`children.<table>.moveOnCreate`): this table's own move, made inside the child's write
+  // once the child is in, by the same steps as an effect's — so held to the same limits, on this row instead of a linked one.
+  for (const [child, rule] of Object.entries(states.children ?? {})) {
+    const state = rule.moveOnCreate;
+    if (state === undefined) continue;
+    const path = at('children', child, 'moveOnCreate');
+    known(state, path);
+    if (!reached(state)) {
+      out.push({ path, message: `no listed move goes to "${state}", so a new "${child}" row has nothing to move this row by` });
+      continue;
+    }
+    effectMoveIssues(table, states, { [states.column]: state }, () => path);
+    const moves = Object.values(states.moves).flatMap((list) => list.filter((move) => moveTarget(move) === state));
+    if (moves.every((move) => typeof move === 'object' && move.planned === true)) {
+      out.push({ path, message: `every move to "${state}" is made by an add-on's ledger alone, so a new "${child}" row cannot make it` });
+    }
+    effectTargetIssues(table, states, path, [state]);
+    if (ctx.limitedOf?.(table) === true) out.push({ path, message: `"${table}" keeps a limit, whose lock a new "${child}" row's write cannot take for it` });
+    // A child is added only in its `createIn` states: a move to the state from none of them would never be made.
+    const addedIn = rule.createIn ?? rule.parentIn;
+    if (addedIn !== undefined && !addedIn.some((from) => from !== state && listed(from, state) !== undefined)) {
+      out.push({ path, message: `no listed move goes to "${state}" from a state a "${child}" row is added in (${addedIn.join(', ')}), so it never moves this row` });
+    }
+  }
   return out;
 }
 

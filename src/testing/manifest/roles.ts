@@ -551,7 +551,7 @@ export function privateShapeIssues(
     ref: string;
     private?: true | undefined;
     belongs?: readonly unknown[] | undefined;
-    states?: { timed?: unknown; effects?: readonly { via?: string }[] | undefined } | undefined;
+    states?: { timed?: unknown; effects?: readonly { via?: string }[] | undefined; children?: Readonly<Record<string, { moveOnCreate?: string | undefined }>> | undefined } | undefined;
     postings?: unknown;
     adjust?: unknown;
     columns: readonly { ref: string; type?: string; references?: string | undefined; rules?: { rollup?: { from: string } | undefined; copy?: { via: string } | undefined; lookup?: { table: unknown } | undefined } | undefined }[];
@@ -569,6 +569,10 @@ export function privateShapeIssues(
       if (table.postings !== undefined) out.push({ path: at('postings'), message: said(table.ref, 'no ledger takes its rows') });
       if (table.adjust !== undefined) out.push({ path: at('adjust'), message: said(table.ref, 'no price rule reads its rows') });
       if (table.states?.timed !== undefined) out.push({ path: at('states', 'timed'), message: said(table.ref, 'nothing moves its rows by itself') });
+      // A row of another table made by somebody the private row is not theirs moves it no more than a move of one does.
+      for (const [child, rule] of Object.entries(table.states?.children ?? {})) {
+        if (rule.moveOnCreate !== undefined) out.push({ path: at('states', 'children', child, 'moveOnCreate'), message: said(table.ref, "another table's new row does not move its rows") });
+      }
       return;
     }
     table.columns.forEach((column, c) => {

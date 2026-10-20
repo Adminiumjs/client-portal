@@ -2838,6 +2838,7 @@ export function appReferenceIssues(
             bookedOf: (ref) => tables.get(ref)?.booking !== undefined || tables.get(ref)?.occupies !== undefined,
             lineOf: (ref) => [...tables.values()].find((other) => other.states?.children?.[ref] !== undefined)?.ref,
             outboxTable: m.outbox?.table,
+            limitedOf: (ref) => tables.get(ref)?.capacity !== undefined,
             pages: new Set((m.pages ?? []).flatMap((page) => ('ref' in page && typeof page.ref === 'string' ? [page.ref] : []))),
             codePages: new Set(m.codePages ?? []),
           },
