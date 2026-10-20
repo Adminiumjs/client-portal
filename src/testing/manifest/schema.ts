@@ -278,6 +278,18 @@ export const COLUMN_SEMANTICS = [
  */
 export const FILE_COLUMN_KINDS = ['png', 'jpeg', 'webp', 'gif', 'pdf', 'office', 'zip', 'csv', 'text', 'markdown', 'json', 'mp4', 'webm', 'mp3', 'wav', 'ogg'] as const;
 
+/**
+ * The kinds of file a PICTURE column takes: a text column with `semantic:
+ * "image"` and a file rule (`rules.file`) whose `accept` names only these.
+ * Never SVG, which can carry script.
+ */
+export const PICTURE_FILE_KINDS = ['png', 'jpeg', 'webp', 'gif'] as const satisfies readonly (typeof FILE_COLUMN_KINDS)[number][];
+
+/** Whether a file rule takes pictures and nothing else. */
+export function takesPicturesOnly(accept: readonly string[]): boolean {
+  return accept.length > 0 && accept.every((kind) => (PICTURE_FILE_KINDS as readonly string[]).includes(kind));
+}
+
 /** The most a file column's `maxBytes` may say: 25 MiB. */
 export const FILE_COLUMN_MAX_BYTES = 25 * 1024 * 1024;
 
@@ -831,6 +843,12 @@ export const columnRulesSchema = z
      * loses what a camera writes beside it (the place, the device) as it is
      * uploaded. A write may name only a file its writer uploaded and no record
      * holds yet; a file a record holds is changed only through the record.
+     *
+     * A PICTURE column is a text column with `semantic: "image"` and this
+     * rule, its `accept` only pictures (`png`, `jpeg`, `webp`, `gif`): a
+     * sample row may give it one of the bundle's pictures (`{"@asset": …}`),
+     * and a public entry may show it to visitors (`pictures`). A column with
+     * `semantic: "image"` and no rule holds links, as it always has.
      */
     file: z
       .object({
@@ -2691,6 +2709,10 @@ export function appReferenceIssues(
           out.push({ path: here('file'), message: `a file is kept in a text column, a list of files in a json column, and "${table.ref}.${column.ref}" is ${column.type}` });
         }
         if (new Set(rules.file.accept).size !== rules.file.accept.length) out.push({ path: here('file', 'accept'), message: 'each kind of file is named once' });
+        // An image column that holds files holds pictures.
+        if ((column as { semantic?: string }).semantic === 'image' && !takesPicturesOnly(rules.file.accept)) {
+          out.push({ path: here('file', 'accept'), message: `"${table.ref}.${column.ref}" is an image column, so its files are pictures: ${PICTURE_FILE_KINDS.join(', ')}` });
+        }
         // What the column holds is a file a person uploaded: no rule of Adminium's makes one, and no two rows share one.
         const others = (Object.keys(rules) as (keyof ColumnRules)[]).filter((name) => !['file', 'personal', 'required', 'requiredWhen'].includes(name));
         if (others.length > 0) out.push({ path: here('file'), message: `a file column holds what a person uploaded, not also ${others.join(', ')}` });

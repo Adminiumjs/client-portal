@@ -97,7 +97,7 @@
  */
 import { z } from 'zod';
 
-import { ledgersOf, type AddOnManifest, type AppManifest, type Manifest } from './schema.ts';
+import { ledgersOf, takesPicturesOnly, type AddOnManifest, type AppManifest, type Manifest } from './schema.ts';
 
 export const SAMPLE_FORMAT = 'adminium.sample/1';
 
@@ -812,10 +812,20 @@ function rowIssues(
           issues.push({ path: `${at}.${column}`, message: `"${table.ref}" has no column "${column}".` });
           continue;
         }
-        // A file is uploaded by a signed-in person: no sample row brings one.
-        if (value !== null && !(Array.isArray(value) && value.length === 0) && shape.columns.find((c) => c.ref === column)?.rules?.file !== undefined) {
-          issues.push({ path: `${at}.${column}`, message: `"${table.ref}.${column}" holds files a signed-in person uploads, so a sample row leaves it empty.` });
-          continue;
+        // A file is uploaded by a signed-in person: no sample row brings one, but for a picture column's one of the bundle's pictures.
+        const fileColumn = shape.columns.find((c) => c.ref === column) as { semantic?: string; rules?: { file?: { accept: readonly string[]; maxCount?: number | undefined } } } | undefined;
+        const fileRule = fileColumn?.rules?.file;
+        if (value !== null && !(Array.isArray(value) && value.length === 0) && fileRule !== undefined) {
+          const pictureColumn = fileColumn?.semantic === 'image' && fileRule.maxCount === undefined && takesPicturesOnly(fileRule.accept);
+          if (!pictureColumn || sampleDirective(value)?.kind !== 'asset') {
+            issues.push({
+              path: `${at}.${column}`,
+              message: pictureColumn
+                ? `"${table.ref}.${column}" holds a picture: a sample row gives it one of the bundle's pictures ({"@asset": …}) or leaves it empty.`
+                : `"${table.ref}.${column}" holds files a signed-in person uploads, so a sample row leaves it empty.`,
+            });
+            continue;
+          }
         }
         // An object that looks like a directive must BE one: a malformed
         // `@ago` would otherwise be written into the column as JSON.
