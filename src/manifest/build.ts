@@ -26,9 +26,11 @@ import { TABLES } from "./tables.ts";
  * changes no table: it asks for Adminium 0.3.7 (`MIN_ADMINIUM`). 0.2.3
  * changes no table either: approved work may go back to review, and it asks
  * for Adminium 0.3.9. 0.2.4 changes no table: a client's invoice stays on
- * screen once they say they paid, and it asks for Adminium 0.3.11.
+ * screen once they say they paid, and it asks for Adminium 0.3.11. 0.2.5
+ * keeps a version's file and a handover file with their row (`column.file`),
+ * so a client opens them again, and it asks for Adminium 0.3.28.
  */
-export const VERSION = "0.2.4";
+export const VERSION = "0.2.5";
 
 /**
  * The Adminium release that first reads everything below: formulas, numbers
@@ -40,8 +42,11 @@ export const VERSION = "0.2.4";
  * that offers a client only the door their "I've sent a payment" may use.
  * 0.3.11 is the first that takes that payment from a client added after the
  * install (one with no tax rate of their own) instead of refusing it.
+ * 0.3.28 is the first that keeps a column's uploaded file with its row
+ * (`rules.file`): one uploaded for a plain column is never attached, and
+ * 0.3.30 serves a client only a file attached to the row they read.
  */
-export const MIN_ADMINIUM = "0.3.11";
+export const MIN_ADMINIUM = "0.3.28";
 
 const ENV = {
   VITE_ADMINIUM_API_BASE_URL: { required: false, example: "https://admin.example.com" },

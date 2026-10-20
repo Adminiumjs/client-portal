@@ -57,6 +57,16 @@ export interface Table {
 const id: Column = { ref: "id", type: "int", role: "pk" };
 const opt = { nullable: true } as const;
 
+/**
+ * A file the studio hands a client (a version of their work, a handover
+ * file): Adminium keeps it with its row, so the client's portal can open it.
+ * Every kind a file column takes, up to the most one may hold (25 MiB); a
+ * picture is kept without its camera notes, and none is wider than 8192 px.
+ * Not `mp4` or `mp3`: Adminium 0.3.30 refuses a kind with a digit in it as it
+ * installs the rule, though its manifest check takes them.
+ */
+const clientFile = { file: { accept: ["pdf", "png", "jpeg", "webp", "gif", "office", "zip", "csv", "text", "markdown", "json", "webm", "wav", "ogg"], maxBytes: 25 * 1048576 } };
+
 /** The desk's per-action key: a retried create finds the row the first try saved. */
 const clientKey: Column = { ref: "client_key", type: "text", maxLength: 36, nullable: true, unique: true, label: l("Action key") };
 
@@ -606,7 +616,7 @@ export const TABLES: Table[] = [
       id,
       fk("project_id", "projects", "Project"),
       clientOf("project_id"),
-      text("file", 255, "File", opt),
+      text("file", 255, "File", { ...opt, rules: clientFile }),
       // A handover item may be a link instead of a file (a shared folder, a font's page).
       text("link", 500, "Link", { ...opt, rules: { validation: { format: "url" } } }),
       text("note", 300, "Note", opt),
@@ -677,7 +687,7 @@ export const TABLES: Table[] = [
       fk("deliverable_id", "deliverables", "Deliverable"),
       clientOf("deliverable_id"),
       int("v", "Version", { ...opt, rules: { sequence: { gapless: true, scope: "deliverable_id" } } }),
-      text("file", 255, "File", opt),
+      text("file", 255, "File", { ...opt, rules: clientFile }),
       text("link", 500, "Link", { ...opt, rules: { validation: { format: "url" } } }),
       text("note", 500, "Note", opt),
       text("posted_by", 120, "Posted by", { ...opt, rules: stamp("user-name", onCreate) }),

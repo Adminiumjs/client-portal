@@ -3,7 +3,7 @@
   "manifestVersion": 1,
   "key": "clients",
   "name": "Client Portal",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "publisher": {
     "id": "adminium",
     "name": "Adminium",
@@ -19,7 +19,7 @@
     "crm"
   ],
   "compatibility": {
-    "minAdminiumVersion": "0.3.11",
+    "minAdminiumVersion": "0.3.28",
     "engines": [
       "sqlite",
       "postgres",
@@ -4163,7 +4163,28 @@
               "zh-CN": "文件",
               "zh-TW": "檔案"
             },
-            "nullable": true
+            "nullable": true,
+            "rules": {
+              "file": {
+                "accept": [
+                  "pdf",
+                  "png",
+                  "jpeg",
+                  "webp",
+                  "gif",
+                  "office",
+                  "zip",
+                  "csv",
+                  "text",
+                  "markdown",
+                  "json",
+                  "webm",
+                  "wav",
+                  "ogg"
+                ],
+                "maxBytes": 26214400
+              }
+            }
           },
           {
             "ref": "link",
@@ -5022,7 +5043,28 @@
               "zh-CN": "文件",
               "zh-TW": "檔案"
             },
-            "nullable": true
+            "nullable": true,
+            "rules": {
+              "file": {
+                "accept": [
+                  "pdf",
+                  "png",
+                  "jpeg",
+                  "webp",
+                  "gif",
+                  "office",
+                  "zip",
+                  "csv",
+                  "text",
+                  "markdown",
+                  "json",
+                  "webm",
+                  "wav",
+                  "ogg"
+                ],
+                "maxBytes": 26214400
+              }
+            }
           },
           {
             "ref": "link",

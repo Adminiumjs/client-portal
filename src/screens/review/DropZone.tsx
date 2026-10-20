@@ -1,10 +1,11 @@
 /**
  * The sheets' file picker: a dashed zone to drop a file on or click to choose
- * one ("Drop a file or choose one · up to 100 MB"), which then names the file
+ * one ("Drop a file or choose one · up to 25 MB"), which then names the file
  * and its size ("… · choose another"); and the "Upload a file | Link" switch
  * the deliverable and version sheets put above it.
  *
- * A file over 100 MB is refused here, before anything is sent.
+ * A file over 25 MB is refused here, before anything is sent: the most a
+ * file column of Adminium's holds (`rules.file` in the manifest).
  */
 import { useId, useState } from "react";
 import { FileCheck, Link as LinkIcon, Upload } from "lucide-react";
@@ -12,7 +13,7 @@ import { FileCheck, Link as LinkIcon, Upload } from "lucide-react";
 import { useI18n } from "../../i18n/index.tsx";
 import { sizeLabel } from "./files.ts";
 
-export const MAX_BYTES = 100 * 1048576;
+export const MAX_BYTES = 25 * 1048576;
 
 export function DropZone({ file, onFile, onTooBig, invalid, describedBy }: { file: File | null; onFile: (file: File) => void; onTooBig: () => void; invalid: boolean; describedBy?: string }) {
   const { t, number } = useI18n();
