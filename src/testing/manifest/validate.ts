@@ -29,6 +29,7 @@ import {
   type Manifest,
   PHONE_KIND,
   PHONE_SIDE,
+  PUBLIC_PICTURE_MAX_BYTES,
 } from './schema.ts';
 import { plainTextLengthWarnings, type ChildEntry, type PublicAccess } from './public-access.ts';
 import { ledgerIndexIssues } from './ledger-indexes.ts';
@@ -185,6 +186,8 @@ export function manifestWarnings(manifest: Manifest): ManifestIssue[] {
   out.push(...createEntryWarnings(manifest.publicAccess ?? [], manifest.requiredSchema?.tables ?? []));
   // A plain-text column longer than its plain text takes: the end of what a guest types is refused.
   out.push(...plainTextLengthWarnings(manifest.publicAccess ?? [], manifest.requiredSchema?.tables ?? []));
+  // A picture visitors see, in a column that takes files larger than one served to them.
+  out.push(...pictureSizeWarnings(manifest.publicAccess ?? [], manifest.requiredSchema?.tables ?? []));
   // A capped balance worked out from a formula whose columns stay open while the capped rows exist.
   for (const warning of cappedFormulaWarnings(manifest.requiredSchema?.tables ?? [])) out.push({ path: warning.path.map(String).join('.'), message: warning.message });
   /*
@@ -198,6 +201,36 @@ export function manifestWarnings(manifest: Manifest): ManifestIssue[] {
       path: `settings.${String(s)}`,
       message: `"${setting.key}" reads like bank details, and a setting that is not secret is published to the customer side: keep them in the settings table, or mark it secret`,
     });
+  });
+  return out;
+}
+
+/** A size in MiB as people read it: `5 MiB`, `7.5 MiB`. */
+const mebibytes = (bytes: number): string => `${String(Math.round((bytes / (1024 * 1024)) * 10) / 10)} MiB`;
+
+/**
+ * Advice about a picture every visitor sees (an entry's `pictures`) whose
+ * column takes files larger than a picture served to them: staff would save
+ * a picture visitors never see. The server refuses such a file as it is
+ * uploaded or chosen for the column, so this is advice, not a refusal — the
+ * column's own number just says more than it gives.
+ */
+export function pictureSizeWarnings(
+  publicAccess: readonly PublicAccess[],
+  tables: readonly { ref: string; columns: readonly { ref: string; rules?: { file?: { maxBytes: number } | undefined } | undefined }[] }[],
+): ManifestIssue[] {
+  const out: ManifestIssue[] = [];
+  publicAccess.forEach((entry, e) => {
+    for (const ref of entry.pictures ?? []) {
+      const maxBytes = tables.find((t) => t.ref === entry.table)?.columns.find((c) => c.ref === ref)?.rules?.file?.maxBytes;
+      if (maxBytes === undefined || maxBytes <= PUBLIC_PICTURE_MAX_BYTES) continue;
+      out.push({
+        path: `publicAccess.${String(e)}.pictures`,
+        message:
+          `"${entry.table}.${ref}" is a picture visitors see, and a picture they see is ${mebibytes(PUBLIC_PICTURE_MAX_BYTES)} at most, ` +
+          `but its file rule says ${mebibytes(maxBytes)}: staff are refused a larger picture all the same, so lower its rules.file.maxBytes to ${String(PUBLIC_PICTURE_MAX_BYTES)}`,
+      });
+    }
   });
   return out;
 }

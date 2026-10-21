@@ -293,6 +293,13 @@ export function takesPicturesOnly(accept: readonly string[]): boolean {
 /** The most a file column's `maxBytes` may say: 25 MiB. */
 export const FILE_COLUMN_MAX_BYTES = 25 * 1024 * 1024;
 
+/**
+ * The largest picture served to every visitor (an entry's `pictures`, through
+ * `GET /public/pictures`): 5 MiB. A picture column shown to visitors takes no
+ * larger file, so a picture staff could save is one visitors see.
+ */
+export const PUBLIC_PICTURE_MAX_BYTES = 5 * 1024 * 1024;
+
 /** The most files a json file column may hold. */
 export const FILE_COLUMN_MAX_COUNT = 20;
 
@@ -4058,6 +4065,25 @@ export function addOnIssues(
       path: 'addOn.network.allow',
       message: 'outbound-http requires a non-empty allow-list of exact https hostnames',
     });
+  }
+
+  // PAYMENT_PROVIDER_RULES — an add-on that moves money: one provider, its own
+  // hosts only (outbound-http, so the allow-list above applies), nothing shown
+  // to the public, and filed under payments.
+  const payments = (block.provides ?? []).filter((entry) => entry.contract === 'payment-provider');
+  if (payments.length > 1) {
+    out.push({ code: 'PAYMENT_PROVIDER_RULES', path: 'addOn.provides', message: 'an add-on provides the contract "payment-provider" at most once' });
+  }
+  if (payments.length > 0) {
+    if (!wantsHttp) {
+      out.push({ code: 'PAYMENT_PROVIDER_RULES', path: 'capabilities', message: 'a payment provider reaches its service through outbound-http and its allow-list' });
+    }
+    if ((block.publicSettings ?? []).length > 0) {
+      out.push({ code: 'PAYMENT_PROVIDER_RULES', path: 'addOn.publicSettings', message: 'a payment provider shows no setting to the public: publicSettings is empty' });
+    }
+    if (!(m.categories ?? []).includes('payments')) {
+      out.push({ code: 'PAYMENT_PROVIDER_RULES', path: 'categories', message: 'a payment provider is filed under the "payments" category' });
+    }
   }
 
   // CAPABILITY_CONFLICT — an oauth2 connect needs the capability that runs it.

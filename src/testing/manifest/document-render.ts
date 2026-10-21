@@ -200,9 +200,11 @@ export const documentQrValueSchema = z
  * `sequence` — the engine's CAS document number, minted after render.
  * `connection` — the connection's currency. `setting` — one of the add-on's
  * own non-secret settings. `now` — `subject.now.iso`, never the provider's own
- * clock.
+ * clock. `pay-link` — the record's own live pay link (a `text` slot), or the
+ * same link as a code to scan (a `qr` slot, only when it is short enough),
+ * when the record can be paid online right now; otherwise the slot stays empty.
  */
-export const OUTLINE_SLOT_DEFAULTS = ['sequence', 'connection', 'setting', 'now'] as const;
+export const OUTLINE_SLOT_DEFAULTS = ['sequence', 'connection', 'setting', 'now', 'pay-link'] as const;
 export type OutlineSlotDefault = (typeof OUTLINE_SLOT_DEFAULTS)[number];
 
 export interface OutlineSlot {
