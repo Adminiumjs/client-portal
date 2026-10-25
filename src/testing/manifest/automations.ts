@@ -226,8 +226,8 @@ export const manifestActionSchema = z.discriminatedUnion('kind', [
        * the record names (or `<link>.<staff column>`). With `lead: true`, not
        * that person but whoever leads a team they are in (never the person
        * themselves), and of those only who can open the record. `else`: the
-       * roles told when the column, or its lead, names nobody; a lead always
-       * has one. Or `listed`: the people a table that lists people against the
+       * roles told when the column, or its lead, names nobody; a lead without
+       * one tells nobody then, and the run says so (from 0.3.35). Or `listed`: the people a table that lists people against the
        * record (one of its `belongs` ways `through`) names for it, of those
        * only who can open the record when the step runs.
        */
@@ -236,8 +236,7 @@ export const manifestActionSchema = z.discriminatedUnion('kind', [
         z.object({ listed: refSchema }).strict(),
         z
           .object({ column: staffPath, lead: z.literal(true).optional(), else: z.object({ roles: z.array(roleKey).min(1).max(20) }).strict().optional() })
-          .strict()
-          .refine((to) => to.lead !== true || to.else !== undefined, { message: 'a notice to a lead says who is told when there is none ("else": { "roles": [...] })', path: ['else'] }),
+          .strict(),
       ]),
       title: localized(200),
       body: localized(2000).optional(),
@@ -280,6 +279,18 @@ export const manifestActionSchema = z.discriminatedUnion('kind', [
               by: z.literal('owner').optional(),
               /** What the sum `of` is measured against: `column` of the rows of `table` whose `owner` names the same people. */
               target: z.object({ table: refSchema, owner: refSchema, column: refSchema, year: refSchema.optional(), of: refSchema }).strict().optional(),
+              /**
+               * Only the rows whose date `column` falls in this calendar year (`"this": "year"`), or in the last
+               * `lastDays` days (today and the days before it), on the business's calendar: its time zone, from
+               * its midnight. Counted when the summary is made, like every condition of a section. `orEmpty`: a row
+               * whose column is empty counts too (the open deals beside the ones won this year).
+               */
+              within: z
+                .union([
+                  z.object({ column: refSchema, this: z.literal('year'), orEmpty: z.literal(true).optional() }).strict(),
+                  z.object({ column: refSchema, lastDays: z.number().int().min(1).max(366), orEmpty: z.literal(true).optional() }).strict(),
+                ])
+                .optional(),
             })
             .strict(),
         )
@@ -573,13 +584,40 @@ export function automationIssues(m: {
     const wasIssue = (ref: string, path: (string | number)[]): void => {
       if (!changing) out.push({ path, message: `{{was.${ref}}}: only a rule run when its record is updated reads the record as it was` });
       else if (record !== undefined && !record.columns.some((candidate) => candidate.ref === ref)) out.push({ path, message: `{{was.${ref}}}: "${record.ref}" has no column "${ref}"` });
+      // Its earlier values are the audit log's alone: a rule reads them as nothing.
+      else if (record?.columns.find((candidate) => candidate.ref === ref)?.rules?.['history'] === 'audit') out.push({ path, message: `{{was.${ref}}}: "${record.ref}.${ref}" keeps its earlier values for the audit log only` });
     };
 
     // The rows earlier steps made, by the name each step gave its row.
     const made = new Map<string, AutomationTableShape | undefined>();
+    /**
+     * A code no staff member reads (`rules.code.hiddenFromStaff`, an order's own link) is no placeholder of a rule:
+     * what a rule writes reaches whoever its author says, and the run leaves it as written. Named as the record's
+     * (`{{record.x}}`, `{{x}}`, `{{was.x}}`), as a linked row's (`{{link.x}}`, `{{record.link.x}}`) or as a row an
+     * earlier step made (`{{steps.name.x}}`); a form after the column (`.name`, `.money`) reads the same column.
+     */
+    const hiddenCodes = (names: Iterable<string>, path: (string | number)[]): void => {
+      const hidden = (of: AutomationTableShape | undefined, ref: string | undefined) =>
+        ref !== undefined && (of?.columns.find((candidate) => candidate.ref === ref)?.rules?.['code'] as { hiddenFromStaff?: unknown } | undefined)?.hiddenFromStaff === true;
+      for (const name of names) {
+        let of: AutomationTableShape | undefined = record;
+        let parts = name.split('.');
+        if (parts[0] === 'steps') {
+          of = made.get(parts[1] ?? '');
+          parts = parts.slice(2);
+        } else if (parts[0] === 'record' || parts[0] === 'was') parts = parts.slice(1);
+        const own = of?.columns.find((candidate) => candidate.ref === parts[0]);
+        if (own === undefined) continue;
+        let said: string | undefined;
+        if (hidden(of, own.ref)) said = `${of!.ref}.${own.ref}`;
+        else if (own.references !== undefined && parts[1] !== undefined && hidden(tables.get(own.references), parts[1])) said = `${own.references}.${parts[1]}`;
+        if (said !== undefined) out.push({ path, message: `{{${name}}} reads "${said}", a code staff never see (rules.code.hiddenFromStaff): no rule carries it` });
+      }
+    };
     // Every `{{record.<column>}}` a text carries is a column of the rule's record; every `{{steps.<name>.<column>}}` a column of a row an earlier step made.
     const tokens = (text: unknown, path: (string | number)[]) => {
       const texts = typeof text === 'string' ? [text] : typeof text === 'object' && text !== null ? Object.values(text as Record<string, unknown>).filter((value): value is string => typeof value === 'string') : [];
+      hiddenCodes(placeholderNames(texts), path);
       for (const each of texts) {
         for (const match of each.matchAll(/\{\{\s*steps\.([A-Za-z0-9_]+)\.([A-Za-z0-9_]+)\s*(\|[^{}]*)?\}\}/g)) {
           const name = match[1] as string;
@@ -670,6 +708,13 @@ export function automationIssues(m: {
           }
           tokens(action.title, here('title'));
           tokens(action.body, here('body'));
+          // Each reader is told in their language: a title and a message given in several languages give the same ones, never half a notice in theirs.
+          if (typeof action.title === 'object' && typeof action.body === 'object') {
+            const titled = Object.keys(action.title).sort();
+            const said = Object.keys(action.body).sort();
+            const missing = [...titled.filter((tag) => !said.includes(tag)).map((tag) => `the message has no ${tag}`), ...said.filter((tag) => !titled.includes(tag)).map((tag) => `the title has no ${tag}`)];
+            if (missing.length > 0) out.push({ path: here('body'), message: `a notice's title and message are given in the same languages: ${missing.join(', ')}` });
+          }
           return;
         }
         if (action.kind === 'record.create') {
@@ -701,6 +746,11 @@ export function automationIssues(m: {
             }
             (section.where ?? []).forEach((condition, c) => conditionIssues(of, condition, here('sections', s, 'where', c), true));
             if (section.orderBy !== undefined) column(of, section.orderBy.column, here('sections', s, 'orderBy', 'column'));
+            // "This year" is a date's: a day, or a moment.
+            if (section.within !== undefined) {
+              const dated = column(of, section.within.column, here('sections', s, 'within', 'column'));
+              if (dated !== undefined && !DATES.includes(dated.type)) out.push({ path: here('sections', s, 'within', 'column'), message: `"${section.table}.${section.within.column}" is ${dated.type}: a section is held to a year or to days by a date column (date or timestamptz)` });
+            }
             // A sum adds up numbers; the same column twice is one figure with two names.
             (section.sum ?? []).forEach((ref, n) => {
               const added = column(of, ref, here('sections', s, 'sum', n));
@@ -821,6 +871,8 @@ export function automationIssues(m: {
         const vars = action.vars ?? {};
         for (const [name, text] of Object.entries(vars)) tokens(text, here('vars', name));
         const columns = new Set((record?.columns ?? []).map((candidate) => candidate.ref));
+        // A column whose earlier values only the audit log keeps: its `was.` is filled with nothing.
+        const auditOnly = new Set((record?.columns ?? []).filter((candidate) => candidate.rules?.['history'] === 'audit').map((candidate) => candidate.ref));
         // The name of the person a staff column of the record names; the record's address, in a mail to a person.
         const people = new Set((record?.columns ?? []).filter((candidate) => candidate.rules?.['staff'] === true).flatMap((candidate) => [`${candidate.ref}.name`, `record.${candidate.ref}.name`]));
         // A mail to a person, or to each of the people listed on the record: each is somebody the address is worked out for.
@@ -832,7 +884,7 @@ export function automationIssues(m: {
           (name.startsWith('record.') && columns.has(name.slice('record.'.length))) ||
           people.has(name) ||
           (toPerson && name === 'recordUrl') ||
-          (changing && name.startsWith('was.') && columns.has(name.slice('was.'.length)));
+          (changing && name.startsWith('was.') && columns.has(name.slice('was.'.length)) && !auditOnly.has(name.slice('was.'.length)));
         const everywhere = new Set<string>();
         if (template.attach !== undefined) out.push({ path: here('templateKey'), message: `"${action.templateKey}" carries a document, which only the outbox draws: send it from the outbox, or give the rule a template with no "attach"` });
         for (const [locale, content] of Object.entries(template.locales)) {
@@ -842,6 +894,8 @@ export function automationIssues(m: {
           }
           const names = templatePlaceholdersOf(content);
           for (const name of names) everywhere.add(name);
+          // The template is filled from the record by the rule: a code no staff member reads is not among what it carries.
+          hiddenCodes(names.filter((name) => !Object.hasOwn(vars, name)), here('templateKey'));
           const unfilled = templateRequiredPlaceholdersOf(content).filter((name) => !filled(name));
           if (unfilled.includes('recordUrl') && !toPerson) {
             out.push({ path: here(), message: `"${action.templateKey}" (${locale}) reads {{recordUrl}}, which only a mail to a person carries ("to": { "kind": "staff", … }): an address of the record is no link for anybody else` });

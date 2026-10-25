@@ -713,6 +713,7 @@ export function statesIssues<C extends ColumnShape>(
           keptFromReaders: (ref) => ctx.keptFromReaders?.(ref) ?? null,
           pages: ctx.pages ?? new Set(),
           codePages: ctx.codePages ?? new Set(),
+          conditionIssues: (of, condition, path) => conditionIssues(of, condition, index, path),
         },
         at,
       ),

@@ -35,8 +35,8 @@
  *
  * `readable` limits the role's READ of the table to some columns, the same
  * way: housekeeping reads a stay's room and dates, and none of its guest or
- * its money. The key and the table's links to other rows are always read (a
- * screen moves through them). A column the role may not read is not written
+ * its money. The key is always read; a link to another row only when it is
+ * listed, as any column (before 0.3.35 every link was read). A column the role may not read is not written
  * through it either, unless `writable` names it.
  *
  * `writableFrom` says which rows the update reaches at all, by the value a
@@ -76,6 +76,31 @@
  *
  * Each reach is its own whole test (its `while` and its `by` hold for it
  * alone), as two roles' reaches are.
+ *
+ * `notBy` on an update (or a delete) reach takes out the rows a staff column
+ * names the person in — of the row itself, or of the row one of its links
+ * names (`starter_id.user_id`): a sales manager changes her team's targets
+ * but never her own, whatever door the change comes through —
+ *
+ * ```json
+ * "rows": { "update": { "reach": "team", "notBy": "rep_id" } }
+ * ```
+ *
+ * It judges the person alone, never the people they lead, and it judges the
+ * row as the change leaves it too: nobody names themselves into it.
+ *
+ * `via` beside `by`, on a table whose rows are whoever's their parent is
+ * (`belongs: [{ "via": "deal_id" }]`), judges the row by a staff column of
+ * that PARENT and by nothing else: a sales manager reaches the visits of the
+ * deals somebody she leads OWNS, and not a visit on another team's deal, even
+ * where her rep helps on that deal or the visit names her rep —
+ *
+ * ```json
+ * "rows": { "read": { "reach": "team", "via": "deal_id", "by": "owner_id" } }
+ * ```
+ *
+ * Without it, a child row is reached by every way its table and its parent
+ * say (a helper listed on the deal, the visit's own rep), as before.
  */
 import { z } from 'zod';
 
@@ -83,6 +108,30 @@ import { refSchema, scalarSchema, valueFits, type ColumnShape, type ReferenceIss
 
 /** How far one action reaches: the person's own rows, their teams', or every row (only `while` some value). */
 export const ROW_REACHES = ['own', 'team', 'all'] as const;
+
+/**
+ * A person a row names: a staff column of the row (`rep_id`), or
+ * `<link>.<staff column>`, the staff column of the row one of its links names
+ * (`deal_id.owner_id`, the deal's owner).
+ */
+export const personPathSchema = z.string().regex(/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)?$/, 'a staff column, or <link>.<staff column> of the row a link of it names');
+
+/**
+ * What is wrong with a person path on a table of the manifest, or null: the
+ * column is not there, holds no staff member, or (with a link) the first
+ * column links nowhere the manifest can read.
+ */
+export function personPathIssue<C extends ColumnShape>(index: TableIndex<C>, table: string, path: string): string | null {
+  const [first, second] = path.split('.') as [string, string | undefined];
+  const own = index.column(table, first);
+  if (own === undefined) return `"${table}" has no column "${first}"`;
+  const staff = (column: C): boolean => (column as { rules?: { staff?: boolean } }).rules?.staff === true;
+  if (second === undefined) return staff(own) ? null : `"${table}.${first}" does not hold a staff member (rules.staff)`;
+  if (own.type !== 'fk' || own.references === undefined || index.table(own.references) === undefined) return `"${table}.${first}" is not a link to another of the app's tables, so it names no row to read "${second}" of`;
+  const far = index.column(own.references, second);
+  if (far === undefined) return `"${own.references}" has no column "${second}"`;
+  return staff(far) ? null : `"${own.references}.${second}" does not hold a staff member (rules.staff)`;
+}
 
 export const rowReachSchema = z
   .object({
@@ -96,10 +145,23 @@ export const rowReachSchema = z
      * table reached through a parent: "the notes of the deals they reach" to read, "the notes they wrote" to change.
      */
     by: refSchema.optional(),
+    /**
+     * And never the rows this staff column (or `<link>.<staff column>`) names the person in: a target's change is
+     * `notBy` its rep, so a manager changes her team's targets and never her own. The person alone, never their team.
+     */
+    notBy: personPathSchema.optional(),
+    /**
+     * With `by`: a link of the table to the row it hangs off (one of its `belongs` `via` ways), and `by` a staff column
+     * of THAT row. The row is reached only where its parent's `by` names the person (with `team`, somebody they lead),
+     * whoever else the row or its parent names: a manager reaches the visits of the deals her team owns.
+     */
+    via: refSchema.optional(),
   })
   .strict()
+  .refine((reach) => reach.via === undefined || reach.by !== undefined, { message: '`via` names the parent whose `by` column judges the row: say `by` too' })
+  .refine((reach) => reach.via === undefined || reach.unowned === undefined, { message: 'a reach judged by the parent\'s person takes no `unowned`: a row whose parent names nobody is nobody\'s to reach' })
   .refine((reach) => reach.reach !== 'all' || reach.by === undefined, { message: '`by` narrows the person\'s own rows or their team\'s: with every row, say `while`' })
-  .refine((reach) => reach.reach !== 'all' || reach.while !== undefined, { message: 'a reach of every row is no limit: leave the action out, or say `while`' })
+  .refine((reach) => reach.reach !== 'all' || reach.while !== undefined || reach.notBy !== undefined, { message: 'a reach of every row is no limit: leave the action out, or say `while` or `notBy`' })
   .refine((reach) => reach.reach !== 'all' || reach.unowned === undefined, { message: 'every row includes the rows nobody owns' });
 export type RowReach = z.infer<typeof rowReachSchema>;
 
@@ -178,7 +240,7 @@ export const roleLimitSchema = z
     writableValues: z.record(refSchema, z.array(scalarSchema).min(1).max(32)).optional(),
     /** For some columns of the table, the only values a row may hold for the update to reach it. */
     writableFrom: z.record(refSchema, z.array(scalarSchema).min(1).max(32)).optional(),
-    /** The only columns the read shows (with the key and the links to other rows). */
+    /** The only columns the read shows (with the key; a link only when listed). */
     readable: z.array(refSchema).min(1).max(200).optional(),
     /** The only columns a new row it creates may be given (the rest take their defaults). */
     creatable: z.array(refSchema).min(1).optional(),
@@ -305,10 +367,30 @@ export function roleLimitIssues<C extends ColumnShape>(roles: readonly RoleShape
               if (!valueFits(found, value)) out.push({ path: where('while', 'in'), message: `${JSON.stringify(value)} is not a value of "${ref}.${reach.while.column}"` });
             }
           }
-          if (reach.by !== undefined) {
+          if (reach.via !== undefined) {
+            // A link to the row this one hangs off, named among the table's own ways; `by` is then a column of that row.
+            const link = index.column(ref, reach.via);
+            const parent = link?.type === 'fk' && link.references !== undefined && index.table(link.references) !== undefined ? link.references : undefined;
+            if (link === undefined) out.push({ path: where('via'), message: `"${ref}" has no column "${reach.via}"` });
+            else if (parent === undefined) out.push({ path: where('via'), message: `"${ref}.${reach.via}" is not a link to another of the app's tables` });
+            else if (rowTables?.ways !== undefined && !rowTables.ways(ref).some((way) => 'via' in way && way.via === reach.via)) {
+              out.push({ path: where('via'), message: `"${ref}" does not belong through "${reach.via}": add { "via": "${reach.via}" } to its "belongs"` });
+            }
+            if (parent !== undefined && reach.by !== undefined) {
+              const found = index.column(parent, reach.by);
+              if (found === undefined) out.push({ path: where('by'), message: `"${parent}" has no column "${reach.by}"` });
+              else if ((found as { rules?: { staff?: boolean } }).rules?.staff !== true) out.push({ path: where('by'), message: `"${parent}.${reach.by}" does not hold a staff member (rules.staff): \`by\` names the column of the parent that says whose the row is` });
+            }
+          } else if (reach.by !== undefined) {
             const found = index.column(ref, reach.by);
             if (found === undefined) out.push({ path: where('by'), message: `"${ref}" has no column "${reach.by}"` });
             else if ((found as { rules?: { staff?: boolean } }).rules?.staff !== true) out.push({ path: where('by'), message: `"${ref}.${reach.by}" does not hold a staff member (rules.staff): \`by\` names the column that says who a row is by` });
+          }
+          if (reach.notBy !== undefined) {
+            // A change the person may not make; their read of the row is theirs as ever.
+            if (action === 'read') out.push({ path: where('notBy'), message: '`notBy` holds a change (update or delete): a person still reads the rows that name them' });
+            const issue = personPathIssue(index, ref, reach.notBy);
+            if (issue !== null) out.push({ path: where('notBy'), message: `${issue}: \`notBy\` names the person who may not change the row` });
           }
         });
       }
@@ -320,7 +402,7 @@ export function roleLimitIssues<C extends ColumnShape>(roles: readonly RoleShape
         if (!grants.has(`table:@${ref}:${action}`)) continue;
         const written = limit?.rows?.[action];
         const reach = Array.isArray(written) ? (written.length === 1 ? written[0] : undefined) : written;
-        if (reach === undefined || reach.reach !== 'own' || reach.unowned !== undefined || reach.while !== undefined || reach.by !== undefined) {
+        if (reach === undefined || reach.reach !== 'own' || reach.unowned !== undefined || reach.while !== undefined || reach.by !== undefined || reach.notBy !== undefined || reach.via !== undefined) {
           out.push({ path: ['roles', r, 'limits', ref, 'rows', action], message: `"${ref}" is private: the role's ${action} reaches the person's own rows only ({ "reach": "own" })` });
         }
       }
@@ -343,6 +425,8 @@ export interface BelongsTableShape {
 export interface RowTables {
   belongs: (ref: string) => boolean;
   privateTables: () => readonly string[];
+  /** A table's own ways, as written (none for a table with no `belongs`). */
+  ways?: (ref: string) => readonly BelongsWay[];
 }
 
 export function rowTablesOf(tables: readonly BelongsTableShape[]): RowTables {
@@ -350,6 +434,7 @@ export function rowTablesOf(tables: readonly BelongsTableShape[]): RowTables {
   return {
     belongs: (ref) => byRef.get(ref)?.belongs !== undefined,
     privateTables: () => tables.filter((table) => table.private === true).map((table) => table.ref),
+    ways: (ref) => byRef.get(ref)?.belongs ?? [],
   };
 }
 
@@ -524,6 +609,8 @@ export function roleAddOnTableIssues(roles: readonly { key: string; tables?: rea
         // An add-on's table does not say whose its rows are yet: its rows are limited by a value only.
         reachList(written).forEach((reach, n) => {
           if (reach.reach !== 'all' || reach.unowned !== undefined) out.push({ path: at('limit', 'rows', action, ...(Array.isArray(written) ? [n] : []), 'reach'), message: 'an add-on\'s table does not say how people belong to its rows: limit it by a value ({ "reach": "all", "while": … })' });
+          // Its columns are the add-on's, which this manifest cannot see: no person of its rows is named.
+          if (reach.notBy !== undefined) out.push({ path: at('limit', 'rows', action, ...(Array.isArray(written) ? [n] : []), 'notBy'), message: 'an add-on\'s table is limited by a value only: "notBy" names a staff column of one of the app\'s own tables' });
         });
       }
       for (const [values, columns] of [['writableValues', 'writable'], ['creatableValues', 'creatable']] as const) {
@@ -544,7 +631,8 @@ export function roleAddOnTableIssues(roles: readonly { key: string; tables?: rea
  * from under it, or lean on it and stop working: each is refused where it is
  * written. A private table's rows are read on the screen by the people they
  * belong to; nothing is kept from them elsewhere, nothing else is reached
- * through them, and nothing Adminium does by itself runs on them.
+ * through them but by those same people, and nothing Adminium does by itself
+ * runs on them.
  */
 export function privateShapeIssues(
   tables: readonly {
@@ -561,6 +649,14 @@ export function privateShapeIssues(
   if (held.size === 0) return [];
   const out: ReferenceIssue[] = [];
   const said = (ref: string, what: string): string => `"${ref}" is private: only the people its rows belong to read it, so ${what}`;
+  /** The staff columns that say whose a private table's row is: its own `belongs` columns. */
+  const ownPeople = (ref: string): ReadonlySet<string> =>
+    new Set(
+      (tables.find((table) => table.ref === ref)?.belongs ?? []).flatMap((way) => {
+        const own = way as { column?: unknown; person?: unknown };
+        return typeof way === 'object' && way !== null && typeof own.column === 'string' && own.person === undefined ? [own.column] : [];
+      }),
+    );
   tables.forEach((table, t) => {
     const at = (...rest: (string | number)[]): (string | number)[] => ['requiredSchema', 'tables', t, ...rest];
     const pointsAt = (column: string): string | undefined => table.columns.find((candidate) => candidate.ref === column)?.references;
@@ -593,7 +689,17 @@ export function privateShapeIssues(
       if (through?.table !== undefined && held.has(through.table)) out.push({ path: at('belongs', w, 'through', 'table'), message: said(through.table, "no other table's rows are reached through it") });
       const column = way as { column?: string; person?: string };
       const person = column.column !== undefined && column.person !== undefined ? pointsAt(column.column) : undefined;
-      if (person !== undefined && held.has(person)) out.push({ path: at('belongs', w, 'column'), message: said(person, "no other table's rows are reached through it") });
+      /*
+       * A ROW HUNG ON A PRIVATE ROW, BY THAT ROW'S OWN PEOPLE. A link to a
+       * private row and one of the columns that say whose that row is (its
+       * own `belongs`): the person it names already reads the private row,
+       * so the way reaches nobody new — a step of a coaching plan is the
+       * rep's and the manager's whose plan it is. Any other person column of
+       * the private row would reach somebody the row is not theirs.
+       */
+      if (person !== undefined && held.has(person) && !ownPeople(person).has(column.person!)) {
+        out.push({ path: at('belongs', w, 'person'), message: said(person, `another table's rows are reached through it only by a person its own rows name: "${column.person!}" is not one of its "belongs" columns`) });
+      }
     });
   });
   return out;

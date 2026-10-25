@@ -44,6 +44,52 @@ const setChild = z.record(refSchema, scalarSchema);
 /** The most actions one table offers. */
 export const STATE_ACTIONS_MAX = 12;
 
+/**
+ * A condition on a carried child row: the same shape as a move's
+ * `requires.where` (`states.ts`, which imports this file and so cannot be
+ * imported here).
+ */
+const carryConditionSchema = z
+  .object({
+    column: refSchema,
+    eq: scalarSchema.optional(),
+    in: z.array(scalarSchema).min(1).max(32).optional(),
+    isNull: z.boolean().optional(),
+    gt: z.number().finite().optional(),
+    gte: z.number().finite().optional(),
+    lt: z.number().finite().optional(),
+    lte: z.number().finite().optional(),
+  })
+  .strict()
+  .refine((c) => [c.eq, c.in, c.isNull, c.gt, c.gte, c.lt, c.lte].filter((part) => part !== undefined).length === 1, {
+    message: 'a condition says one of eq, in, isNull, gt, gte, lt or lte',
+  });
+export type CarryCondition = z.infer<typeof carryConditionSchema>;
+
+/**
+ * What a hand-over carries with the row: the rows of a child `table` (linked
+ * by `via`) whose staff `column` names the OLD person of the row's `from`
+ * column (the staff column the action asks for, when it asks one) and that
+ * meet every `where`. In the hand-over's own write each such row's `column`
+ * is given the new person, each as its own update: a deal handed over takes
+ * its booked visits and its owner's open follow-ups along; a visit already
+ * made, and a colleague's rows, stay as they are.
+ */
+export const carrySchema = z
+  .object({
+    table: refSchema,
+    via: refSchema,
+    column: refSchema,
+    from: refSchema.optional(),
+    where: z.array(carryConditionSchema).min(1).max(8).optional(),
+  })
+  .strict();
+export type Carry = z.infer<typeof carrySchema>;
+
+/** The most child tables one hand-over carries rows of. */
+export const CARRIES_MAX = 8;
+const carriesSchema = z.array(carrySchema).min(1).max(CARRIES_MAX);
+
 export const stateActionSchema = z.union([
   z
     .object({
@@ -61,6 +107,8 @@ export const stateActionSchema = z.union([
        * (`belongs[].set`). The one way a rep gives a deal to a colleague.
        */
       handOver: z.literal(true).optional(),
+      /** With `handOver`: the child rows of the old person that go to the new one in the same write. */
+      carries: carriesSchema.optional(),
     })
     .strict(),
   z
@@ -73,6 +121,7 @@ export const stateActionSchema = z.union([
       confirm: wordsOrLabels.optional(),
       ask: z.array(refSchema).min(1).max(4).optional(),
       handOver: z.literal(true).optional(),
+      carries: carriesSchema.optional(),
     })
     .strict(),
   z
@@ -146,6 +195,52 @@ export interface StateActionsContext {
   /** The manifest's generated page refs, and its code page refs when it is an add-on. */
   pages: ReadonlySet<string>;
   codePages: ReadonlySet<string>;
+  /** What is wrong with a condition on a row of a table (a carried child row's `where`). */
+  conditionIssues?: (table: string, condition: CarryCondition, path: (string | number)[]) => ReferenceIssue[];
+}
+
+/**
+ * Everything wrong with what a hand-over carries: a carry on a button that
+ * hands nothing over, a table that is no child of this one, a column that
+ * holds no staff member, a person column of the row the button does not ask
+ * for, a condition on a column the child has not.
+ */
+function carryIssues(action: { handOver?: true; ask?: string[]; carries?: Carry[] }, ctx: StateActionsContext, here: (...rest: (string | number)[]) => (string | number)[]): ReferenceIssue[] {
+  const out: ReferenceIssue[] = [];
+  if (action.carries === undefined) return out;
+  if (action.handOver !== true) {
+    out.push({ path: here('carries'), message: 'only a hand-over carries child rows: say "handOver": true' });
+    return out;
+  }
+  const { table } = ctx;
+  const staff = (column: ActionColumn | undefined): boolean => column?.rules?.['staff'] === true;
+  // The staff columns the button asks for: the person handed the row.
+  const asked = (action.ask ?? []).filter((ref) => staff(ctx.column(table, ref)));
+  const seen = new Set<string>();
+  action.carries.forEach((carry, c) => {
+    const at = (...rest: (string | number)[]) => here('carries', c, ...rest);
+    const key = `${carry.table}.${carry.column}`;
+    if (seen.has(key)) out.push({ path: at(), message: `"${key}" is carried twice` });
+    seen.add(key);
+    if (carry.table === table) out.push({ path: at('table'), message: 'a hand-over carries rows of its child tables, not of its own' });
+    if (!ctx.hasTable(carry.table)) {
+      out.push({ path: at('table'), message: `"${carry.table}" is not one of this manifest's tables` });
+      return;
+    }
+    const via = ctx.column(carry.table, carry.via);
+    if (via === undefined || via.type !== 'fk' || via.references !== table) out.push({ path: at('via'), message: `"${carry.table}.${carry.via}" is not a foreign key to "${table}"` });
+    const column = ctx.column(carry.table, carry.column);
+    if (column === undefined) out.push({ path: at('column'), message: `"${carry.table}" has no column "${carry.column}"` });
+    else if (!staff(column)) out.push({ path: at('column'), message: `"${carry.table}.${carry.column}" does not hold a staff member (rules.staff): a hand-over moves a person` });
+    else if (carry.column === carry.via) out.push({ path: at('column'), message: `"${carry.column}" links the row to this one: the person moved is another column` });
+    if (carry.from !== undefined) {
+      if (!asked.includes(carry.from)) out.push({ path: at('from'), message: `"${carry.from}" is not a staff column the action asks for: the old person and the new are read from one it asks` });
+    } else if (asked.length !== 1) {
+      out.push({ path: at('from'), message: asked.length === 0 ? 'the action asks for no staff column: nobody is handed the row, so nothing is carried' : `the action asks for several staff columns: say which one the rows follow ("from")` });
+    }
+    (carry.where ?? []).forEach((condition, w) => out.push(...(ctx.conditionIssues?.(carry.table, condition, at('where', w)) ?? [])));
+  });
+  return out;
 }
 
 /**
@@ -222,6 +317,7 @@ export function stateActionIssues(actions: readonly StateAction[], ctx: StateAct
           }
         });
       }
+      out.push(...carryIssues(action as { handOver?: true; ask?: string[]; carries?: Carry[] }, ctx, here));
       return;
     }
 

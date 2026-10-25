@@ -95,7 +95,7 @@ export function shapeKey(addOn: string, shape: { name: string; version: number }
  * `secret` only as `true`: an app may hide a part's column, never show one the
  * shape keeps back (`SECRET_ONLY_HIDES`).
  */
-const ADDABLE_RULES: ReadonlySet<string> = new Set(['enumLabels', 'personal', 'secret', 'validation', 'required', 'requiredWhen', 'options', 'notAfter', 'notBefore']);
+const ADDABLE_RULES: ReadonlySet<string> = new Set(['enumLabels', 'personal', 'secret', 'validation', 'required', 'requiredWhen', 'options', 'notAfter', 'notBefore', 'changes']);
 /** An addable rule that is added only one way: `secret: true` hides; `false` would show a part's column to every reader. */
 const SECRET_ONLY_HIDES = (name: string, value: unknown) => name === 'secret' && value !== true;
 
@@ -306,6 +306,33 @@ function withoutAddedConditions(
   );
 }
 
+/**
+ * How an app's `create` differs from the shape's, beyond what an app may add.
+ *
+ * As with a move, an app may hold a shape's create to MORE: a condition
+ * (`requires.where`) on a column it added itself — no new quote on a closed
+ * deal, read from the deal's state the app keeps on the quote. Every
+ * condition the shape writes stays as written; a condition of the app's never
+ * reads a column of the shape's (the shape decides what its columns allow);
+ * and a linked row, a setting or a window on the clock is the shape's to ask.
+ * History (an import, a sample) is not held to it, as it is not to the shape's.
+ */
+function createDifferences(want: States['create'], have: States['create'], added: ReadonlySet<string>): string[] {
+  if (canonical(want) === canonical(have)) return [];
+  const shape = want?.requires;
+  const own = have?.requires;
+  const kept = new Set((shape?.where ?? []).map((condition) => canonical(condition)));
+  const extra = (own?.where ?? []).filter((condition) => !kept.has(canonical(condition)));
+  const theirs = extra.filter((condition) => !added.has(condition.column));
+  if (theirs.length > 0) return [`a condition an app adds to the shape's create reads a column the app added, never ${theirs.map((condition) => condition.column).join(', ')}`];
+  // What is left after taking the app's own conditions out must be the shape's create exactly.
+  const rest = (own?.where ?? []).filter((condition) => kept.has(canonical(condition)));
+  const { where: _where, ...others } = own ?? {};
+  const back = { ...others, ...(rest.length === 0 ? {} : { where: rest }) };
+  const left = Object.keys(back).length === 0 ? undefined : { requires: back };
+  return canonical(left) === canonical(want) ? [] : ["create is the shape's (an app may only hold it to a condition on a column it added)"];
+}
+
 /** A part's states with the part names they read replaced by the app's tables. */
 export function mapStates(states: States, map: (ref: string) => string): States {
   return {
@@ -388,9 +415,10 @@ function statesDifferences(want: States, have: States, ownColumns: (childRef: st
     if (!same(want[name], have[name])) out.push(`${name} is the shape's`);
   }
   // What a move waits for or is refused as are the shape's too: an app adds none of them to a shape's table.
-  for (const name of ['strict', 'late', 'timed', 'create'] as const) {
+  for (const name of ['strict', 'late', 'timed'] as const) {
     if (!same(want[name], have[name])) out.push(`${name} is the shape's`);
   }
+  out.push(...createDifferences(want.create, have.create, added));
   /*
    * What a move sets off (`effects`). The shape's own stay, each as written
    * and in its order. An app may add one that runs THROUGH A LINK IT ADDED

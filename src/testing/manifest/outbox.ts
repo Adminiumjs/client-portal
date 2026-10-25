@@ -487,7 +487,7 @@ export type EmailTemplate = z.infer<typeof emailTemplateSchema>;
 /** The column rules that decide a value on the server (see `columnRulesSchema`). */
 const DECIDING_RULES = ['copy', 'default', 'sequence', 'format', 'code', 'rollup', 'formula', 'stamp', 'perNight'] as const;
 /** The column rules that refuse a value: Adminium's own writes to the column would be refused by them. */
-const REFUSING_RULES = ['options', 'validation', 'required', 'requiredWhen', 'notAfter', 'notBefore'] as const;
+const REFUSING_RULES = ['options', 'validation', 'required', 'requiredWhen', 'notAfter', 'notBefore', 'changes'] as const;
 /**
  * What a producer of a removal (`onDelete`) does not take: each reads the row
  * again after the message is written (to date it, drop it, overtake it, hold

@@ -41,8 +41,8 @@
  * The grant an app asks for is cut to fit (`roleTableHold`): an action or a
  * column outside the add-on's words is left out and said, by name; a grant on
  * a table with `appGrants` is always written with its column lists, never
- * whole. The key and the table's links to other rows are read with any read,
- * as with every read limit: a link says which row, never what is in it.
+ * whole. The key is read with any read; a link to another row only when
+ * `readable` lists it, as with every read limit.
  *
  * Pure: no I/O, and nothing imported from the manifest's own schema file, so
  * that file may import this one.
@@ -58,7 +58,7 @@ export const appGrantsSchema = z
   .object({
     /** The most an app's role may be given on this table. */
     actions: z.array(z.enum(ROLE_ADD_ON_ACTIONS)).min(1).max(3),
-    /** The only columns an app's read shows (with the key and the links); absent, every column but `never`'s. */
+    /** The only columns an app's read shows (with the key); absent, every column but `never`'s. */
     readable: z.array(refSchema).min(1).max(200).optional(),
     /** The only columns an app's update may change. Named whenever `update` is allowed. */
     writable: z.array(refSchema).min(1).max(200).optional(),
@@ -122,8 +122,8 @@ export function appGrantsIssues(tables: readonly AppGrantTableShape[], ledgers: 
     (grants.never ?? []).forEach((ref, c) => {
       const column = columns.get(ref);
       if (column === undefined) out.push({ path: at('never', c), message: `"${table.ref}" has no column "${ref}"` });
-      // Every read shows the key and the links: naming one here would promise what no read keeps.
-      else if (column.role === 'pk' || column.type === 'fk') out.push({ path: at('never', c), message: `"${ref}" is the table's key or a link, which every read shows: leave it out of "writable" and "creatable" instead` });
+      // Every read shows the key: naming it here would promise what no read keeps. A link is a column like any other.
+      else if (column.role === 'pk') out.push({ path: at('never', c), message: `"${ref}" is the table's key, which every read shows: leave it out of "writable" and "creatable" instead` });
     });
   });
   return out;

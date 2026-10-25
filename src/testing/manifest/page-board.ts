@@ -27,7 +27,9 @@
  *   "title": "name",
  *   "totals": [{ "column": "amount", "fn": "sum" }, { "column": "weighted_value", "fn": "sum" }],
  *   "only": { "state": "open" },
- *   "card": { "link": "company_id.name", "person": "owner_id", "amount": "amount", "daysSince": { "column": "entered_stage_at", "warnFrom": 14, "alertFrom": 30 }, "date": "expected_close" },
+ *   "card": { "link": "company_id.name", "person": "owner_id", "amount": "amount", "secondAmount": { "column": "weighted_value", "label": "w" },
+ *             "daysSince": { "column": "entered_stage_at", "warnFrom": 14, "alertFrom": 30, "label": "in stage" }, "date": "expected_close" },
+ *   "toolbar": { "total": true, "person": "owner_id" },
  *   "note": { "text": "Columns come from Stages", "href": "/p/crm-stages" }
  * } }
  * ```
@@ -51,10 +53,20 @@
  *  - `card`: what a card shows under its title, each from a column of the
  *    page's table: `link` (`<link column>.<column of the row it points at>`:
  *    the company's name), `person` (a staff column, shown as the person's
- *    name), `amount` (a number or money), `daysSince` (days from a date or
- *    time column to today, by the server's clock; from `warnFrom` days the
- *    figure is amber and from `alertFrom` red; the longest-waiting cards come
- *    first) and `date` (a date or time, as a day);
+ *    name), `amount` (a number or money), `secondAmount` (a second number
+ *    or money under it, `column`, with a short `label` before it, by
+ *    language in `labels`: a deal's weighted value, "w €12,000"),
+ *    `daysSince` (days from a date or time column to today, by the server's
+ *    clock; from `warnFrom` days the figure is amber and from `alertFrom`
+ *    red; the longest-waiting cards come first; `label` is what the days
+ *    are, after the figure: "12 days in stage", by language in `labels`) and
+ *    `date` (a date or time, as a day);
+ *  - `toolbar`: a line above the board. `total: true` says how many cards
+ *    the board holds and each of its `totals` over all of them, worked out
+ *    by the server over every card the reader reaches (not the cards
+ *    listed); `person` (a staff column) offers "Everyone" and each person
+ *    who holds cards on the board, and narrows the cards, each column's
+ *    count and totals, and the toolbar's total to that person's;
  *  - `note`: one sentence drawn above the board, in the page's language
  *    (`text`, and `texts` by language as a page's `titles` are), with an
  *    optional `href` the whole note opens.
@@ -108,15 +120,32 @@ export const PAGE_BOARD_DAYS_MAX = 3650;
 
 const localeTag = z.string().regex(/^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/);
 
+/** The longest a card's short label is ("in stage", "w"): a card is narrow. */
+export const PAGE_BOARD_LABEL_MAX = 40;
+const cardLabel = z.string().min(1).max(PAGE_BOARD_LABEL_MAX);
+const cardLabels = z.record(localeTag, cardLabel);
+
 export const pageBoardCardSchema = z
   .object({
     link: z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*$/).optional(),
     person: refSchema.optional(),
     amount: refSchema.optional(),
+    secondAmount: z
+      .object({ column: refSchema, label: cardLabel.optional(), labels: cardLabels.optional() })
+      .strict()
+      .refine((second) => second.labels === undefined || second.label !== undefined, { message: 'labels gives a label in other languages: say it first in label' })
+      .optional(),
     daysSince: z
-      .object({ column: refSchema, warnFrom: z.number().int().min(1).max(PAGE_BOARD_DAYS_MAX).optional(), alertFrom: z.number().int().min(1).max(PAGE_BOARD_DAYS_MAX).optional() })
+      .object({
+        column: refSchema,
+        warnFrom: z.number().int().min(1).max(PAGE_BOARD_DAYS_MAX).optional(),
+        alertFrom: z.number().int().min(1).max(PAGE_BOARD_DAYS_MAX).optional(),
+        label: cardLabel.optional(),
+        labels: cardLabels.optional(),
+      })
       .strict()
       .refine((days) => days.warnFrom === undefined || days.alertFrom === undefined || days.warnFrom < days.alertFrom, { message: 'warnFrom comes before alertFrom' })
+      .refine((days) => days.labels === undefined || days.label !== undefined, { message: 'labels gives a label in other languages: say it first in label' })
       .optional(),
     date: refSchema.optional(),
   })
@@ -132,6 +161,11 @@ export const pageBoardNoteSchema = z
   })
   .strict();
 
+export const pageBoardToolbarSchema = z
+  .object({ total: z.literal(true).optional(), person: refSchema.optional() })
+  .strict()
+  .refine((toolbar) => toolbar.total !== undefined || toolbar.person !== undefined, { message: 'a toolbar shows the total (total: true), a person filter (person), or both' });
+
 export const pageBoardSchema = z
   .object({
     column: refSchema,
@@ -140,6 +174,7 @@ export const pageBoardSchema = z
       .strict()
       .optional(),
     card: pageBoardCardSchema.optional(),
+    toolbar: pageBoardToolbarSchema.optional(),
     note: pageBoardNoteSchema.optional(),
     title: refSchema.optional(),
     totals: z
@@ -234,10 +269,18 @@ export function pageBoardIssues<C extends ColumnShape>(pages: readonly PageShape
       if (person === undefined) out.push({ path: at('card', 'person'), message: `"${table}" has no column "${card.person}"` });
       else if (person.rules?.staff !== true) out.push({ path: at('card', 'person'), message: `"${table}.${card.person}" is not a staff column (rules.staff), so it holds no person to name` });
     }
-    if (card.amount !== undefined) {
-      const amount = index.column(table, card.amount);
-      if (amount === undefined) out.push({ path: at('card', 'amount'), message: `"${table}" has no column "${card.amount}"` });
-      else if (!NUMERIC_TYPES.includes(amount.type)) out.push({ path: at('card', 'amount'), message: `"${table}.${card.amount}" is not a number or money` });
+    for (const [key, name] of [['amount', card.amount], ['secondAmount', card.secondAmount?.column]] as const) {
+      if (name === undefined) continue;
+      const here = key === 'amount' ? at('card', 'amount') : at('card', 'secondAmount', 'column');
+      const amount = index.column(table, name);
+      if (amount === undefined) out.push({ path: here, message: `"${table}" has no column "${name}"` });
+      else if (!NUMERIC_TYPES.includes(amount.type)) out.push({ path: here, message: `"${table}.${name}" is not a number or money` });
+    }
+    const person = board.toolbar?.person;
+    if (person !== undefined) {
+      const named = index.column(table, person) as (C & { rules?: { staff?: unknown } }) | undefined;
+      if (named === undefined) out.push({ path: at('toolbar', 'person'), message: `"${table}" has no column "${person}"` });
+      else if (named.rules?.staff !== true) out.push({ path: at('toolbar', 'person'), message: `"${table}.${person}" is not a staff column (rules.staff), so it holds no person to choose cards by` });
     }
     for (const [key, name] of [['daysSince', card.daysSince?.column], ['date', card.date]] as const) {
       if (name === undefined) continue;

@@ -43,7 +43,7 @@ const DECIDED_BY = ['copy', 'default', 'sequence', 'format', 'code', 'codeLast4'
  * that must hold a value and carries none but these has to be filled by the
  * step; one with any other rule is left to the save, which knows that rule.
  */
-const ONLY_JUDGES: ReadonlySet<string> = new Set(['options', 'validation', 'required', 'requiredWhen', 'notAfter', 'notBefore', 'personal', 'plainText', 'normalize']);
+const ONLY_JUDGES: ReadonlySet<string> = new Set(['options', 'validation', 'required', 'requiredWhen', 'notAfter', 'notBefore', 'personal', 'plainText', 'normalize', 'changes']);
 
 type Issue = { path: (string | number)[]; message: string };
 

@@ -34,6 +34,7 @@ import { NAV_LINK_SCREENS, RECORD_ADDRESS_MESSAGE, SIDE_PATH_MESSAGE, isRecordAd
 import { addOnModuleIssues, moduleIdSchema, moduleIssues, modulesSchema, optionalShapeAddOns, roleNamesSchema, shapeIsOptional, withoutModules } from './modules.ts';
 import { bookingIssues, bookingSchema } from './booking.ts';
 import { occupiesIssues, occupiesSchema } from './occupies.ts';
+import { columnHistorySchema, removalIssues, removalSchema } from './removal.ts';
 import { capacityIssues, capacitySchema, isLegacyCapacity, kindOf, rulesOf, viaIndexIssues, type Capacity } from './capacity.ts';
 import { appDocumentIssues, appDocumentSchema, mappingIssues, type AppDocument } from './documents.ts';
 import { formulaColumns, formulaExprSchema, tableFormulaIssues } from './formula.ts';
@@ -65,6 +66,7 @@ import { assistantIssues, type AssistantTableShape } from './assistant.ts';
 import { stepsIssues, type StepTableShape } from './steps.ts';
 import { WORD_FLOORS, installFloorWords } from './words.ts';
 import { automationIssues, manifestAutomationsSchema, type AutomationTableShape, type ManifestAutomation } from './automations.ts';
+import { changeGuardIssues, changeGuardsSchema } from './change-guards.ts';
 import { adjustDecidedColumns, adjustIssues, adjustSchema, adjusterIssues, adjusterSchema, type Adjuster, type AdjustTableShape } from './adjust.ts';
 import { ledgerIssues, ledgersSchema, postingIssues, postingsSchema, receiptTableIssues, wordsIssues, wordsListSchema, type Ledger, type LedgerScopeTable, type LedgerTableShape, type StockWords } from './ledgers.ts';
 
@@ -483,13 +485,17 @@ export const perNightSchema = z
   .strict();
 
 /**
- * A date kept on one side of another date: a column of the same row, or —
- * with `via`, a foreign key of this row — a column of the row it points at.
- * `when`: held only while the row, as the write leaves it, meets these (a
- * credit bounded by its stay's departure only once it is for nights not
- * stayed). `strict`: the dates may not be the same day — always, or only
- * while the row meets these (a guest who left early is credited from the day
- * after the arrival; a guest who never came, from the arrival itself).
+ * A value kept on one side of another column's: a column of the same row, or
+ * — with `via`, a foreign key of this row — a column of the row it points at.
+ * A date against a date, a number against a number (warm below stale), a
+ * time of day kept as text (`HH:MM`) against another (opening before
+ * closing). `when`: held only while the row, as the write leaves it, meets
+ * these (a credit bounded by its stay's departure only once it is for nights
+ * not stayed). `strict`: the two may not be the same — always, or only while
+ * the row meets these (a guest who left early is credited from the day after
+ * the arrival; a guest who never came, from the arrival itself). `days`, on a
+ * date: the other date moved by so many days (a cover ends at most a year
+ * after it starts: `notAfter: {column: 'starts_on', days: 365}`).
  */
 const dateBoundSchema = z
   .object({
@@ -497,8 +503,19 @@ const dateBoundSchema = z
     via: refSchema.optional(),
     when: z.array(stateConditionSchema).min(1).max(8).optional(),
     strict: z.union([z.literal(true), z.array(stateConditionSchema).min(1).max(8)]).optional(),
+    days: z.number().int().min(1).max(36_600).optional(),
   })
   .strict();
+
+/** What a bound compares a column as, by its type: null for a column no bound holds. */
+function boundKindOf(type: string | undefined): 'date' | 'number' | 'time' | null {
+  if (type === 'date' || type === 'timestamptz') return 'date';
+  if (type === 'int' || type === 'bigint' || type === 'decimal' || type === 'money' || type === 'float') return 'number';
+  if (type === 'text') return 'time';
+  return null;
+}
+
+const BOUND_KIND_WORDS = { date: 'a date', number: 'a number', time: 'a time of day kept as text' } as const;
 
 /** A table of an add-on, by the add-on's key and the table's own short name. */
 export const addOnTableSchema = z
@@ -721,6 +738,14 @@ export const columnRulesSchema = z
          * the kitchen undoes the Ready).
          */
         clearOnBack: z.literal(true).optional(),
+        /**
+         * Always the server's: a value any writer sends for the column — a
+         * form, a bulk edit, a rule, the public door, an add-on — is dropped,
+         * and a line of a brought file that carries one is refused, so who
+         * ticked a consent and when is never typed (`may_email_by_id`). Only
+         * history keeps its own: an app's sample data and an undo.
+         */
+        strict: z.literal(true).optional(),
       })
       .strict()
       .optional(),
@@ -743,15 +768,20 @@ export const columnRulesSchema = z
     /**
      * A date that may never be later than today, on the venue's calendar — a
      * payment is recorded when it came in, not when it might — or than another
-     * date, as `notBefore` says it (a credit's nights end by the stay's departure).
+     * column's value, as `notBefore` says it (a credit's nights end by the
+     * stay's departure; a cover ends at most a year after it starts).
      */
     notAfter: z.union([z.literal('today'), dateBoundSchema]).optional(),
     /**
-     * A date that may never be earlier than another: a column of the same row,
-     * or — with `via`, a foreign key of this row — a column of the row it
-     * points at (a payment is never dated before its invoice was issued).
+     * A value that may never be earlier than another column's: a column of
+     * the same row, or — with `via`, a foreign key of this row — a column of
+     * the row it points at (a payment is never dated before its invoice was
+     * issued; warm below stale; work starts before it ends). `now`, on a
+     * moment: a new row's moment is not in the past (a visit is never booked
+     * to start before now). Judged on a create only, and not on one that
+     * brings history (an import, sample data): a later change may correct it.
      */
-    notBefore: dateBoundSchema.optional(),
+    notBefore: z.union([z.literal('now'), dateBoundSchema]).optional(),
     /**
      * The column a staff create keeps its retry key in, as a hash: a desk's
      * save sent again after a lost reply answers the row the first one made
@@ -865,6 +895,21 @@ export const columnRulesSchema = z
       })
       .strict()
       .optional(),
+    /**
+     * When, and by whom, the column may change (see `change-guards.ts`): to
+     * some values only from others, only while another column holds a value,
+     * only by the person a staff column names, never by the people others
+     * name. Judged by the server on every way a row is written but history.
+     */
+    changes: changeGuardsSchema.optional(),
+    /**
+     * `"audit"`: the column's earlier values are kept for the audit log only,
+     * which the install's owner reads. Record history, a rule's
+     * `{{was.<column>}}`, a removed row's history and live frames leave them
+     * out (a removed message's text). The value a row holds now is read as
+     * any other column is.
+     */
+    history: columnHistorySchema.optional(),
   })
   .strict();
 export type ColumnRules = z.infer<typeof columnRulesSchema>;
@@ -1076,6 +1121,8 @@ export const requiredTableSchema = z
     private: z.literal(true).optional(),
     /** An add-on's table: the most an app's role may be given of it (see `app-grants.ts`). */
     appGrants: appGrantsSchema.optional(),
+    /** What a removal of a row takes (a reason) and keeps (the removed row's history, read through a parent): see `removal.ts`. */
+    removal: removalSchema.optional(),
   })
   .strict()
   .refine(
@@ -2197,8 +2244,9 @@ export function appReferenceIssues(
    * column a rule lands it in is kept the same way (a secret in a secret;
    * personal data in personal data or a secret). A copy of one, or a formula
    * over one, would show it where it is not kept, past the audit's and the
-   * outbox's redaction and the public refusals. A shared link's code is never
-   * landed anywhere.
+   * outbox's redaction and the public refusals. A shared link's code, and any
+   * code no staff member reads (`code.hiddenFromStaff`), is never landed
+   * anywhere.
    *
    * Personal data is told as the install tells it: by its mark, or guessed by
    * its name (`email`, a guest's `first_name` beside an address), and so is
@@ -2206,13 +2254,20 @@ export function appReferenceIssues(
    * formula over a guessed column into an unmarked one passed here and was
    * then skipped by the install, leaving the column empty.
    */
+  /**
+   * Whether a column is a code that leaves only as a shared link: one an
+   * entry claims by (`claim: { by: 'token' }`), or one no staff member reads
+   * (`code.hiddenFromStaff`). Nothing copies one, keeps its newest value, its
+   * last four or a ledger's copy of it, and no public entry shows it.
+   */
+  const linkCode = (tableRef: string, columnRef: string): boolean => shareCodeColumns(m.publicAccess ?? [], tableRef, index).includes(columnRef);
   const keptFromReaders = (
     tableRef: string,
     columnRef: string,
     into: ColumnRules | undefined,
     intoAt?: { table: string; column: string },
   ): string | null => {
-    if (shareCodeColumns(m.publicAccess ?? [], tableRef).includes(columnRef)) return 'the code a shared link opens its row with';
+    if (linkCode(tableRef, columnRef)) return 'the code a shared link opens its row with';
     const source = tables.get(tableRef)?.columns.find((x) => x.ref === columnRef)?.rules;
     if (source?.secret === true && into?.secret !== true) return 'a secret';
     const personal = (t: string, c: string): boolean => {
@@ -2268,13 +2323,20 @@ export function appReferenceIssues(
       if (rules.normalize !== undefined && column.type !== 'text') {
         out.push({ path: here('normalize'), message: 'only text is stored trimmed or in lower case' });
       }
-      const dated = (type: string | undefined) => type === 'date' || type === 'timestamptz';
-      if ((rules.notAfter !== undefined || rules.notBefore !== undefined) && !dated(column.type)) {
-        out.push({ path: here(rules.notAfter !== undefined ? 'notAfter' : 'notBefore'), message: 'only a date is kept within dates' });
+      // A bound compares like with like: dates, numbers, or times of day kept as text (`HH:MM`).
+      const boundKind = boundKindOf(column.type);
+      if ((rules.notAfter !== undefined || rules.notBefore !== undefined) && boundKind === null) {
+        out.push({ path: here(rules.notAfter !== undefined ? 'notAfter' : 'notBefore'), message: 'only a date, a number or a time of day is kept on one side of another' });
+      }
+      if (rules.notAfter === 'today' && boundKind !== 'date') out.push({ path: here('notAfter'), message: 'only a date is kept not later than today' });
+      if (rules.notBefore === 'now' && column.type !== 'timestamptz') out.push({ path: here('notBefore'), message: 'only a moment (timestamptz) is kept not before now' });
+      if ((rules.notAfter !== undefined || rules.notBefore !== undefined) && boundKind === 'time' && typeof column.maxLength === 'number' && column.maxLength < 5) {
+        out.push({ path: here(rules.notAfter !== undefined ? 'notAfter' : 'notBefore'), message: 'a time of day is kept as the 5 characters of HH:MM, so maxLength is at least 5' });
       }
       for (const side of ['notBefore', 'notAfter'] as const) {
         const bound = rules[side];
-        if (bound === undefined || bound === 'today') continue;
+        if (bound === undefined || bound === 'today' || bound === 'now') continue;
+        if (bound.days !== undefined && boundKind !== 'date') out.push({ path: here(side, 'days'), message: 'days are counted between dates only' });
         let owner = table.ref;
         if (bound.via !== undefined) {
           const via = index.column(table.ref, bound.via);
@@ -2287,9 +2349,10 @@ export function appReferenceIssues(
         }
         if (owner !== '') {
           const other = index.column(owner, bound.column);
+          const kind = other === undefined ? null : boundKindOf(other.type);
           if (other === undefined) out.push({ path: here(side, 'column'), message: `"${owner}" has no column "${bound.column}"` });
-          else if (!dated(other.type)) out.push({ path: here(side, 'column'), message: `"${owner}.${bound.column}" is not a date` });
-          else if (bound.via === undefined && other.ref === column.ref) out.push({ path: here(side, 'column'), message: 'a date is bounded by another column' });
+          else if (boundKind !== null && kind !== boundKind) out.push({ path: here(side, 'column'), message: `"${owner}.${bound.column}" is not ${BOUND_KIND_WORDS[boundKind]}` });
+          else if (bound.via === undefined && other.ref === column.ref) out.push({ path: here(side, 'column'), message: 'a value is bounded by another column' });
         }
         // The conditions read this row, as the write leaves it.
         (bound.when ?? []).forEach((condition, w) => out.push(...conditionIssues(table.ref, condition, index, here(side, 'when', w))));
@@ -2350,7 +2413,9 @@ export function appReferenceIssues(
         if (rules.required === true) out.push({ path: here('requiredWhen'), message: 'a column is required always, or only when another column says so, not both' });
         // A copy that only fills what a write leaves out still leaves a person to ask when there is nothing to copy.
         const fillsWhatIsLeftOut = deciders.length === 1 && deciders[0] === 'copy' && (rules.copy?.mode ?? 'default') === 'default' && rules.copy?.follow !== true;
-        if (deciders.length > 0 && !fillsWhatIsLeftOut) out.push({ path: here('requiredWhen'), message: 'Adminium fills this column, so nobody is asked for it' });
+        // A stamp fills a person's write, never a write that brings history: a won deal brought in carries its own closed date, or is named.
+        const stampedLive = deciders.length === 1 && deciders[0] === 'stamp';
+        if (deciders.length > 0 && !fillsWhatIsLeftOut && !stampedLive) out.push({ path: here('requiredWhen'), message: 'Adminium fills this column, so nobody is asked for it' });
       }
       if (rules.default !== undefined) {
         const from = rules.default.from;
@@ -2454,6 +2519,10 @@ export function appReferenceIssues(
             if (!has(r.from, name)) out.push({ path: here('rollup'), message: `"${r.from}" has no column "${name}"` });
           }
           if (r.latest !== undefined) out.push(...rollupLatestIssues(index, table, column, r.from, r.latest, decide, here));
+          // A kept total of a shared link's code would show it on the parent, to whoever reads the parent.
+          if (r.latest !== undefined && linkCode(r.from, r.latest.of)) {
+            out.push({ path: here('rollup', 'latest', 'of'), message: `"${r.from}.${r.latest.of}" is the code a shared link opens its row with, so no total keeps it` });
+          }
           if (r.where !== undefined) {
             const filter = index.column(r.from, r.where.column);
             if (filter === undefined) out.push({ path: here('rollup', 'where'), message: `"${r.from}" has no column "${r.where.column}"` });
@@ -2509,6 +2578,10 @@ export function appReferenceIssues(
       if (rules.stamp !== undefined) {
         const stamp = rules.stamp;
         const set = stamp.set;
+        // A strict stamp is the server's on every write: a staff writer's own word (`byOrigin` with no `staff`) would be theirs.
+        if (stamp.strict === true && typeof set === 'object' && 'byOrigin' in set && set.byOrigin.staff === undefined) {
+          out.push({ path: here('stamp', 'strict'), message: 'a strict stamp is always the server\'s, so a staff write says its value too (byOrigin.staff)' });
+        }
         if (set === 'now' && column.type !== 'timestamptz') {
           out.push({ path: here('stamp', 'set'), message: 'a "now" stamp needs a timestamptz column' });
         } else if (set === 'today' && column.type !== 'date') {
@@ -2644,7 +2717,7 @@ export function appReferenceIssues(
       }
       if (rules.code?.renew !== undefined) out.push(...codeRenewIssues(table, column, rules.code.renew, here('code', 'renew')));
       if (rules.lookup !== undefined) {
-        out.push(...codeLookupIssues(table, column, rules.lookup, here('lookup'), { index, tables, shareCodes: (ref) => shareCodeColumns(m.publicAccess ?? [], ref) }));
+        out.push(...codeLookupIssues(table, column, rules.lookup, here('lookup'), { index, tables, shareCodes: (ref) => shareCodeColumns(m.publicAccess ?? [], ref, index) }));
       }
       if (rules.addOnLink !== undefined) {
         const link = rules.addOnLink;
@@ -2721,7 +2794,7 @@ export function appReferenceIssues(
           out.push({ path: here('file', 'accept'), message: `"${table.ref}.${column.ref}" is an image column, so its files are pictures: ${PICTURE_FILE_KINDS.join(', ')}` });
         }
         // What the column holds is a file a person uploaded: no rule of Adminium's makes one, and no two rows share one.
-        const others = (Object.keys(rules) as (keyof ColumnRules)[]).filter((name) => !['file', 'personal', 'required', 'requiredWhen'].includes(name));
+        const others = (Object.keys(rules) as (keyof ColumnRules)[]).filter((name) => !['file', 'personal', 'required', 'requiredWhen', 'history'].includes(name));
         if (others.length > 0) out.push({ path: here('file'), message: `a file column holds what a person uploaded, not also ${others.join(', ')}` });
         if (column.unique === true) out.push({ path: at('columns', c, 'unique'), message: 'a file column holds a file nobody else holds already: it is not also unique' });
         if ((column as { default?: unknown }).default !== undefined) out.push({ path: at('columns', c, 'default'), message: 'a file column takes no default: a file is uploaded' });
@@ -2729,6 +2802,7 @@ export function appReferenceIssues(
       if (rules.plainText !== undefined && column.type !== 'text') {
         out.push({ path: here('plainText'), message: 'plain text is a rule of a text column' });
       }
+      if (rules.changes !== undefined) out.push(...changeGuardIssues(index, table.ref, column, rules.changes, here));
       if (rules.announce !== undefined) {
         // Told from the settle, which has the row before and after only for a formula over one of its own totals.
         const reads = rules.formula === undefined ? [] : formulaColumns(rules.formula);
@@ -2760,6 +2834,8 @@ export function appReferenceIssues(
           // A code Adminium makes, or one a person types that a look-up on this table reads (a gift card's code on a payment).
           const typed = table.columns.some((other) => (other.rules as ColumnRules | undefined)?.lookup?.from === of.ref);
           if ((of.rules?.code === undefined && !typed) || of.ref === column.ref) out.push({ path: here('codeLast4', 'of'), message: `"${table.ref}.${of.ref}" is neither a code Adminium makes (rules.code) nor a code a look-up reads (rules.lookup.from)` });
+          // A link's code is shown nowhere, not even in part: its last four would narrow the guess to a quarter of it.
+          else if (linkCode(table.ref, of.ref)) out.push({ path: here('codeLast4', 'of'), message: `"${table.ref}.${of.ref}" is the code a shared link opens its row with, so no column keeps its last four` });
         }
         const others = (['copy', 'sequence', 'code', 'rollup', 'stamp', 'formula', 'format', 'default', 'lookup', 'perNight'] as const).filter((name) => rules[name] !== undefined);
         if (others.length > 0) out.push({ path: here('codeLast4'), message: `the last four of a code are copied from it, not also decided by ${others.join(', ')}` });
@@ -2812,6 +2888,13 @@ export function appReferenceIssues(
           else if (parentRef !== undefined && typeof mapping === 'object' && mapping !== null && 'parent' in mapping) decide(parentRef, String((mapping as { parent: unknown }).parent));
         };
         if (posting.heldUntil !== undefined) own(posting.heldUntil);
+        // A ledger's row is the add-on's, read by whoever reads its ledger: a shared link's code is never copied into one.
+        for (const [input, mapping] of Object.entries(posting.map)) {
+          const read = typeof mapping === 'string' ? { table: table.ref, column: mapping } : parentRef !== undefined && typeof mapping === 'object' && mapping !== null && 'parent' in mapping ? { table: parentRef, column: String((mapping as { parent: unknown }).parent) } : undefined;
+          if (read !== undefined && linkCode(read.table, read.column)) {
+            out.push({ path: at('postings', p, 'map', input), message: `"${read.table}.${read.column}" is the code a shared link opens its row with, so no posting copies it into a ledger` });
+          }
+        }
         const action = (m.ledgers ?? []).find((ledger) => ledger.id === posting.into.ledger && posting.into.addOn === m.key)?.actions[posting.into.action];
         for (const rule of action?.decides ?? []) {
           const mapping = posting.map[rule.input];
@@ -2914,6 +2997,7 @@ export function appReferenceIssues(
   out.push(...privateTableIssues(m as unknown as Record<string, unknown>, m.requiredSchema.tables.filter((table) => table.private === true).map((table) => table.ref)));
   out.push(...storedTotalIssues(m.requiredSchema.tables as never, (m.roles ?? []) as never));
   out.push(...privateShapeIssues(m.requiredSchema.tables as never));
+  out.push(...removalIssues(m.requiredSchema.tables));
   // Whose a row is, is an app's to say for now: an add-on's tables are shared by every app that names it.
   if (m.kind === 'add-on') {
     m.requiredSchema.tables.forEach((table, t) => {
