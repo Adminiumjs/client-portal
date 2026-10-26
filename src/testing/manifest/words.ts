@@ -171,6 +171,7 @@ export const INSTALL_FLOOR_WORD_NAMES = [
   'column.changes',
   'rows.notBy',
   'rows.via',
+  'rows.notThrough',
   'states.carries',
   'table.removal',
   'column.history',
@@ -319,6 +320,8 @@ export const WORD_FLOORS: Readonly<Partial<Record<ManifestWordName, string>>> = 
   'rows.notBy': '0.3.35',
   // A reach of a child table judged by a staff column of the row it hangs off (a manager's visits of the deals her team owns).
   'rows.via': '0.3.35',
+  // A change a role's reach does not count a listing for (a helper on a deal reads it and changes nothing of it).
+  'rows.notThrough': '0.3.36',
   // A hand-over that moves the old owner's child rows with the record, in the same write (a deal's booked visits).
   'states.carries': '0.3.35',
   // A removal's reason, and a removed row's history read through a row it linked to; a column whose earlier values only the audit log keeps.
@@ -472,6 +475,7 @@ export function installFloorWords(document: unknown): ManifestWord[] {
         if (Array.isArray(reach)) out.push({ word: 'rows.several', path: `roles.${String(r)}.limits.${ref}.rows.${action}` });
         if ((Array.isArray(reach) ? reach : [reach]).some((one) => isDoc(one) && one['notBy'] !== undefined)) out.push({ word: 'rows.notBy', path: `roles.${String(r)}.limits.${ref}.rows.${action}` });
         if ((Array.isArray(reach) ? reach : [reach]).some((one) => isDoc(one) && one['via'] !== undefined)) out.push({ word: 'rows.via', path: `roles.${String(r)}.limits.${ref}.rows.${action}` });
+        if ((Array.isArray(reach) ? reach : [reach]).some((one) => isDoc(one) && one['notThrough'] !== undefined)) out.push({ word: 'rows.notThrough', path: `roles.${String(r)}.limits.${ref}.rows.${action}` });
       }
     }
     list(role['tables']).forEach((grant, g) => {
@@ -484,6 +488,7 @@ export function installFloorWords(document: unknown): ManifestWord[] {
           if (Array.isArray(reach)) out.push({ word: 'rows.several', path: `roles.${String(r)}.tables.${String(g)}.limit.rows.${action}` });
           if ((Array.isArray(reach) ? reach : [reach]).some((one) => isDoc(one) && one['notBy'] !== undefined)) out.push({ word: 'rows.notBy', path: `roles.${String(r)}.tables.${String(g)}.limit.rows.${action}` });
           if ((Array.isArray(reach) ? reach : [reach]).some((one) => isDoc(one) && one['via'] !== undefined)) out.push({ word: 'rows.via', path: `roles.${String(r)}.tables.${String(g)}.limit.rows.${action}` });
+          if ((Array.isArray(reach) ? reach : [reach]).some((one) => isDoc(one) && one['notThrough'] !== undefined)) out.push({ word: 'rows.notThrough', path: `roles.${String(r)}.tables.${String(g)}.limit.rows.${action}` });
         }
       }
     });

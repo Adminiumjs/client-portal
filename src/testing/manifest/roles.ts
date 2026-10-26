@@ -101,6 +101,20 @@
  *
  * Without it, a child row is reached by every way its table and its parent
  * say (a helper listed on the deal, the visit's own rep), as before.
+ *
+ * `notThrough` on an update (or a delete) reach names a listing the reach
+ * does not count: a `through` way of the table, or of a row it hangs off
+ * (`via`, up to two links up), whose table is that listing. A helper listed
+ * on a deal reads it and its quotes and comments on them, and changes none
+ * of them; whoever covers for the deal's owner, and the owner, change them as
+ * before —
+ *
+ * ```json
+ * "rows": { "update": { "reach": "own", "notThrough": "deal_members" } }
+ * ```
+ *
+ * Every other way counts as it did: a staff column, another listing, the
+ * rows nobody owns.
  */
 import { z } from 'zod';
 
@@ -108,6 +122,9 @@ import { refSchema, scalarSchema, valueFits, type ColumnShape, type ReferenceIss
 
 /** How far one action reaches: the person's own rows, their teams', or every row (only `while` some value). */
 export const ROW_REACHES = ['own', 'team', 'all'] as const;
+
+/** The most listings one reach's `notThrough` names. */
+export const NOT_THROUGH_MAX = 4;
 
 /**
  * A person a row names: a staff column of the row (`rep_id`), or
@@ -156,14 +173,28 @@ export const rowReachSchema = z
      * whoever else the row or its parent names: a manager reaches the visits of the deals her team owns.
      */
     via: refSchema.optional(),
+    /**
+     * A change (update or delete) that does not count these listings: a `through` way of the table, or of a parent it
+     * hangs off (`via`), whose table is one of them makes no row the person's for this reach. A helper listed on a deal
+     * reads it and changes nothing of it; whoever covers for its owner changes it as before.
+     */
+    notThrough: z.union([refSchema, z.array(refSchema).min(1).max(NOT_THROUGH_MAX)]).optional(),
   })
   .strict()
   .refine((reach) => reach.via === undefined || reach.by !== undefined, { message: '`via` names the parent whose `by` column judges the row: say `by` too' })
   .refine((reach) => reach.via === undefined || reach.unowned === undefined, { message: 'a reach judged by the parent\'s person takes no `unowned`: a row whose parent names nobody is nobody\'s to reach' })
   .refine((reach) => reach.reach !== 'all' || reach.by === undefined, { message: '`by` narrows the person\'s own rows or their team\'s: with every row, say `while`' })
   .refine((reach) => reach.reach !== 'all' || reach.while !== undefined || reach.notBy !== undefined, { message: 'a reach of every row is no limit: leave the action out, or say `while` or `notBy`' })
-  .refine((reach) => reach.reach !== 'all' || reach.unowned === undefined, { message: 'every row includes the rows nobody owns' });
+  .refine((reach) => reach.reach !== 'all' || reach.unowned === undefined, { message: 'every row includes the rows nobody owns' })
+  .refine((reach) => reach.reach !== 'all' || reach.notThrough === undefined, { message: '`notThrough` takes a listing out of the person\'s own rows or their team\'s: every row is reached by no listing' })
+  .refine((reach) => reach.via === undefined || reach.notThrough === undefined, { message: 'a reach judged by the parent\'s person (`via`) counts no listing already: leave `notThrough` out' });
 export type RowReach = z.infer<typeof rowReachSchema>;
+
+/** The listings a reach's `notThrough` names, as a list, however it was written. */
+export function notThroughList(reach: { notThrough?: string | readonly string[] | undefined }): readonly string[] {
+  const written = reach.notThrough;
+  return written === undefined ? [] : typeof written === 'string' ? [written] : written;
+}
 
 /** The actions a row limit narrows. A create makes a new row: it is held by the links and people it names. */
 export const ROW_LIMIT_ACTIONS = ['read', 'update', 'delete'] as const;
@@ -392,6 +423,19 @@ export function roleLimitIssues<C extends ColumnShape>(roles: readonly RoleShape
             const issue = personPathIssue(index, ref, reach.notBy);
             if (issue !== null) out.push({ path: where('notBy'), message: `${issue}: \`notBy\` names the person who may not change the row` });
           }
+          if (reach.notThrough !== undefined) {
+            // A change the listed person may not make; they still read the row, by the listing, as before.
+            if (action === 'read') out.push({ path: where('notThrough'), message: '`notThrough` holds a change (update or delete): a person listed on a row still reads it' });
+            const listings = rowTables?.ways === undefined ? null : listingsOf(ref, index, rowTables.ways);
+            const names = notThroughList(reach);
+            names.forEach((listing, l) => {
+              const at = typeof reach.notThrough === 'string' ? where('notThrough') : [...where('notThrough'), l];
+              if (names.indexOf(listing) !== l) out.push({ path: at, message: `"${listing}" is named twice` });
+              else if (listings !== null && !listings.has(listing)) {
+                out.push({ path: at, message: `"${listing}" is no listing "${ref}" is read through: name the table of a "through" way of "${ref}", or of a row it hangs off ("via")` });
+              }
+            });
+          }
         });
       }
     }
@@ -402,7 +446,7 @@ export function roleLimitIssues<C extends ColumnShape>(roles: readonly RoleShape
         if (!grants.has(`table:@${ref}:${action}`)) continue;
         const written = limit?.rows?.[action];
         const reach = Array.isArray(written) ? (written.length === 1 ? written[0] : undefined) : written;
-        if (reach === undefined || reach.reach !== 'own' || reach.unowned !== undefined || reach.while !== undefined || reach.by !== undefined || reach.notBy !== undefined || reach.via !== undefined) {
+        if (reach === undefined || reach.reach !== 'own' || reach.unowned !== undefined || reach.while !== undefined || reach.by !== undefined || reach.notBy !== undefined || reach.via !== undefined || reach.notThrough !== undefined) {
           out.push({ path: ['roles', r, 'limits', ref, 'rows', action], message: `"${ref}" is private: the role's ${action} reaches the person's own rows only ({ "reach": "own" })` });
         }
       }
@@ -411,6 +455,28 @@ export function roleLimitIssues<C extends ColumnShape>(roles: readonly RoleShape
       }
     }
   });
+  return out;
+}
+
+/**
+ * The listings a table's rows are read through: the table of each of its
+ * `through` ways, and of the rows it hangs off (`via`), as far up as a row is
+ * followed ({@link BELONGS_VIA_MAX_STEPS} links).
+ */
+export function listingsOf<C extends ColumnShape>(ref: string, index: TableIndex<C>, ways: (ref: string) => readonly BelongsWay[]): Set<string> {
+  const out = new Set<string>();
+  const walk = (table: string, steps: number, seen: ReadonlySet<string>): void => {
+    for (const way of ways(table)) {
+      if ('through' in way) out.add(way.through.table);
+      else if ('via' in way && steps < BELONGS_VIA_MAX_STEPS) {
+        const link = index.column(table, way.via);
+        const parent = link?.type === 'fk' ? link.references : undefined;
+        if (parent === undefined || seen.has(parent)) continue;
+        walk(parent, steps + 1, new Set([...seen, table]));
+      }
+    }
+  };
+  walk(ref, 0, new Set([ref]));
   return out;
 }
 
