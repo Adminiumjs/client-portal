@@ -153,7 +153,8 @@ export function modulesLeftOut(document: unknown, has: (addOn: string) => boolea
  * column into one (and an index or a way of belonging that reads the column),
  * a kept total over one (the column stays, empty), a page bound to one, a
  * role's grants and limits on one, a rule or a public entry on one, an
- * outbox link and producer on one, a starting row for one. A role left with
+ * outbox link and producer on one (and the class of a kind that went), a
+ * starting row for one, a people table and a copy of a person kept on one. A role left with
  * no module is gone too. The modules themselves stay declared: one that is
  * left out is simply off.
  */
@@ -298,6 +299,40 @@ export function withoutModules<T>(manifest: T, gone: readonly string[]): T {
       const had = new Set(list((isDoc(manifest['outbox']) ? manifest['outbox']['producers'] : undefined) as unknown).flatMap((producer) => (isDoc(producer) && typeof producer['kind'] === 'string' ? [producer['kind']] : [])));
       if (isDoc(outbox['kinds'])) for (const kind of Object.keys(outbox['kinds'])) if (had.has(kind) && !sent.has(kind)) delete outbox['kinds'][kind];
     }
+    // A kind that went says no class either.
+    if (isDoc(outbox['classes'])) {
+      const kinds = isDoc(outbox['kinds']) ? outbox['kinds'] : {};
+      for (const kind of Object.keys(outbox['classes'])) if (kinds[kind] === undefined) delete outbox['classes'][kind];
+      if (Object.keys(outbox['classes']).length === 0) delete outbox['classes'];
+    }
+  }
+
+  // A people table that is not made goes; so does a copy kept on one, or read through a link it lost, a company link it lost, and what is carried from one.
+  if (Array.isArray(out['people'])) {
+    const kept = list(out['people']).filter((entry) => !(isDoc(entry) && onGoneTable(entry['table'])));
+    for (const entry of kept) {
+      if (!isDoc(entry)) continue;
+      const lost = lostColumns.get(text(entry['table']) ?? '') ?? new Set<string>();
+      if (typeof entry['company'] === 'string' && lost.has(entry['company'])) delete entry['company'];
+      // A mark carried from a table that is not made, and a carry that reads one, go with it.
+      const mark = entry['optOutMark'];
+      if (isDoc(mark) && isDoc(mark['carryFrom']) && onGoneTable(mark['carryFrom']['table'])) delete mark['carryFrom'];
+      if (Array.isArray(entry['carry'])) {
+        const carries = list(entry['carry']).filter((carry) => !(isDoc(carry) && isDoc(carry['consent']) && onGoneTable(carry['consent']['from'])));
+        if (carries.length === 0) delete entry['carry'];
+        else entry['carry'] = carries;
+      }
+      if (!Array.isArray(entry['copies'])) continue;
+      const copies = list(entry['copies']).filter((copy) => {
+        if (!isDoc(copy)) return true;
+        if (onGoneTable(copy['table'])) return false;
+        return !(typeof copy['via'] === 'string' && (lostColumns.get(text(copy['table']) ?? '') ?? new Set<string>()).has(copy['via']));
+      });
+      if (copies.length === 0) delete entry['copies'];
+      else entry['copies'] = copies;
+    }
+    if (kept.length === 0) delete out['people'];
+    else out['people'] = kept;
   }
 
   if (Array.isArray(out['roles'])) {

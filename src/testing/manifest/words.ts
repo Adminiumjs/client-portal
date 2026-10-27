@@ -182,6 +182,17 @@ export const INSTALL_FLOOR_WORD_NAMES = [
   'stamp.strict',
   // A column a stamp fills and `requiredWhen` asks for: a brought line must carry it.
   'requiredWhen.stamp',
+  // Marketing or service: each outbox kind's class, and a rule's e-mail to the record's own address.
+  'outbox.classes',
+  'automations.emailClass',
+  // The tables that hold an app's people, and where else a person is copied.
+  'people',
+  // A table whose rows the law keeps.
+  'table.keep',
+  // A consent tick a stranger gives on a public entry, with the sentence shown and its version.
+  'publicAccess.consent',
+  // More rules than a manifest could ship before (twenty-four).
+  'automations.more',
 ] as const;
 export type ManifestWordName = (typeof INSTALL_FLOOR_WORD_NAMES)[number];
 
@@ -335,6 +346,18 @@ export const WORD_FLOORS: Readonly<Partial<Record<ManifestWordName, string>>> = 
   'stamp.strict': '0.3.35',
   // A stamp beside `requiredWhen`: stamped on a person's save, asked of a brought line (a release before refuses the pair).
   'requiredWhen.stamp': '0.3.35',
+  // Each outbox kind's class beside its template, and a rule's e-mail to the record's own address marked marketing or service:
+  // from this release on every one says which (see `mail-class.ts`).
+  'outbox.classes': '0.3.38',
+  'automations.emailClass': '0.3.38',
+  // An app's people tables: their address, name, consent and copies, read by e-mail to contacts and a person's data.
+  'people': '0.3.38',
+  // A table whose rows the law keeps: an erasure leaves them and says why.
+  'table.keep': '0.3.38',
+  // A stranger's consent tick on a public entry: the row's bool, its purpose, the sentence shown and its version.
+  'publicAccess.consent': '0.3.38',
+  // More rules than a manifest could ship before (twenty-four, now thirty-two).
+  'automations.more': '0.3.38',
 };
 
 /** Every word of `document` that needs the install floor, in document order. */
@@ -385,6 +408,8 @@ export function installFloorWords(document: unknown): ManifestWord[] {
     });
     // An entry of the app's section that is not a page.
     if (document['navLinks'] !== undefined) out.push({ word: 'navLinks', path: 'navLinks' });
+    // The app's people tables.
+    if (document['people'] !== undefined) out.push({ word: 'people', path: 'people' });
   }
 
   list(schema['tables']).forEach((table, t) => {
@@ -409,6 +434,7 @@ export function installFloorWords(document: unknown): ManifestWord[] {
     if (table['appGrants'] !== undefined) out.push({ word: 'table.appGrants', path: `${at}.appGrants` });
     if (table['occupies'] !== undefined) out.push({ word: 'table.occupies', path: `${at}.occupies` });
     if (table['removal'] !== undefined) out.push({ word: 'table.removal', path: `${at}.removal` });
+    if (table['keep'] !== undefined) out.push({ word: 'table.keep', path: `${at}.keep` });
     if (isDoc(table['states']) && table['states']['actions'] !== undefined) out.push({ word: 'states.actions', path: `${at}.states.actions` });
     list(isDoc(table['states']) ? table['states']['actions'] : undefined).forEach((action, a) => {
       if (isDoc(action) && action['handOver'] !== undefined) out.push({ word: 'states.handOver', path: `${at}.states.actions.${String(a)}.handOver` });
@@ -529,6 +555,7 @@ export function installFloorWords(document: unknown): ManifestWord[] {
   // An email block sent only with, or without, a variable; an add-on's links into its app; rows found by a table-and-row pair.
   const outbox = isDoc(document['outbox']) ? document['outbox'] : {};
   if (isDoc(outbox['pages']) && outbox['pages']['app'] !== undefined) out.push({ word: 'outbox.pages.app', path: 'outbox.pages.app' });
+  if (outbox['classes'] !== undefined) out.push({ word: 'outbox.classes', path: 'outbox.classes' });
   list(outbox['producers']).forEach((producer, p) => {
     if (isDoc(producer) && producer['replyTo'] !== undefined) out.push({ word: 'outbox.replyTo', path: `outbox.producers.${String(p)}.replyTo` });
     // A message about a row that was removed.
@@ -574,6 +601,7 @@ export function installFloorWords(document: unknown): ManifestWord[] {
     Array.isArray(value) ? value.some(holdsSettingAmount) : isDoc(value) && ((value['amount'] !== undefined && value['unit'] !== undefined && value['setting'] !== undefined) || Object.values(value).some(holdsSettingAmount));
   // More rules than a manifest could ship before.
   if (list(document['automations']).length > 12) out.push({ word: 'automations.many', path: 'automations' });
+  if (list(document['automations']).length > 24) out.push({ word: 'automations.more', path: 'automations' });
   // A rule that uses a step an add-on gives.
   list(document['automations']).forEach((rule, r) => {
     const steps = (nodes: unknown, at: string): void => {
@@ -584,6 +612,7 @@ export function installFloorWords(document: unknown): ManifestWord[] {
         const to = isDoc(action['to']) ? action['to'] : {};
         if ((action['kind'] === 'notification' && to['column'] !== undefined) || (action['kind'] === 'email' && to['kind'] === 'staff')) out.push({ word: 'automations.staffRecipient', path: `${at}.${String(n)}.action.to` });
         if (action['kind'] === 'email' && action['replyTo'] !== undefined) out.push({ word: 'automations.replyTo', path: `${at}.${String(n)}.action.replyTo` });
+        if (action['kind'] === 'email' && action['class'] !== undefined) out.push({ word: 'automations.emailClass', path: `${at}.${String(n)}.action.class` });
         if (action['kind'] === 'notification' && (to['lead'] !== undefined || to['else'] !== undefined)) out.push({ word: 'automations.lead', path: `${at}.${String(n)}.action.to` });
         if (action['kind'] === 'notification' && to['lead'] === true && to['else'] === undefined) out.push({ word: 'automations.leadAlone', path: `${at}.${String(n)}.action.to` });
         if ((action['kind'] === 'notification' && to['listed'] !== undefined) || (action['kind'] === 'email' && to['kind'] === 'listed')) out.push({ word: 'automations.listed', path: `${at}.${String(n)}.action.to` });
@@ -637,6 +666,7 @@ export function installFloorWords(document: unknown): ManifestWord[] {
     }
     if (isDoc(entry) && entry['words'] !== undefined) out.push({ word: 'availability.words', path: `publicAccess.${String(e)}.words` });
     if (isDoc(entry) && entry['requiresWhen'] !== undefined) out.push({ word: 'publicAccess.requiresWhen', path: `publicAccess.${String(e)}.requiresWhen` });
+    if (isDoc(entry) && entry['consent'] !== undefined) out.push({ word: 'publicAccess.consent', path: `publicAccess.${String(e)}.consent` });
   });
   return out;
 }

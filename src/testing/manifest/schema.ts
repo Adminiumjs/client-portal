@@ -65,6 +65,8 @@ import { compareSemver, parseSemverRange } from './semver.ts';
 import { assistantIssues, type AssistantTableShape } from './assistant.ts';
 import { stepsIssues, type StepTableShape } from './steps.ts';
 import { WORD_FLOORS, installFloorWords } from './words.ts';
+import { mailClassFloorIssues } from './mail-class.ts';
+import { keepSchema, peopleIssues, peopleSchema, publicConsentIssues } from './people.ts';
 import { automationIssues, manifestAutomationsSchema, type AutomationTableShape, type ManifestAutomation } from './automations.ts';
 import { changeGuardIssues, changeGuardsSchema } from './change-guards.ts';
 import { adjustDecidedColumns, adjustIssues, adjustSchema, adjusterIssues, adjusterSchema, type Adjuster, type AdjustTableShape } from './adjust.ts';
@@ -1123,6 +1125,8 @@ export const requiredTableSchema = z
     appGrants: appGrantsSchema.optional(),
     /** What a removal of a row takes (a reason) and keeps (the removed row's history, read through a parent): see `removal.ts`. */
     removal: removalSchema.optional(),
+    /** The law makes the business keep its rows (`{law: 'tax'}`): an erasure leaves them, and says why (see `people.ts`). */
+    keep: keepSchema.optional(),
   })
   .strict()
   .refine(
@@ -3519,6 +3523,8 @@ export const appManifestSchema = z
      * first app that says this asks, and no later one asks again.
      */
     maps: z.literal(true).optional(),
+    /** The tables that hold the app's people and companies, and where else a person is copied (see `people.ts`). */
+    people: peopleSchema.optional(),
   })
   .strict()
   .refine(capabilitiesNotContradictory, { ...CAPS_MESSAGE, path: [...CAPS_MESSAGE.path] })
@@ -3528,6 +3534,9 @@ export const appManifestSchema = z
     for (const issue of phoneSideIssues(m)) ctx.addIssue({ code: 'custom', message: issue.message, path: issue.path });
     for (const issue of railIssues(m)) ctx.addIssue({ code: 'custom', message: issue.message, path: issue.path });
     for (const issue of installFloorIssues(m)) ctx.addIssue({ code: 'custom', message: issue.message, path: issue.path });
+    for (const issue of mailClassFloorIssues(m)) ctx.addIssue({ code: 'custom', message: issue.message, path: issue.path });
+    for (const issue of peopleIssues(m, tableIndex(m.requiredSchema.tables))) ctx.addIssue({ code: 'custom', message: issue.message, path: issue.path });
+    for (const issue of publicConsentIssues(m, tableIndex(m.requiredSchema.tables))) ctx.addIssue({ code: 'custom', message: issue.message, path: issue.path });
     for (const issue of appReferenceIssues(m)) {
       ctx.addIssue({ code: 'custom', message: issue.message, path: issue.path });
     }
@@ -3590,6 +3599,9 @@ export const addOnManifestSchema = z
   .refine(compatibilityWindowOrdered, { ...WINDOW_MESSAGE, path: [...WINDOW_MESSAGE.path] })
   .superRefine((m, ctx) => {
     for (const issue of installFloorIssues(m)) ctx.addIssue({ code: 'custom', message: issue.message, path: issue.path });
+    for (const issue of mailClassFloorIssues(m)) ctx.addIssue({ code: 'custom', message: issue.message, path: issue.path });
+    // An add-on keeps no people of its own: a tick on its public entry has nobody to be kept for.
+    for (const issue of publicConsentIssues(m, tableIndex(m.requiredSchema?.tables ?? []))) ctx.addIssue({ code: 'custom', message: issue.message, path: issue.path });
     for (const issue of addOnModuleIssues(m)) ctx.addIssue({ code: 'custom', message: issue.message, path: issue.path });
     // Add-ons released before the floor keep the page refs they shipped with.
     if (m.pages !== undefined || compareSemver(m.compatibility.minAdminiumVersion, ADD_ON_INSTALL_FLOOR) >= 0) {

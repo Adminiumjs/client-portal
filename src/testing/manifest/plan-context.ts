@@ -696,6 +696,17 @@ export function planWithContext(
     for (const column of table.columns) {
       if (column.type !== 'fk' || column.references === undefined) continue;
       const target = column.references;
+      // A foreign key into Adminium's own tables would stop their rows being deleted, and their migrations.
+      if (!declared.has(target) && target.startsWith('adminium_')) {
+        references.push({ fromTable: table.ref, fromColumn: column.ref, to: target, resolution: 'unresolved' });
+        problems.push({
+          code: 'RESERVED_TABLE',
+          table: table.ref,
+          column: column.ref,
+          message: `"${table.ref}.${column.ref}" links to "${target}", one of Adminium's own tables, which no ${noun} may link to.`,
+        });
+        continue;
+      }
       const resolution = declared.has(target) ? 'internal' : live.has(target) ? 'host' : 'unresolved';
       references.push({ fromTable: table.ref, fromColumn: column.ref, to: target, resolution });
       if (resolution === 'unresolved') {

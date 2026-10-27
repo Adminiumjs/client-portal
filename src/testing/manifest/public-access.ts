@@ -41,6 +41,8 @@
  */
 import { z } from 'zod';
 
+import { publicConsentSchema } from './people.ts';
+
 import { kindOf, rulesOf, type Capacity } from './capacity.ts';
 import { formulaColumns, type FormulaExpr } from './formula.ts';
 import {
@@ -535,6 +537,16 @@ export const publicAccessSchema = z
     shareLink: refSchema.optional(),
     /** On an identity entry: what "delete my details" empties. */
     forget: forgetSchema.optional(),
+    /**
+     * A tick a stranger gives on this entry's create or change ("Email me
+     * about new shows"): `column` is the bool of the written row that carries
+     * it, `purpose` the consent it gives, and `wording` the sentence shown
+     * beside the box, with its version, so the consent log keeps what was
+     * shown and never a text from the request. Kept for the person the entry
+     * finds or works for (see `people.ts` `publicConsentIssues`). A box left
+     * unticked writes nothing: it takes back no earlier yes.
+     */
+    consent: publicConsentSchema.optional(),
     /** On a signed-in person's rows: "Make a new link" for a row's own link. */
     newLink: newLinkSchema.optional(),
     /**

@@ -35,13 +35,16 @@
  */
 import { z } from 'zod';
 
+import { MAIL_CLASSES } from './mail-classes.ts';
 import { placeholderNames, requiredNamesOfEmail, showWhenNames } from './placeholders.ts';
 import { bcp47TagSchema, refSchema, type ReferenceIssue } from './refs.ts';
 
 /** The most rules one manifest ships, and the most steps one rule holds. */
-export const MANIFEST_AUTOMATIONS_MAX = 24;
+export const MANIFEST_AUTOMATIONS_MAX = 32;
 /** How many a manifest could ship before: one with more says so, so a server that reads only these refuses it by its version. */
 export const MANIFEST_AUTOMATIONS_FIRST_MAX = 12;
+/** How many it could ship until Adminium 0.3.38: one with more says so the same way. */
+export const MANIFEST_AUTOMATIONS_SECOND_MAX = 24;
 export const AUTOMATION_NODES_MAX = 40;
 
 /** One text, or the same text in several languages (US English always among them). */
@@ -211,6 +214,13 @@ export const manifestActionSchema = z.discriminatedUnion('kind', [
        * address they sign in with. Nobody there: no Reply-To.
        */
       replyTo: z.object({ staff: staffPath }).strict().optional(),
+      /**
+       * A mail to the record's own address (`to.kind` `field`) is marketing
+       * or service mail; from Adminium 0.3.38 it says which (see
+       * `mail-class.ts`). A mail to staff (`staff`, `listed`) says nothing:
+       * it is never stopped.
+       */
+      class: z.enum(MAIL_CLASSES).optional(),
       /** What fills a placeholder of the template that the record does not. */
       vars: z
         .record(z.string().regex(/^[A-Za-z0-9_.-]{1,120}$/), z.string().max(2000))
@@ -862,6 +872,9 @@ export function automationIssues(m: {
         if (action.to.kind === 'staff') staffAt(action.to.column, here('to', 'column'));
         else if (action.to.kind === 'listed') listedAt(action.to.table, here('to', 'table'));
         else column(record, action.to.column, here('to', 'column'));
+        if (action.class !== undefined && action.to.kind !== 'field') {
+          out.push({ path: here('class'), message: 'a mail to staff is never stopped, so it has no class: "class" is said of a mail to the record\'s own address (to.kind "field")' });
+        }
         if (action.replyTo !== undefined) staffAt(action.replyTo.staff, here('replyTo', 'staff'));
         const template = templates.get(action.templateKey);
         if (template === undefined) {

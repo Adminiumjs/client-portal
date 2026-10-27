@@ -42,6 +42,7 @@ import { z } from 'zod';
 import type { AddOnNeeds } from './add-ons.ts';
 import { formulaColumns, type FormulaExpr } from './formula.ts';
 import { OTHERWISE_BLOCKS, placeholderPattern } from './placeholders.ts';
+import { MAIL_CLASSES } from './mail-classes.ts';
 import { personalColumn, unlistedColumn } from './public-access.ts';
 import { reachedOnlyByUndo, type StateMove } from './states.ts';
 import {
@@ -397,6 +398,15 @@ export const outboxSchema = z
       .optional(),
     /** Each value of the kind column, and the template it is sent with. */
     kinds: z.record(z.string().min(1).max(40), z.string().min(1).max(80)),
+    /**
+     * Each kind's class, beside `kinds` so nothing that reads a kind's
+     * template changes: `marketing` (stopped for an address on the
+     * do-not-email list, sent with an unsubscribe link) or `service` (a
+     * receipt, a confirmation, a quote: never stopped). From Adminium 0.3.38
+     * every kind says which (see `mail-class.ts`); a manifest for an older
+     * Adminium has none, and its mail reads as service.
+     */
+    classes: z.record(z.string().min(1).max(40), z.enum(MAIL_CLASSES)).optional(),
     producers: z.array(outboxProducerSchema).max(24).optional(),
   })
   .strict();
@@ -786,6 +796,10 @@ export function outboxIssues(
       out.push({ path: at('kinds', value), message: `"${value}" is not a value of "${box.table}.${kind.ref}"` });
     }
     if (!templates.has(template)) out.push({ path: at('kinds', value), message: `"${template}" is not one of the app's emailTemplates` });
+  }
+  // A class is said of a kind the outbox sends.
+  for (const value of Object.keys(box.classes ?? {})) {
+    if (box.kinds[value] === undefined) out.push({ path: at('classes', value), message: `"${value}" is not one of the outbox's kinds` });
   }
 
   const unlisted = (table: string, column: string) => unlistedColumn(m, table, column);
