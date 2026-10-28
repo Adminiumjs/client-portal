@@ -22,7 +22,8 @@ rather than lorem ipsum.
 
 ## What it needs
 
-- **Adminium 0.3.28 or later.**
+- **Adminium 0.3.38 or later.** Update Adminium first, then the app: 0.2.6
+  changes no table and updates an install of 0.2.0 or later in place.
 - **Invoices & Receipts 1.0.5 or later**, which installs with the app.
 - A database on **SQLite, Postgres or MySQL**. The app creates its own tables
   there, under names Adminium gives them.
@@ -148,7 +149,20 @@ rather than lorem ipsum.
 
 - **Twenty emails, all in the outbox.** The `messages` table is the outbox,
   so every email can be seen, approved, edited, sent early or skipped. The
-  notices to the studio each have their own switch in Settings.
+  notices to the studio each have their own switch in Settings. Every one is
+  service mail: each email to a client is about their own proposal, work or
+  invoice, so Adminium's do-not-email list never stops it, and the studio
+  sends no newsletter.
+
+- **Clients, as Adminium knows them.** The clients are the studio's people:
+  the contact's address, name and language, and the copies of them on an
+  enquiry, a signed proposal, work approved on the clients' side and a note
+  written there. Finding, exporting or erasing a person by their address
+  reaches all of it. The proposals a client signed and the terms they were
+  sent under are a contract the law makes the studio keep, and the invoices,
+  their lines and the payments are kept for tax: an erasure leaves those as
+  they are and says so. (The app's `people` table is the studio's own team,
+  not its clients.)
 
 - **Live.** A change made on another computer, or by a client on the portal,
   reaches the desk as it happens.
@@ -280,6 +294,18 @@ TEST_POSTGRES_URL=postgres://postgres:postgres@127.0.0.1:5432/postgres \
 TEST_MYSQL_URL=mysql://root@127.0.0.1:3306 \
 npx vitest run src/contract
 ```
+
+Two more prove an update in place on the same three engines: the released
+0.2.0 (`src/contract/update.test.ts`) and the released 0.2.5
+(`src/contract/update-latest.test.ts`), each the published file, refused
+unless it matches `RELEASES.json`, installed on the Adminium it was released
+for, that Adminium upgraded in place to `ADMINIUM_REPO`, and the app updated
+to this build with every row kept byte for byte.
+
+| Variable | What it points at |
+| --- | --- |
+| `CONTRACT_FROM_TARBALL`, `CONTRACT_FROM_ADMINIUM` | `clients-0.2.0.tgz` from `downloads.adminium.dev/apps/clients/`, and an Adminium `v0.3.3` checkout, built. |
+| `CONTRACT_LATEST_TARBALL`, `CONTRACT_LATEST_ADMINIUM` | `clients-0.2.5.tgz`, and an Adminium `v0.3.28` checkout, built. |
 
 `ADMINIUM_REQUIRE_CONTRACT=1` turns a skip into a failure. CI's `contract`
 workflow sets it and runs all three engines, alongside the drift checks for
