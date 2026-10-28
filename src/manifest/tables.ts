@@ -49,8 +49,15 @@ export interface Table {
   builtOn?: string;
   part?: string;
   states?: Record<string, unknown>;
+  /** The law makes the studio keep these rows (its money, the contracts its clients signed): an erasure leaves them as they are. */
+  keep?: { law: "tax" | "health" | "contract" | "safety" };
   columns: Column[];
 }
+
+/** The studio's money: what it invoiced and what it was paid, kept for the tax years. */
+const KEPT_FOR_TAX = { law: "tax" } as const;
+/** What a client agreed to: the proposals they signed and the terms those proposals were sent under. */
+const KEPT_AS_CONTRACT = { law: "contract" } as const;
 
 // ── column makers ───────────────────────────────────────────────────────────
 
@@ -397,6 +404,7 @@ export const TABLES: Table[] = [
   },
   {
     ref: "terms_versions",
+    keep: KEPT_AS_CONTRACT,
     label: l("Terms version"),
     labelPlural: l("Terms versions"),
     keyField: "version",
@@ -517,6 +525,7 @@ export const TABLES: Table[] = [
   },
   {
     ref: "proposals",
+    keep: KEPT_AS_CONTRACT,
     label: l("Proposal"),
     labelPlural: l("Proposals"),
     keyField: "number",
@@ -836,6 +845,7 @@ export const TABLES: Table[] = [
   },
   {
     ref: "invoices",
+    keep: KEPT_FOR_TAX,
     label: l("Invoice"),
     labelPlural: l("Invoices"),
     keyField: "number",
@@ -882,6 +892,7 @@ export const TABLES: Table[] = [
   },
   {
     ref: "invoice_lines",
+    keep: KEPT_FOR_TAX,
     label: l("Invoice line"),
     labelPlural: l("Invoice lines"),
     ...builtOn("invoice@1", "lines"),
@@ -900,6 +911,7 @@ export const TABLES: Table[] = [
   },
   {
     ref: "payments",
+    keep: KEPT_FOR_TAX,
     label: l("Payment"),
     labelPlural: l("Payments"),
     keyField: "number",

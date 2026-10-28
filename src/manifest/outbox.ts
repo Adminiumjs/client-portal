@@ -25,6 +25,11 @@
  * paid; a brief sent; an enquiry from the studio's website (one the desk
  * types in from a call is not news to the desk).
  *
+ * Every kind is service mail, which the do-not-email list never stops: each
+ * to a client is about their own proposal, work or invoice, and the studio
+ * sends no newsletter. The notices to the studio are its own mail and would
+ * need no class; they say service too, so every kind says one.
+ *
  * The log is the dedupe: a kind already queued or sent for the same row is not
  * queued again.
  */
@@ -117,6 +122,8 @@ export const OUTBOX = {
   // A handover's link opens its page on the clients' side; its code rides the fragment.
   pages: { manage: "/h", booking: "/" },
   kinds: Object.fromEntries(KINDS.map((kind) => [kind, `clients-${kind}`])),
+  // About the client's own work and money, or the studio's own notices: none is stopped by the do-not-email list.
+  classes: Object.fromEntries(KINDS.map((kind) => [kind, "service"])),
   producers: [
     // ── to clients ──────────────────────────────────────────────────────────
     { kind: "proposal-sent", link: "proposal_id", onChange: { table: "proposals", column: "status", to: "sent" } },

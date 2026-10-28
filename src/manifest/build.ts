@@ -15,6 +15,7 @@ import { emailTemplates } from "./emails.ts";
 import { untranslated } from "./labels.ts";
 import { KINDS, OUTBOX } from "./outbox.ts";
 import { NAV_GROUPS, pages } from "./pages.ts";
+import { PEOPLE } from "./people-word.ts";
 import { PUBLIC_ACCESS, PUBLIC_KEYS } from "./public.ts";
 import { ROLES } from "./roles.ts";
 import { TABLES } from "./tables.ts";
@@ -28,9 +29,11 @@ import { TABLES } from "./tables.ts";
  * for Adminium 0.3.9. 0.2.4 changes no table: a client's invoice stays on
  * screen once they say they paid, and it asks for Adminium 0.3.11. 0.2.5
  * keeps a version's file and a handover file with their row (`column.file`),
- * so a client opens them again, and it asks for Adminium 0.3.28.
+ * so a client opens them again, and it asks for Adminium 0.3.28. 0.2.6
+ * changes no table: it tells Adminium who the clients are and where they are
+ * copied, that every email is service mail, and which tables the law keeps.
  */
-export const VERSION = "0.2.5";
+export const VERSION = "0.2.6";
 
 /**
  * The Adminium release that first reads everything below: formulas, numbers
@@ -45,8 +48,10 @@ export const VERSION = "0.2.5";
  * 0.3.28 is the first that keeps a column's uploaded file with its row
  * (`rules.file`): one uploaded for a plain column is never attached, and
  * 0.3.30 serves a client only a file attached to the row they read.
+ * 0.3.38 is the first that reads who the clients are and where they are
+ * copied (`people`), each email's class, and the tables the law keeps.
  */
-export const MIN_ADMINIUM = "0.3.28";
+export const MIN_ADMINIUM = "0.3.38";
 
 const ENV = {
   VITE_ADMINIUM_API_BASE_URL: { required: false, example: "https://admin.example.com" },
@@ -124,6 +129,7 @@ export function buildManifest(opts: { laterPages?: boolean } = {}): Record<strin
     roles: ROLES,
     publicKeys: PUBLIC_KEYS,
     publicAccess: PUBLIC_ACCESS,
+    people: PEOPLE,
     outbox: OUTBOX,
     emailTemplates: emailTemplates(KINDS),
     sampleData: { file: "seeds/clients.sample.json" },

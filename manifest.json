@@ -3,7 +3,7 @@
   "manifestVersion": 1,
   "key": "clients",
   "name": "Client Portal",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "publisher": {
     "id": "adminium",
     "name": "Adminium",
@@ -19,7 +19,7 @@
     "crm"
   ],
   "compatibility": {
-    "minAdminiumVersion": "0.3.28",
+    "minAdminiumVersion": "0.3.38",
     "engines": [
       "sqlite",
       "postgres",
@@ -942,6 +942,9 @@
       },
       {
         "ref": "terms_versions",
+        "keep": {
+          "law": "contract"
+        },
         "label": {
           "en-US": "Terms version",
           "de-DE": "Version der Bedingungen",
@@ -2319,6 +2322,9 @@
       },
       {
         "ref": "proposals",
+        "keep": {
+          "law": "contract"
+        },
         "label": {
           "en-US": "Proposal",
           "de-DE": "Angebot",
@@ -6618,6 +6624,9 @@
       },
       {
         "ref": "invoices",
+        "keep": {
+          "law": "tax"
+        },
         "label": {
           "en-US": "Invoice",
           "de-DE": "Rechnung",
@@ -7578,6 +7587,9 @@
       },
       {
         "ref": "invoice_lines",
+        "keep": {
+          "law": "tax"
+        },
         "label": {
           "en-US": "Invoice line",
           "de-DE": "Rechnungsposition",
@@ -7983,6 +7995,9 @@
       },
       {
         "ref": "payments",
+        "keep": {
+          "law": "tax"
+        },
         "label": {
           "en-US": "Payment",
           "de-DE": "Zahlung",
@@ -13627,6 +13642,54 @@
       "key": "handover"
     }
   ],
+  "people": [
+    {
+      "table": "clients",
+      "kind": "people",
+      "email": "email",
+      "name": "contact_name",
+      "firstName": "firstWordOfName",
+      "language": "language",
+      "copies": [
+        {
+          "table": "enquiries",
+          "column": "name",
+          "holds": "name",
+          "via": "client_id"
+        },
+        {
+          "table": "enquiries",
+          "column": "email",
+          "holds": "email",
+          "via": "client_id"
+        },
+        {
+          "table": "proposals",
+          "column": "signed_name",
+          "holds": "name",
+          "via": "client_id"
+        },
+        {
+          "table": "proposals",
+          "column": "signed_email",
+          "holds": "email",
+          "via": "client_id"
+        },
+        {
+          "table": "deliverables",
+          "column": "approved_by",
+          "holds": "name",
+          "via": "client_id"
+        },
+        {
+          "table": "deliverable_notes",
+          "column": "author",
+          "holds": "name",
+          "via": "client_id"
+        }
+      ]
+    }
+  ],
   "outbox": {
     "table": "messages",
     "columns": {
@@ -13695,6 +13758,28 @@
       "invoice-rung-2": "clients-invoice-rung-2",
       "invoice-rung-3": "clients-invoice-rung-3",
       "payment-receipt": "clients-payment-receipt"
+    },
+    "classes": {
+      "proposal-sent": "service",
+      "proposal-reminder": "service",
+      "new-work": "service",
+      "handover": "service",
+      "enquiry-reply": "service",
+      "ask-to-sign": "service",
+      "accepted-and-signed": "service",
+      "declined": "service",
+      "changes-requested": "service",
+      "approved": "service",
+      "client-says-paid": "service",
+      "brief-sent": "service",
+      "asked-for-a-new-price": "service",
+      "new-note": "service",
+      "new-enquiry": "service",
+      "invoice-sent": "service",
+      "invoice-rung-1": "service",
+      "invoice-rung-2": "service",
+      "invoice-rung-3": "service",
+      "payment-receipt": "service"
     },
     "producers": [
       {
