@@ -452,24 +452,39 @@ export const FROM_TARBALL = process.env["CONTRACT_FROM_TARBALL"] ?? "";
 export const FROM_ADMINIUM = process.env["CONTRACT_FROM_ADMINIUM"] ?? "";
 export const FROM_NODE_OPTIONS = process.env["CONTRACT_FROM_NODE_OPTIONS"] ?? "";
 
+/**
+ * A released version to update from: its published tarball and a built
+ * checkout of the Adminium it was released for, each named by its variable.
+ * The first is `CONTRACT_FROM_*` (0.2.0, on 0.3.3); the update from the
+ * release before this one (`update-latest.test.ts`) has its own pair.
+ */
+export interface ReleasedFrom {
+  tarball: string;
+  adminium: string;
+  /** The variables that name them, for a skip to say which is missing. */
+  names: { tarball: string; adminium: string };
+}
+
+const FIRST_FROM: ReleasedFrom = { tarball: FROM_TARBALL, adminium: FROM_ADMINIUM, names: { tarball: "CONTRACT_FROM_TARBALL", adminium: "CONTRACT_FROM_ADMINIUM" } };
+
 /** Why the released tarball, or the Adminium it was installed under, cannot be used here, or null when they can. */
-export function releasedMissing(): string | null {
-  if (FROM_TARBALL === "") return "CONTRACT_FROM_TARBALL is not set (the published tarball of the release this one updates)";
-  if (!existsSync(FROM_TARBALL)) return `no tarball at ${FROM_TARBALL}`;
-  if (FROM_ADMINIUM === "") return "CONTRACT_FROM_ADMINIUM is not set (a built checkout of the Adminium the released version was installed under)";
-  if (!existsSync(join(FROM_ADMINIUM, "apps", "server", "dist", "app.js"))) return `no built server in ${FROM_ADMINIUM}`;
-  if (!existsSync(join(FROM_ADMINIUM, "apps", "dashboard", "dist", "index.html"))) return `no built dashboard in ${FROM_ADMINIUM}`;
+export function releasedMissing(from: ReleasedFrom = FIRST_FROM): string | null {
+  if (from.tarball === "") return `${from.names.tarball} is not set (the published tarball of the release this one updates)`;
+  if (!existsSync(from.tarball)) return `no tarball at ${from.tarball}`;
+  if (from.adminium === "") return `${from.names.adminium} is not set (a built checkout of the Adminium the released version was installed under)`;
+  if (!existsSync(join(from.adminium, "apps", "server", "dist", "app.js"))) return `no built server in ${from.adminium}`;
+  if (!existsSync(join(from.adminium, "apps", "dashboard", "dist", "index.html"))) return `no built dashboard in ${from.adminium}`;
   return null;
 }
 
-export function releasedBundle(): Bundle & { key: string; version: string; files: Record<string, Buffer>; manifest: Record<string, unknown> } {
-  const buffer = readFileSync(FROM_TARBALL);
+export function releasedBundle(from: ReleasedFrom = FIRST_FROM): Bundle & { key: string; version: string; files: Record<string, Buffer>; manifest: Record<string, unknown> } {
+  const buffer = readFileSync(from.tarball);
   const integrity = `sha512-${createHash("sha512").update(buffer).digest("base64")}`;
   const files = untar(buffer);
   const pkg = JSON.parse(files["package.json"]!.toString("utf8")) as { version: string };
   const recorded = recordedRelease(pkg.version);
   if (recorded === null) throw new Error(`RELEASES.json records no ${pkg.version}`);
-  if (recorded.integrity !== integrity) throw new Error(`${FROM_TARBALL} is not the published ${pkg.version}: ${integrity} ≠ ${recorded.integrity}`);
+  if (recorded.integrity !== integrity) throw new Error(`${from.tarball} is not the published ${pkg.version}: ${integrity} ≠ ${recorded.integrity}`);
   const manifest = JSON.parse(files["manifest.json"]!.toString("utf8")) as Record<string, unknown> & { key: string; version: string };
   return { buffer, integrity, key: manifest.key, version: manifest.version, files, manifest };
 }
