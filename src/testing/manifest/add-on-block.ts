@@ -36,9 +36,11 @@ import { BUILTIN_NAV_GROUP_KEYS, type BuiltinNavGroupKey } from './nav-groups.ts
  * Add-ons get their OWN closed category vocabulary, because an add-on is
  * not a vertical and forcing it into the app facet set would make a carrier a
  * "commerce" product. Wave 4 uses two of the five; the other three exist so a
- * second add-on wave does not have to reopen the vocabulary.
+ * second add-on wave does not have to reopen the vocabulary. `marketing` is
+ * for the add-ons that reach people outside the business: forms and surveys,
+ * landing pages, chat, social posts, prospecting.
  */
-export const ADD_ON_CATEGORIES = ['artwork', 'delivery', 'payments', 'email', 'data'] as const;
+export const ADD_ON_CATEGORIES = ['artwork', 'delivery', 'payments', 'email', 'data', 'marketing'] as const;
 export const addOnCategorySchema = z.enum(ADD_ON_CATEGORIES);
 export type AddOnCategory = (typeof ADD_ON_CATEGORIES)[number];
 
@@ -338,6 +340,20 @@ export const addOnBlockSchema = z
      * manifest's own tables, so `@adminium/manifest` checks the whole of it.
      */
     lookUp: z.record(z.string(), z.unknown()).optional(),
+    /**
+     * Forms: which of the add-on's own tables hold the forms, the answers,
+     * and (optional) the survey invitations and the strangers' files. The
+     * engine reads, draws and writes them for a stranger; no add-on code
+     * runs for one. Only the two tables every forms add-on has are typed
+     * here: the columns each must have are the manifest's own vocabulary,
+     * so `@adminium/manifest` checks the whole of it.
+     */
+    forms: z
+      .looseObject({
+        forms: z.string().regex(/^[a-z][a-z0-9_]*$/, 'a table ref'),
+        answers: z.string().regex(/^[a-z][a-z0-9_]*$/, 'a table ref'),
+      })
+      .optional(),
     /**
      * Steps the add-on gives to Automations: each a named write of one row of
      * one of its own tables (see `steps.ts`). Which table and columns they are

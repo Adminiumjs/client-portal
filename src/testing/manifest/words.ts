@@ -193,6 +193,22 @@ export const INSTALL_FLOOR_WORD_NAMES = [
   'publicAccess.consent',
   // More rules than a manifest could ship before (twenty-four).
   'automations.more',
+  // An add-on's forms: the tables that hold its forms, answers, invitations and files.
+  'addOn.forms',
+  // A table an app opens to forms, through an entry under the reserved key `forms`.
+  'publicAccess.forms',
+  // An outbox kind's consent purpose, and the kinds whose template prints a survey's link.
+  'outbox.purposes',
+  'outbox.surveyLinks',
+  // The column of a table opened to forms that a form's fixed "Source" value goes into.
+  'publicAccess.forms.source',
+  // An add-on step's person input and its fields, a record input named by a unique column and held to some rows, a
+  // choice's help line, and the rule record's own table and key as tokens.
+  'step.person',
+  'step.recordBy',
+  'step.recordWhere',
+  'step.help',
+  'step.recordTokens',
 ] as const;
 export type ManifestWordName = (typeof INSTALL_FLOOR_WORD_NAMES)[number];
 
@@ -358,6 +374,24 @@ export const WORD_FLOORS: Readonly<Partial<Record<ManifestWordName, string>>> = 
   'publicAccess.consent': '0.3.38',
   // More rules than a manifest could ship before (twenty-four, now thirty-two).
   'automations.more': '0.3.38',
+  // An add-on's forms, which the engine draws and takes answers for, and a table an app opens to them.
+  'addOn.forms': '0.3.40',
+  'publicAccess.forms': '0.3.40',
+  // An outbox kind sent for a consent purpose (a survey invitation skips a "no" to surveys, even as service mail), and a
+  // kind whose template prints a survey's link, filled when it goes.
+  'outbox.purposes': '0.3.40',
+  'outbox.surveyLinks': '0.3.40',
+  // The column of a table opened to forms that a form's fixed "Source" value goes into (an enquiry's "From form").
+  'publicAccess.forms.source': '0.3.41',
+  // A step about a person (the rule record, or one link of it): their address, name, language, company, table and key.
+  'step.person': '0.3.41',
+  // A record input that names its row by a unique column (a survey by its slug), and the rows it may pick (only live ones).
+  'step.recordBy': '0.3.41',
+  'step.recordWhere': '0.3.41',
+  // A line under an input, and under each of a choice's options (the rule editor then draws them as cards).
+  'step.help': '0.3.41',
+  // The rule record's stored table name and its key, as an add-on's record tab and a survey's invitation keep them.
+  'step.recordTokens': '0.3.41',
 };
 
 /** Every word of `document` that needs the install floor, in document order. */
@@ -383,6 +417,25 @@ export function installFloorWords(document: unknown): ManifestWord[] {
     if (block['lookUp'] !== undefined) out.push({ word: 'addOn.lookUp', path: 'addOn.lookUp' });
     if (block['steps'] !== undefined) out.push({ word: 'addOn.steps', path: 'addOn.steps' });
     if (block['assistant'] !== undefined) out.push({ word: 'addOn.assistant', path: 'addOn.assistant' });
+    if (block['forms'] !== undefined) out.push({ word: 'addOn.forms', path: 'addOn.forms' });
+    // A step's person, its record named by a column and filtered, a choice's help line, and the record's own table and key.
+    list(block['steps']).forEach((step, s) => {
+      if (!isDoc(step)) return;
+      const at = `addOn.steps.${String(s)}`;
+      list(step['inputs']).forEach((input, i) => {
+        if (!isDoc(input)) return;
+        if (input['kind'] === 'person') out.push({ word: 'step.person', path: `${at}.inputs.${String(i)}.kind` });
+        if (input['by'] !== undefined) out.push({ word: 'step.recordBy', path: `${at}.inputs.${String(i)}.by` });
+        if (input['where'] !== undefined) out.push({ word: 'step.recordWhere', path: `${at}.inputs.${String(i)}.where` });
+        if (input['help'] !== undefined) out.push({ word: 'step.help', path: `${at}.inputs.${String(i)}.help` });
+        if (list(input['options']).some((option) => isDoc(option) && option['help'] !== undefined)) out.push({ word: 'step.help', path: `${at}.inputs.${String(i)}.options` });
+      });
+      const writes = isDoc(step['writes']) && isDoc(step['writes']['values']) ? step['writes']['values'] : {};
+      for (const [column, value] of Object.entries(writes)) {
+        if (isDoc(value) && value['person'] !== undefined) out.push({ word: 'step.person', path: `${at}.writes.values.${column}` });
+        if (isDoc(value) && (value['token'] === 'recordTable' || value['token'] === 'recordKey')) out.push({ word: 'step.recordTokens', path: `${at}.writes.values.${column}` });
+      }
+    });
     // An amount Adminium decides for a ledger's action (what a card may pay).
     list(block['ledgers']).forEach((ledger, l) => {
       for (const [name, action] of Object.entries(isDoc(ledger) && isDoc(ledger['actions']) ? ledger['actions'] : {})) {
@@ -556,6 +609,8 @@ export function installFloorWords(document: unknown): ManifestWord[] {
   const outbox = isDoc(document['outbox']) ? document['outbox'] : {};
   if (isDoc(outbox['pages']) && outbox['pages']['app'] !== undefined) out.push({ word: 'outbox.pages.app', path: 'outbox.pages.app' });
   if (outbox['classes'] !== undefined) out.push({ word: 'outbox.classes', path: 'outbox.classes' });
+  if (outbox['purposes'] !== undefined) out.push({ word: 'outbox.purposes', path: 'outbox.purposes' });
+  if (outbox['surveyLinks'] !== undefined) out.push({ word: 'outbox.surveyLinks', path: 'outbox.surveyLinks' });
   list(outbox['producers']).forEach((producer, p) => {
     if (isDoc(producer) && producer['replyTo'] !== undefined) out.push({ word: 'outbox.replyTo', path: `outbox.producers.${String(p)}.replyTo` });
     // A message about a row that was removed.
@@ -667,6 +722,8 @@ export function installFloorWords(document: unknown): ManifestWord[] {
     if (isDoc(entry) && entry['words'] !== undefined) out.push({ word: 'availability.words', path: `publicAccess.${String(e)}.words` });
     if (isDoc(entry) && entry['requiresWhen'] !== undefined) out.push({ word: 'publicAccess.requiresWhen', path: `publicAccess.${String(e)}.requiresWhen` });
     if (isDoc(entry) && entry['consent'] !== undefined) out.push({ word: 'publicAccess.consent', path: `publicAccess.${String(e)}.consent` });
+    if (isDoc(entry) && entry['key'] === 'forms') out.push({ word: 'publicAccess.forms', path: `publicAccess.${String(e)}.key` });
+    if (isDoc(entry) && entry['source'] !== undefined) out.push({ word: 'publicAccess.forms.source', path: `publicAccess.${String(e)}.source` });
   });
   return out;
 }

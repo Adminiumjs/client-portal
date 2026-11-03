@@ -43,7 +43,7 @@ import { pageBoardIssues } from './page-board.ts';
 import { pageCalendarIssues } from './page-calendar.ts';
 import { pageConfigIssues } from './page-config.ts';
 import { emailTemplateSchema, outboxIssues, outboxProducerSchema, outboxSchema } from './outbox.ts';
-import { codeWhereSchema, personalColumn, publicAccessIssues, publicAccessSchema, publicKeysSchema, shareCodeColumns, unlistedColumn, type PublicAccess } from './public-access.ts';
+import { FORMS_KEY, codeWhereSchema, personalColumn, plainTextMax, plainTextRef, publicAccessIssues, publicAccessSchema, publicKeysSchema, shareCodeColumns, unlistedColumn, type PublicAccess } from './public-access.ts';
 import { appGrantsIssues, appGrantsSchema, roleTableHold, type AppGrantTableShape, type RoleTableHold } from './app-grants.ts';
 import { belongsIssues, belongsSchema, privateTableIssues, roleAddOnTableIssues, roleAddOnTablesSchema, type RoleAddOnTable, roleLimitIssues, roleLimitsSchema, rowTablesOf, type RoleShape, privateShapeIssues, storedTotalIssues } from './roles.ts';
 import { conditionIssues, stateConditionSchema, statesIssues, statesSchema, type States } from './states.ts';
@@ -71,6 +71,7 @@ import { automationIssues, manifestAutomationsSchema, type AutomationTableShape,
 import { changeGuardIssues, changeGuardsSchema } from './change-guards.ts';
 import { adjustDecidedColumns, adjustIssues, adjustSchema, adjusterIssues, adjusterSchema, type Adjuster, type AdjustTableShape } from './adjust.ts';
 import { ledgerIssues, ledgersSchema, postingIssues, postingsSchema, receiptTableIssues, wordsIssues, wordsListSchema, type Ledger, type LedgerScopeTable, type LedgerTableShape, type StockWords } from './ledgers.ts';
+import { addOnFormsSchema, formsBlockIssues, type AddOnForms, type FormsTableShape } from './forms.ts';
 
 export { compareSemver };
 
@@ -2218,6 +2219,8 @@ export function appReferenceIssues(
    * own key and setting keys, which its rules may read, and no roles to name.
    */
   shapeOf?: { addOn: string; settings: readonly string[] },
+  /** Filled with the columns Adminium decides on each table, for a reader that needs them (`decidedColumnsOf`). */
+  sink?: { decided?: Map<string, ReadonlySet<string>> },
 ): { path: (string | number)[]; message: string }[] {
   const out: { path: (string | number)[]; message: string }[] = [];
   const index = tableIndex(m.requiredSchema.tables);
@@ -2980,6 +2983,7 @@ export function appReferenceIssues(
   out.push(
     ...publicAccessIssues(m.publicAccess ?? [], {
       index,
+      appKey: m.key,
       decided: (table) => decided.get(table) ?? new Set(),
       answersAvailability: (table) => tables.get(table)?.capacity !== undefined || tables.get(table)?.booking !== undefined,
       addOns: new Set([...(m.kind === 'add-on' ? [m.key] : []), ...[...(m.addOns?.requires ?? []), ...(m.addOns?.suggests ?? [])].map((need) => need.key)]),
@@ -3065,6 +3069,7 @@ export function appReferenceIssues(
       }),
     );
   }
+  if (sink !== undefined) sink.decided = new Map(decided);
   return out;
 }
 
@@ -3713,7 +3718,7 @@ const ADD_ON_BLOCKS = ['pages', 'roles', 'seeds', 'navGroups', 'optionLists', 'p
 export function installsLikeAnApp(m: Manifest): boolean {
   if (m.kind !== 'add-on') return false;
   if (ADD_ON_BLOCKS.some((block) => m[block] !== undefined)) return true;
-  if (m.requiredSchema?.prefixed === true || m.addOn.settingsTable !== undefined || m.addOn.ledgers !== undefined || m.addOn.adjuster !== undefined || m.addOn.words !== undefined || m.addOn.recordTabs !== undefined || m.addOn.steps !== undefined || m.addOn.assistant !== undefined) return true;
+  if (m.requiredSchema?.prefixed === true || m.addOn.settingsTable !== undefined || m.addOn.ledgers !== undefined || m.addOn.adjuster !== undefined || m.addOn.words !== undefined || m.addOn.recordTabs !== undefined || m.addOn.steps !== undefined || m.addOn.assistant !== undefined || m.addOn.forms !== undefined) return true;
   return (m.requiredSchema?.tables ?? []).some(
     (table) =>
       table.states !== undefined ||
@@ -3854,6 +3859,90 @@ export function adjusterOf(m: Manifest): Adjuster | null {
   return parsed.success ? parsed.data : null;
 }
 
+/** An add-on's forms block, typed; null for an app, and for an add-on that declares none. */
+export function formsOf(m: Manifest): AddOnForms | null {
+  if (m.kind !== 'add-on' || m.addOn.forms === undefined) return null;
+  const parsed = addOnFormsSchema.safeParse(m.addOn.forms);
+  return parsed.success ? parsed.data : null;
+}
+
+/** Per table of an app (or an add-on's own), the columns Adminium decides and no writer may set. */
+export function decidedColumnsOf(m: Manifest): ReadonlyMap<string, ReadonlySet<string>> {
+  const sink: { decided?: Map<string, ReadonlySet<string>> } = {};
+  appReferenceIssues(
+    {
+      ...m,
+      requiredSchema: m.requiredSchema ?? { tables: [] },
+      ...(m.kind === 'add-on' ? { ledgers: ledgersOf(m), codePages: (m.addOn.pages ?? []).map((page) => page.ref) } : {}),
+    },
+    undefined,
+    sink,
+  );
+  return sink.decided ?? new Map();
+}
+
+/** One table an app opens to forms: the entry under the key `forms`, as the forms door reads it. */
+export interface FormsEntry {
+  /** The manifest's short name for the table. */
+  table: string;
+  /** The columns a form's answers may fill. */
+  writable: string[];
+  /** The only values a browser may write into these columns. */
+  writableValues: Readonly<Record<string, readonly (string | number | boolean)[]>>;
+  /** Values the row gets whatever the answer says. */
+  defaults: Readonly<Record<string, string | number | boolean>>;
+  /** Columns the row must be given. */
+  requires: string[];
+  /** Columns Adminium decides on the table: no answer, default or source ever fills them. */
+  decided: string[];
+  /** Columns held to plain text, each with the longest it may be and the digits it may hold in all. */
+  plainText: { column: string; max: number; digits?: number }[];
+  /** The limits on a create nobody signed in for. */
+  anonymous: { perValue?: { columns: string[]; n: number }; perKeyHour?: number; perIpHour?: number };
+  /** Refused while one of these settings is off. */
+  requireSetting: { table: string; column: string }[];
+  /** The part of the app the entry belongs to: closed while it is off. */
+  module?: string;
+  /** The `writable` text column a form's fixed "Source" value goes into; absent when the entry names none. */
+  source?: string;
+}
+
+/**
+ * The tables an app opens to forms, each with what a form's answer may fill
+ * there: the entries under the reserved key `forms`. Empty for a manifest that
+ * opens none. The forms door reads these and nothing else, so a form's map
+ * can never write a column the app did not open.
+ */
+export function formsEntriesOf(m: Manifest): FormsEntry[] {
+  const entries = (m.publicAccess ?? []).filter((entry) => entry.key === FORMS_KEY);
+  if (entries.length === 0) return [];
+  const decided = decidedColumnsOf(m);
+  return entries.map((entry): FormsEntry => {
+    const anonymous = entry.anonymous ?? {};
+    return {
+      table: entry.table,
+      writable: [...(entry.writable ?? [])],
+      writableValues: structuredClone(entry.writableValues ?? {}),
+      defaults: { ...(entry.defaults ?? {}) },
+      requires: [...(entry.requires ?? [])],
+      decided: [...(decided.get(entry.table) ?? [])].sort(),
+      plainText: (anonymous.plainText ?? []).map((ref) => ({
+        column: plainTextRef(ref),
+        max: plainTextMax(ref),
+        ...(typeof ref !== 'string' && ref.digits !== undefined ? { digits: ref.digits } : {}),
+      })),
+      anonymous: {
+        ...(anonymous.perValue === undefined ? {} : { perValue: { columns: [...anonymous.perValue.columns], n: anonymous.perValue.n } }),
+        ...(anonymous.perKeyHour === undefined ? {} : { perKeyHour: anonymous.perKeyHour }),
+        ...(anonymous.perIpHour === undefined ? {} : { perIpHour: anonymous.perIpHour }),
+      },
+      requireSetting: (entry.requireSetting ?? []).map((setting) => ({ table: setting.table, column: setting.column })),
+      ...(entry.module === undefined ? {} : { module: entry.module }),
+      ...(entry.source === undefined ? {} : { source: entry.source }),
+    };
+  });
+}
+
 /** An add-on's ledgers, typed. Empty for an app, and for an add-on that declares none. */
 export function ledgersOf(m: Manifest): Ledger[] {
   if (m.kind !== 'add-on' || m.addOn.ledgers === undefined) return [];
@@ -3904,6 +3993,26 @@ function addOnInstallIssues(m: AddOnManifest): { path: (string | number)[]; mess
 
   // Steps the add-on gives to Automations: the row each writes is one of its own tables.
   if (m.addOn.steps !== undefined) out.push(...stepsIssues(m.addOn.steps, tables as unknown as readonly StepTableShape[]));
+
+  // Forms: typed loosely in the contracts package; its tables, their columns and who may write them are checked here.
+  if (m.addOn.forms !== undefined) {
+    const parsed = addOnFormsSchema.safeParse(m.addOn.forms);
+    if (!parsed.success) {
+      for (const issue of parsed.error.issues) out.push({ path: ['addOn', 'forms', ...issue.path.map((part) => (typeof part === 'symbol' ? String(part) : part))], message: issue.message });
+    } else {
+      out.push(
+        ...formsBlockIssues(parsed.data, {
+          categories: m.categories,
+          tables: tables as unknown as readonly FormsTableShape[],
+          roles: m.roles,
+          publicAccess: m.publicAccess,
+          steps: m.addOn.steps,
+          decided: (table, column) => decidedByRules(byRef.get(table)?.columns.find((candidate) => candidate.ref === column)?.rules),
+          settingsTable: m.addOn.settingsTable,
+        }),
+      );
+    }
+  }
 
   // Tabs that list the add-on's rows on other tables' record pages: its own tables, columns and words.
   if (m.addOn.recordTabs !== undefined) {

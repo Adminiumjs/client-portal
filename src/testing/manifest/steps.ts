@@ -21,7 +21,9 @@
  * input is used, and no column the row cannot be saved without is left
  * unfilled. So a step that installs is a step that can run.
  */
-import type { AddOnStep } from './add-on-steps.ts';
+import { ADD_ON_STEP_PERSONAL_FIELDS, type AddOnStep } from './add-on-steps.ts';
+
+import { personalColumn } from './public-access.ts';
 
 /** What the checks read of a table. */
 export interface StepTableShape {
@@ -32,6 +34,8 @@ export interface StepTableShape {
     role?: string | undefined;
     nullable?: boolean | undefined;
     default?: unknown;
+    unique?: boolean | undefined;
+    enum?: readonly string[] | undefined;
     rules?: Readonly<Record<string, unknown>> | undefined;
   }[];
 }
@@ -55,7 +59,25 @@ export function stepsIssues(steps: readonly AddOnStep[], tables: readonly StepTa
     const at = (...rest: (string | number)[]) => ['addOn', 'steps', s, ...rest];
     const inputs = new Map(step.inputs.map((input) => [input.key, input]));
     step.inputs.forEach((input, i) => {
-      if (input.table !== undefined && !byRef.has(input.table)) out.push({ path: at('inputs', i, 'table'), message: `"${input.table}" is not one of this add-on's tables` });
+      if (input.table === undefined) return;
+      const picked = byRef.get(input.table);
+      if (picked === undefined) {
+        out.push({ path: at('inputs', i, 'table'), message: `"${input.table}" is not one of this add-on's tables` });
+        return;
+      }
+      // A row named by a column is one row: the column holds each value once.
+      if (input.by !== undefined) {
+        const by = picked.columns.find((column) => column.ref === input.by);
+        if (by === undefined) out.push({ path: at('inputs', i, 'by'), message: `"${picked.ref}" has no column "${input.by}"` });
+        else if (by.unique !== true && by.role !== 'pk') out.push({ path: at('inputs', i, 'by'), message: `"${picked.ref}.${input.by}" may hold a value twice: a row is named by a unique column` });
+      }
+      (input.where ?? []).forEach((condition, w) => {
+        const column = picked.columns.find((candidate) => candidate.ref === condition.column);
+        if (column === undefined) out.push({ path: at('inputs', i, 'where', w, 'column'), message: `"${picked.ref}" has no column "${condition.column}"` });
+        else if (column.enum !== undefined && !column.enum.includes(String(condition.eq))) {
+          out.push({ path: at('inputs', i, 'where', w, 'eq'), message: `"${picked.ref}.${condition.column}" is one of ${column.enum.join(', ')}: no row holds "${String(condition.eq)}"` });
+        }
+      });
     });
     const table = byRef.get(step.writes.table);
     if (table === undefined) {
@@ -76,6 +98,14 @@ export function stepsIssues(steps: readonly AddOnStep[], tables: readonly StepTa
       if ('input' in value) {
         if (inputs.has(value.input)) used.add(value.input);
         else out.push({ path: at('writes', 'values', ref, 'input'), message: `"${value.input}" is not one of this step's inputs` });
+      }
+      if ('person' in value) {
+        if (inputs.get(value.person)?.kind === 'person') used.add(value.person);
+        else out.push({ path: at('writes', 'values', ref, 'person'), message: `"${value.person}" is not one of this step's person inputs` });
+        // A person's address and name are kept as the add-on keeps them: never in a column anybody may read in full.
+        if (ADD_ON_STEP_PERSONAL_FIELDS.includes(value.field) && personalColumn(table as Parameters<typeof personalColumn>[0], ref) === null) {
+          out.push({ path: at('writes', 'values', ref, 'field'), message: `"${table.ref}.${ref}" takes a person's ${value.field}: mark the column personal` });
+        }
       }
     }
     step.inputs.forEach((input, i) => {

@@ -42,7 +42,7 @@ import { z } from 'zod';
 import type { AddOnNeeds } from './add-ons.ts';
 import { formulaColumns, type FormulaExpr } from './formula.ts';
 import { OTHERWISE_BLOCKS, placeholderPattern } from './placeholders.ts';
-import { MAIL_CLASSES } from './mail-classes.ts';
+import { MAIL_CLASSES, MAIL_PURPOSES } from './mail-classes.ts';
 import { personalColumn, unlistedColumn } from './public-access.ts';
 import { reachedOnlyByUndo, type StateMove } from './states.ts';
 import {
@@ -407,6 +407,25 @@ export const outboxSchema = z
      * Adminium has none, and its mail reads as service.
      */
     classes: z.record(z.string().min(1).max(40), z.enum(MAIL_CLASSES)).optional(),
+    /**
+     * The consent purpose a kind is sent for (`newsletter`, `surveys`). A
+     * marketing kind is judged by the consent log's answer for it instead of
+     * the newsletter's; a service kind that names one is skipped for a
+     * person whose latest answer for it is "no" (a survey invitation, sent as
+     * service mail, never reaches a person who said no to surveys), and, from
+     * Adminium 0.3.42, for an address on the do-not-email list: a purpose
+     * marks the mail as an offer the person may refuse. From Adminium 0.3.40.
+     */
+    purposes: z.record(z.string().min(1).max(40), z.enum(MAIL_PURPOSES)).optional(),
+    /**
+     * The kinds whose template may print `{{survey_link}}`: a link to the
+     * survey of the invitation the message is about, filled by Adminium when
+     * the message goes and only then (a named survey's link carries a one-use
+     * token, kept on the invitation as its hash alone). Only on an add-on that
+     * declares forms with invitations, and only for a kind every producer of
+     * which reads the invitations table. From Adminium 0.3.40.
+     */
+    surveyLinks: z.array(z.string().min(1).max(40)).min(1).max(8).optional(),
     producers: z.array(outboxProducerSchema).max(24).optional(),
   })
   .strict();
@@ -801,6 +820,11 @@ export function outboxIssues(
   for (const value of Object.keys(box.classes ?? {})) {
     if (box.kinds[value] === undefined) out.push({ path: at('classes', value), message: `"${value}" is not one of the outbox's kinds` });
   }
+  // So is a purpose.
+  for (const value of Object.keys(box.purposes ?? {})) {
+    if (box.kinds[value] === undefined) out.push({ path: at('purposes', value), message: `"${value}" is not one of the outbox's kinds` });
+  }
+  out.push(...surveyLinkIssues(m, box, at));
 
   const unlisted = (table: string, column: string) => unlistedColumn(m, table, column);
   (box.producers ?? []).forEach((producer, p) => {
@@ -1371,4 +1395,44 @@ export function rowFormsOf(column: Parameters<typeof clockShaped>[0] & { rules?:
   const own = column.type === 'text' && !clockShaped(column) ? forms.filter((form) => form !== 'time') : forms;
   const coded = isCodeColumn(column) ? [...own, GROUPED_FORM] : own;
   return column.rules?.staff === true ? [...coded, STAFF_NAME_FORM] : coded;
+}
+
+/** The name a template prints a survey's link under (`outbox.surveyLinks`). */
+export const SURVEY_LINK_VARIABLE = 'survey_link';
+
+/**
+ * A survey's link is sent only to the invitation it was made for: the kinds
+ * that print it belong to an add-on that declares forms with invitations, and
+ * every producer of such a kind reads the invitations table itself (the
+ * message's own link names the invitation). A kind is named once.
+ */
+function surveyLinkIssues(m: { kind?: string | undefined }, box: Outbox, at: (...rest: (string | number)[]) => (string | number)[]): ReferenceIssue[] {
+  const out: ReferenceIssue[] = [];
+  const kinds = box.surveyLinks ?? [];
+  if (kinds.length === 0) return out;
+  const forms = m.kind === 'add-on' ? (m as { addOn?: { forms?: { invitations?: unknown } } }).addOn?.forms : undefined;
+  const invitations = typeof forms?.invitations === 'string' ? forms.invitations : undefined;
+  if (invitations === undefined) {
+    out.push({ path: at('surveyLinks'), message: 'a survey link is sent for an invitation: only an add-on that declares forms with invitations (addOn.forms.invitations) prints one' });
+    return out;
+  }
+  const seen = new Set<string>();
+  kinds.forEach((kind, k) => {
+    if (seen.has(kind)) out.push({ path: at('surveyLinks', k), message: `"${kind}" is named twice` });
+    seen.add(kind);
+    if (box.kinds[kind] === undefined) {
+      out.push({ path: at('surveyLinks', k), message: `"${kind}" is not one of the outbox's kinds` });
+      return;
+    }
+    const producers = (box.producers ?? []).map((producer, p) => ({ producer, p })).filter(({ producer }) => producer.kind === kind);
+    if (producers.length === 0) out.push({ path: at('surveyLinks', k), message: `"${kind}" prints a survey link, so a producer queues it for an invitation: none does` });
+    for (const { producer, p } of producers) {
+      const source = 'onCreate' in producer ? producer.onCreate : 'onChange' in producer ? producer.onChange : 'before' in producer ? producer.before : producer.onDelete;
+      const via = 'via' in source ? source.via : undefined;
+      if (source.table !== invitations || via !== undefined || 'onDelete' in producer) {
+        out.push({ path: at('producers', p), message: `"${kind}" prints a survey link, so its producer reads a row of the invitations ("${invitations}") itself, as it is made, changed or comes due` });
+      }
+    }
+  });
+  return out;
 }
