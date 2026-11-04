@@ -452,6 +452,8 @@ const childEntryShape = {
   plainText: plainTextSchema.optional(),
   /** The most a column may add up to across the rows of one write (a dozen items to an order). */
   sumMax: sumMaxSchema.optional(),
+  /** File columns of the child a guest may upload into (`POST /public/uploads`), as on the entry itself. */
+  uploads: z.array(refSchema).min(1).max(8).optional(),
 };
 
 const childTablesSchema = <T extends z.ZodTypeAny>(entry: T) =>
@@ -534,7 +536,8 @@ export const publicAccessSchema = z
   .object({
     table: refSchema,
     kind: z.enum(['records', 'availability']).optional(),
-    methods: z.array(z.enum(['GET', 'POST', 'PATCH'])).min(1),
+    /** `DELETE` only on an add-on's own link: its holder removes their own row while it is in a state the entry names. */
+    methods: z.array(z.enum(['GET', 'POST', 'PATCH', 'DELETE'])).min(1),
     select: z.array(refSchema).optional(),
     writable: z.array(refSchema).optional(),
     filters: z.array(z.union([valueFilterSchema, relativeFilterSchema])).optional(),
@@ -566,6 +569,14 @@ export const publicAccessSchema = z
      * unticked writes nothing: it takes back no earlier yes.
      */
     consent: publicConsentSchema.optional(),
+    /**
+     * On an add-on's entry, which rides the key of every app it is attached
+     * to: a text column of the table that holds the key of the app a row is
+     * for (`app`). Through an app's key the entry reads only the rows whose
+     * column holds that app's key, a create writes that key there (the
+     * browser cannot choose it), and a change never moves it.
+     */
+    appColumn: refSchema.optional(),
     /** On a signed-in person's rows: "Make a new link" for a row's own link. */
     newLink: newLinkSchema.optional(),
     /**
@@ -576,6 +587,14 @@ export const publicAccessSchema = z
     visibleWith: z.object({ table: refSchema, via: refSchema }).strict().optional(),
     /** File columns a claimed person may download (the file the row names, never by its id). */
     files: z.array(refSchema).min(1).max(8).optional(),
+    /**
+     * File columns a guest may upload into (`POST /public/uploads`): each a
+     * `writable` file column whose rule says what a guest may send
+     * (`rules.file.upload`). The upload is kept for a day; the guest's next
+     * create or change through this entry names it in the column, and it
+     * becomes the row's own file.
+     */
+    uploads: z.array(refSchema).min(1).max(8).optional(),
     /** The kinds of document a claimed person may list and open for these rows. */
     documents: z.array(z.string().regex(/^[a-z][a-z0-9-]*$/, 'a document kind')).min(1).max(8).optional(),
     /**
@@ -761,6 +780,13 @@ export const publicAccessSchema = z
     /** Image columns any visitor may see, through the rows this entry reads. */
     pictures: z.array(refSchema).min(1).max(4).optional(),
     /**
+     * File columns of product assets every visitor's browser may load,
+     * through the rows this entry reads (`GET /public/assets`): a preview
+     * model (GLB), a print model (STL, 3MF), a web font (WOFF2), an SVG piece.
+     * Each column holds files by a `file` rule that takes only those kinds.
+     */
+    assets: z.array(refSchema).min(1).max(8).optional(),
+    /**
      * On rows reached through a parent: `columns` are left out unless
      * `unlessHolder` is empty or names the session's own person (a ticket
      * sent to a friend keeps its code from the buyer who sent it).
@@ -820,6 +846,12 @@ interface PublicAccessContext {
   answersAvailability: (table: string) => boolean;
   /** The add-ons whose stock words an entry may be answered by: the ones the manifest names, and itself when it is one. Absent: not checked. */
   addOns?: ReadonlySet<string> | undefined;
+  /**
+   * The manifest is an add-on's: its entries with no key ride the `customer`
+   * key of each app it is attached to, whose own sign-in opens the sessions
+   * they are read with.
+   */
+  ridesAppKeys?: boolean | undefined;
   /** The table's limits, as it declares them (absent: the caller does not say). */
   capacityOf?: (table: string) => Capacity | undefined;
   publicKeys: Readonly<Record<string, PublicKey>> | undefined;
@@ -980,11 +1012,36 @@ function formsEntryIssues(entry: PublicAccess, i: number, entries: readonly Publ
   return out;
 }
 
+/**
+ * An entry held to the app whose key serves it (`appColumn`): a text column
+ * of its table, never one a browser writes or a value the entry sets, and
+ * only on an entry that rides each app's own key (no key of the add-on's,
+ * no sign-in of its own).
+ */
+function appColumnIssues(entries: readonly PublicAccess[], index: TableIndex): ReferenceIssue[] {
+  const out: ReferenceIssue[] = [];
+  entries.forEach((entry, i) => {
+    const column = entry.appColumn;
+    if (column === undefined) return;
+    const at = ['publicAccess', i, 'appColumn'];
+    const found = index.column(entry.table, column);
+    if (found === undefined) out.push({ path: at, message: `"${entry.table}" has no column "${column}"` });
+    else if (found.type !== 'text') out.push({ path: at, message: `"${entry.table}.${column}" is not a text column, so it cannot hold an app's key` });
+    if ((entry.writable ?? []).includes(column) || Object.prototype.hasOwnProperty.call(entry.defaults ?? {}, column)) {
+      out.push({ path: at, message: `"${column}" holds the app whose key serves the entry: Adminium writes it, so it is neither writable nor a default` });
+    }
+    if ((entry.key ?? CUSTOMER_KEY) !== CUSTOMER_KEY) out.push({ path: at, message: `an entry on "${String(entry.key)}" is served by no app's key, so it has no app to be held to` });
+    if (entry.claim !== undefined || entry.identity !== undefined) out.push({ path: at, message: 'a sign-in entry is the key\'s own, and is held to no app' });
+  });
+  return out;
+}
+
 /** Everything in `publicAccess` and `publicKeys` that names something undeclared, or breaks a rule. */
 export function publicAccessIssues(entries: readonly PublicAccess[], ctx: PublicAccessContext): ReferenceIssue[] {
   const out: ReferenceIssue[] = [];
   const { index } = ctx;
   const has = index.has;
+  out.push(...appColumnIssues(entries, index));
 
   for (const [name, key] of Object.entries(ctx.publicKeys ?? {})) {
     const at = ['publicKeys', name];
@@ -1154,13 +1211,23 @@ export function publicAccessIssues(entries: readonly PublicAccess[], ctx: Public
     if (patches && entry.claim === undefined && entry.visibleWith === undefined && (entry.claimedBy === undefined || entry.claimedBy.optional === true)) {
       out.push({ path: at('methods'), message: 'PATCH is allowed only with a claim' });
     }
+    /*
+     * A removal from a browser: only through an add-on's own link (a shopper
+     * deleting their own saved draft), on the entry that opens the row by it.
+     * Nothing else a guest holds removes a row.
+     */
+    if (entry.methods.includes('DELETE')) {
+      const ownLink = ctx.ridesAppKeys === true && entry.key !== undefined && entry.claim !== undefined && 'by' in entry.claim && entry.claim.own === true;
+      if (!ownLink) out.push({ path: at('methods'), message: "DELETE is allowed only on an add-on's own link, the entry that opens the row by it (claim by token, own)" });
+    }
     // Nothing a server decides may be written by a browser.
     const decided = ctx.decided(entry.table);
     for (const ref of writable) {
       if (decided.has(ref)) out.push({ path: at('writable'), message: `"${ref}" is decided by Adminium and cannot be written publicly` });
     }
-    // A file column names a file a signed-in staff member uploaded: a browser's key uploads nothing, so it names none.
-    for (const [list, refs] of [['writable', [...writable]], ['defaults', Object.keys(entry.defaults ?? {})]] as const) {
+    // A file column names a file a signed-in staff member uploaded: a browser's key uploads nothing, so it names none —
+    // but a guest's own upload, in a column the entry lets them upload into (`uploads`).
+    for (const [list, refs] of [['writable', [...writable].filter((ref) => !(entry.uploads ?? []).includes(ref))], ['defaults', Object.keys(entry.defaults ?? {})]] as const) {
       for (const ref of refs) {
         const found = ctx.index.column(entry.table, ref) as { rules?: { file?: unknown } } | undefined;
         if (found?.rules?.file !== undefined) out.push({ path: at(list), message: `"${entry.table}.${ref}" holds files a signed-in person uploads, so a public write never sets it` });
@@ -1330,7 +1397,8 @@ export function publicAccessIssues(entries: readonly PublicAccess[], ctx: Public
       if (root === undefined) out.push({ path: at('visibleWith'), message: 'the entries it is visible with lead to no claimed person' });
     }
     for (const ref of entry.files ?? []) {
-      if (writable.has(ref)) out.push({ path: at('files'), message: `"${ref}" is offered for download, so a browser never writes it` });
+      // A guest's own upload is written by naming it, and only a file they uploaded for the column is taken there.
+      if (writable.has(ref) && !(entry.uploads ?? []).includes(ref)) out.push({ path: at('files'), message: `"${ref}" is offered for download, so a browser never writes it` });
       const found = column(ref);
       if (found === undefined) out.push({ path: at('files'), message: `"${entry.table}" has no column "${ref}"` });
       else if (found.type !== 'text') out.push({ path: at('files'), message: `"${entry.table}.${ref}" is not a text column holding a file` });
@@ -1425,7 +1493,7 @@ export function publicAccessIssues(entries: readonly PublicAccess[], ctx: Public
           [when.after, when.before].some((end) => end !== undefined) &&
           [when.after, when.before].every((end) => end === undefined || end.column !== undefined),
       );
-    if (entry.writableWhen !== undefined && !patches && !createWindow) {
+    if (entry.writableWhen !== undefined && !patches && !entry.methods.includes('DELETE') && !createWindow) {
       out.push({ path: at('writableWhen'), message: "writableWhen limits a change, and this entry changes nothing (a child's create takes a window read from its parent, keyed by the link)" });
     }
     for (const [ref, when] of Object.entries(entry.writableWhen ?? {})) {
@@ -1574,6 +1642,11 @@ export function publicAccessIssues(entries: readonly PublicAccess[], ctx: Public
     if (entry.words === undefined) out.push(...availabilityShapeIssues(entry, ctx, at));
     if (entry.unlockBy !== undefined) out.push(...unlockIssues(entry, entry.unlockBy, entries, ctx, at));
     if (entry.pictures !== undefined) out.push(...pictureIssues(entry, entry.pictures, entries, ctx, at));
+    if (entry.uploads !== undefined) {
+      if (!entry.methods.includes('POST') && !entry.methods.includes('PATCH')) out.push({ path: at('uploads'), message: "a guest's upload is named by a create or a change, and this entry makes neither" });
+      out.push(...uploadIssues(ctx.index, entry.table, entry.uploads, entry.writable ?? [], at('uploads')));
+    }
+    if (entry.assets !== undefined) out.push(...assetIssues(entry, entry.assets, entries, ctx, at));
   });
   out.push(...treeIssues(entries, ctx, identities, shareCodes));
   out.push(...personIssues(entries, ctx, identities));
@@ -1753,6 +1826,100 @@ function pictureIssues(
   return out;
 }
 
+/** The kinds of file a product asset may be (`ASSET_FILE_KINDS` in `schema.ts`, which imports this file). */
+const ASSET_KINDS: readonly string[] = ['svg', 'glb', 'stl', '3mf', 'woff2'];
+
+/**
+ * Product assets every visitor's browser loads: file columns the entry shows,
+ * held to a model's, a font's or an SVG's kinds, which no browser writes. The
+ * same shape as pictures: a viewer `fetch`es a model and `@font-face` loads a
+ * font with no session, so the rows are read by every visitor alike.
+ */
+function assetIssues(
+  entry: PublicAccess,
+  assets: readonly string[],
+  entries: readonly PublicAccess[],
+  ctx: PublicAccessContext,
+  at: (...rest: (string | number)[]) => (string | number)[],
+): ReferenceIssue[] {
+  const out: ReferenceIssue[] = [];
+  if (entry.methods.length !== 1 || entry.methods[0] !== 'GET' || entry.kind === 'availability') {
+    out.push({ path: at('assets'), message: 'assets are served through an entry that only reads rows' });
+  }
+  if (entry.claim !== undefined || entry.claimedBy !== undefined || entry.visibleWith !== undefined) {
+    out.push({ path: at('assets'), message: "assets are for every visitor; a signed-in person's own files are `files`" });
+  }
+  if (entry.unlockBy !== undefined) out.push({ path: at('assets'), message: 'assets are for every visitor; rows a code unlocks are read only by whoever gave the code' });
+  if (entry.level !== undefined && entry.claim === undefined && entry.claimedBy === undefined && entry.visibleWith === undefined) {
+    out.push({ path: at('assets'), message: 'assets are for every visitor; rows read by a signed-in session alone are no asset a page loads for anyone' });
+  }
+  if ((entry.key ?? CUSTOMER_KEY) !== CUSTOMER_KEY) out.push({ path: at('key'), message: "assets are served through the app's customer key" });
+  const writes = new Set([...(entry.writable ?? []), ...Object.keys(entry.defaults ?? {})]);
+  const shareCodes = shareCodeColumns(entries, entry.table, ctx.index);
+  const guests = guestUploadColumns(entries, entry.table);
+  if (new Set(assets).size !== assets.length) out.push({ path: at('assets'), message: 'an asset column is named twice' });
+  for (const ref of assets) {
+    const found = ctx.index.column(entry.table, ref) as
+      | (ColumnShape & { rules?: { code?: unknown; secret?: boolean; personal?: boolean; file?: { accept?: readonly string[] } } })
+      | undefined;
+    if (found === undefined) {
+      out.push({ path: at('assets'), message: `"${entry.table}" has no column "${ref}"` });
+      continue;
+    }
+    const accept = found.rules?.file?.accept;
+    if (accept === undefined || accept.length === 0 || accept.some((kind) => !ASSET_KINDS.includes(kind))) {
+      out.push({ path: at('assets'), message: `"${entry.table}.${ref}" is not a column of assets: a file rule that takes only ${ASSET_KINDS.join(', ')}` });
+    }
+    if (writes.has(ref)) out.push({ path: at('assets'), message: `"${ref}" is an asset every visitor loads, so a browser never writes it` });
+    if (entry.select !== undefined && !entry.select.includes(ref)) out.push({ path: at('assets'), message: `"${ref}" is not one of the columns the entry shows` });
+    if ((entry.files ?? []).includes(ref)) out.push({ path: at('assets'), message: `"${ref}" is a signed-in person's file, not an asset for everyone` });
+    if ((entry.pictures ?? []).includes(ref)) out.push({ path: at('assets'), message: `"${ref}" is a picture already; a column is one or the other` });
+    if (found.rules?.secret === true || found.rules?.code !== undefined || shareCodes.includes(ref)) {
+      out.push({ path: at('assets'), message: `"${entry.table}.${ref}" is kept from readers, so it is no asset for everyone` });
+    }
+    if (found.rules?.personal === true) out.push({ path: at('assets'), message: `"${entry.table}.${ref}" is personal data, so it is no asset for everyone` });
+    if (guests.has(ref)) out.push({ path: at('assets'), message: `guests upload into "${entry.table}.${ref}", and a guest's file is kept private, so it is no asset for everyone` });
+  }
+  return out;
+}
+
+/** The columns of `table` any entry lets a guest upload into, on the entry itself or on a level of its child rows. */
+function guestUploadColumns(entries: readonly PublicAccess[], table: string): Set<string> {
+  const out = new Set<string>();
+  const walk = (children: Readonly<Record<string, ChildEntry>> | undefined): void => {
+    for (const [name, child] of Object.entries(children ?? {})) {
+      if (name === table) for (const ref of child.uploads ?? []) out.add(ref);
+      walk(child.children);
+    }
+  };
+  for (const entry of entries) {
+    if (entry.table === table) for (const ref of entry.uploads ?? []) out.add(ref);
+    walk(entry.children);
+  }
+  return out;
+}
+
+/**
+ * The file columns a guest may upload into, at one level of an entry: each a
+ * column of the table, written there, whose file rule says what a guest may
+ * send (`rules.file.upload`). Named once each.
+ */
+function uploadIssues(index: TableIndex, table: string, uploads: readonly string[], writable: readonly string[], path: Path): ReferenceIssue[] {
+  const out: ReferenceIssue[] = [];
+  if (new Set(uploads).size !== uploads.length) out.push({ path, message: 'each column is named once' });
+  for (const ref of uploads) {
+    const found = ruledColumn(index, table, ref);
+    if (found === undefined) {
+      out.push({ path, message: `"${table}" has no column "${ref}"` });
+      continue;
+    }
+    if (found.rules?.file === undefined) out.push({ path, message: `"${table}.${ref}" holds no files: give it a file rule (rules.file)` });
+    else if (found.rules.file.upload === undefined) out.push({ path, message: `"${table}.${ref}" does not say what a guest may upload: give its file rule an upload (kinds, maxBytes)` });
+    if (!writable.includes(ref)) out.push({ path, message: `"${ref}" is filled by naming the upload, so it is writable` });
+  }
+  return out;
+}
+
 /**
  * Whether an entry reads a table's rows: a GET that is not an availability
  * answer (free or full per slot, never a row), so it can be a child's parent.
@@ -1855,6 +2022,7 @@ interface RuledColumn extends ColumnShape {
         validation?: { min?: number | undefined; max?: number | undefined; format?: string | undefined; maxLength?: number | undefined } | undefined;
         normalize?: string | undefined;
         secret?: boolean | undefined;
+        file?: { upload?: unknown } | undefined;
       }
     | undefined;
 }
@@ -2157,6 +2325,7 @@ function treeIssues(
           }
         }
         out.push(...boundIssues(index, ctx, name, child.writable, here('writable')));
+        if (child.uploads !== undefined) out.push(...uploadIssues(index, name, child.uploads, child.writable, here('uploads')));
         (child.agrees ?? []).forEach((agree, a) => out.push(...agreeIssues(index, name, parent, agree, (...rest) => here('agrees', a, ...rest))));
         (child.counts ?? []).forEach((counts, c) => out.push(...countsIssues(index, name, parent, counts, (...rest) => here('counts', c, ...rest))));
         if (child.children !== undefined) {
@@ -2455,7 +2624,9 @@ function personIssues(
     // A read for the holder of a session alone (no claim of its own): the settings a signed-in guest may see.
     if (entry.level !== undefined && entry.claim === undefined && entry.claimedBy === undefined && entry.visibleWith === undefined) {
       if (entry.methods.length !== 1 || entry.methods[0] !== 'GET') out.push({ path: at('methods'), message: 'a read for a signed-in guest alone only reads' });
-      if (!identities.has(key)) out.push({ path: at('level'), message: `the "${key}" key signs nobody in, so no session could read this` });
+      // An add-on's entry on an app's key is read with a session the app's own sign-in opened (a guest who found their order).
+      const appSignsIn = ctx.ridesAppKeys === true && key === CUSTOMER_KEY;
+      if (!identities.has(key) && !appSignsIn) out.push({ path: at('level'), message: `the "${key}" key signs nobody in, so no session could read this` });
       if (entry.select === undefined) out.push({ path: at('select'), message: 'a read for a signed-in guest lists what it shows; without select it would show every column' });
       const signIn = identities.get(key)?.entry.claim;
       const verifiedOnly = signIn !== undefined && (claimKind(signIn) === 'link' || ('own' in signIn && signIn.own === true));

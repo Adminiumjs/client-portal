@@ -105,6 +105,23 @@ export const CONTRACT_REGISTRY = [
   },
   {
     /*
+     * THE EIGHTH: WHETHER A SHOPPER'S DESIGN MAY BE ORDERED. An add-on that
+     * keeps designs answers, for each order line that names one, whether it
+     * stands by its ready-made design and base and which priced features it
+     * uses. Adminium reads the rows the add-on declared, asks once a save
+     * (and once a dry run), and checks the answer against what each line
+     * pays for. A third kind of code that decides inside a save, loaded only
+     * from a package Adminium can vouch for. Its implementer is the
+     * Customiser, which both shops of the customising plan require.
+     */
+    id: 'design-check',
+    version: 1,
+    summary:
+      'Whether each order line\'s design stands and which priced features it uses: one synchronous, pure answer per question, checked by Adminium against what each line pays for, inside the save and the dry run.',
+    implementations: 1,
+  },
+  {
+    /*
      * THE SEVENTH: MONEY THAT MOVES AT A PAYMENT SERVICE. A shop's customer
      * pays on the provider's own hosted page; the provider half starts the
      * checkout, says how it ended, refunds, and proves its webhooks. Consumed

@@ -26,6 +26,7 @@ import { z } from 'zod';
 
 import { i18nMessageSchema, wordsByLanguageSchema } from './common.ts';
 import { contractIdSchema, hasContractVersion } from './contracts.ts';
+import { recordPanelsSchema } from './record-panels.ts';
 import { recordTabsSchema } from './record-tabs.ts';
 import { slotIdSchema } from './slots.ts';
 import { addOnAssistantSchema } from './assistant-block.ts';
@@ -322,6 +323,13 @@ export const addOnBlockSchema = z
      */
     adjuster: z.record(z.string(), z.unknown()).optional(),
     /**
+     * What the add-on reads to answer whether a design may be ordered (its
+     * designs table and keyed reads from a design row), served by its
+     * `design-check` provider. Its words are the manifest's own, so
+     * `@adminium/manifest` checks the whole of it.
+     */
+    checker: z.record(z.string(), z.unknown()).optional(),
+    /**
      * Stock words: a question a page may ask of a ledger without writing
      * anything — "is this in, low or out?". Only the id is typed here; the
      * rest names the manifest's own ledgers and settings, which
@@ -334,6 +342,8 @@ export const addOnBlockSchema = z
       .optional(),
     /** Tabs on other tables' record pages that list this add-on's rows for the record (see `record-tabs.ts`). */
     recordTabs: recordTabsSchema.optional(),
+    /** The add-on's own screens on the record pages of tables that link into one of its tables (see `record-panels.ts`). */
+    panels: recordPanelsSchema.optional(),
     /**
      * What a typed or scanned code may find: the tables that hold codes and
      * the columns an answer may carry. Typed loosely here: it names the

@@ -40,6 +40,9 @@ type Doc = Readonly<Record<string, unknown>>;
 const isDoc = (value: unknown): value is Doc => typeof value === 'object' && value !== null && !Array.isArray(value);
 const list = (value: unknown): readonly unknown[] => (Array.isArray(value) ? value : []);
 
+/** The most a file column took before guests could upload into it: past this, a column needs the release that reads it. */
+export const FILE_COLUMN_EARLIER_MAX_BYTES = 25 * 1024 * 1024;
+
 /** The top-level blocks an add-on shares with an app since the install floor. */
 export const ADD_ON_INSTALL_BLOCKS = [
   'pages',
@@ -209,6 +212,37 @@ export const INSTALL_FLOOR_WORD_NAMES = [
   'step.recordWhere',
   'step.help',
   'step.recordTokens',
+  // An add-on's entry held to the rows of the app whose key serves it; a copy of a person on an add-on's table; an add-on's
+  // own rows let go some days after a moment of theirs.
+  'publicAccess.appColumn',
+  'people.addOnCopies',
+  'table.expire',
+  // A link filled with the band a number falls in; a date so many working days on; a formula rounded up or down.
+  'column.band',
+  'stamp.addWorkingDays',
+  'formula.ceilFloor',
+  // Whether an order line's design may be ordered: the line table's rule, and the add-on's side of it.
+  'table.check',
+  'addOn.checker',
+  // A panel an add-on draws on the record pages of the tables that link into one of its own.
+  'addOn.panels',
+  // A guest's file uploaded into a file column through a public entry: the entry's list, the column's rule for it; a
+  // column that takes TIFF, or files past the 25 MiB a column took before.
+  'publicAccess.uploads',
+  'file.upload',
+  'file.tiff',
+  'file.large',
+  // A file column that takes a cleaned SVG, a model (GLB, STL, 3MF) or a web font (WOFF2); an entry's product assets,
+  // loaded by every visitor's browser.
+  'file.assetKinds',
+  'publicAccess.assets',
+  // An add-on's link key opening its row as the row's own link, which may change it while it is in a state; an add-on's
+  // read for a session the app's own sign-in opened; a copy of a person's other details (a design's words, in JSON).
+  'publicAccess.ownLink',
+  'publicAccess.sessionRead',
+  'people.copyDetails',
+  // An add-on's own link removing its row (a shopper deleting their own draft) while it is in a state.
+  'publicAccess.ownDelete',
 ] as const;
 export type ManifestWordName = (typeof INSTALL_FLOOR_WORD_NAMES)[number];
 
@@ -392,7 +426,46 @@ export const WORD_FLOORS: Readonly<Partial<Record<ManifestWordName, string>>> = 
   'step.help': '0.3.41',
   // The rule record's stored table name and its key, as an add-on's record tab and a survey's invitation keep them.
   'step.recordTokens': '0.3.41',
+  // An add-on's entry on each app's key held to that app's rows, a person's copy kept on an add-on's table, and an add-on's
+  // rows that expire. The release that reads them is the one that holds an add-on's foreign keys to its own tables
+  // (`HOST_REFERENCES_FLOOR` in `schema.ts`, moved with it at the release).
+  'publicAccess.appColumn': '0.3.43',
+  'people.addOnCopies': '0.3.43',
+  'table.expire': '0.3.43',
+  // The band a number falls in, a date counted in working days, and a formula's ceil and floor: read by the same release.
+  'column.band': '0.3.43',
+  'stamp.addWorkingDays': '0.3.43',
+  'formula.ceilFloor': '0.3.43',
+  // A design checked by an add-on inside the save, and an add-on's panel on a record page: read by the same release.
+  'table.check': '0.3.43',
+  'addOn.checker': '0.3.43',
+  'addOn.panels': '0.3.43',
+  // A guest's upload into an app's file column, TIFF, and file columns up to 100 MiB: read by the same release.
+  'publicAccess.uploads': '0.3.43',
+  'file.upload': '0.3.43',
+  'file.tiff': '0.3.43',
+  'file.large': '0.3.43',
+  // A cleaned SVG, a model and a web font in a file column, and an entry's product assets: read by the same release.
+  'file.assetKinds': '0.3.43',
+  'publicAccess.assets': '0.3.43',
+  // A guest's draft changed in place through its own link, a design read by its code inside a session, and a copy of
+  // a person's words kept as JSON: read by the same release.
+  'publicAccess.ownLink': '0.3.43',
+  'publicAccess.sessionRead': '0.3.43',
+  'people.copyDetails': '0.3.43',
+  // A guest's own draft removed through its own link: read by the same release.
+  'publicAccess.ownDelete': '0.3.43',
 };
+
+/** The kinds of file a column takes from the release that cleans SVG and reads models and fonts whole (`ASSET_FILE_KINDS`). */
+const ASSET_KINDS: ReadonlySet<string> = new Set(['svg', 'glb', 'stl', '3mf', 'woff2']);
+
+/** Whether a formula, at any depth, rounds up or down (`ceil`, `floor`). */
+function roundsUpOrDown(node: unknown): boolean {
+  if (Array.isArray(node)) return node.some(roundsUpOrDown);
+  if (!isDoc(node)) return false;
+  return Object.entries(node).some(([key, value]) => key === 'ceil' || key === 'floor' || roundsUpOrDown(value));
+}
 
 /** Every word of `document` that needs the install floor, in document order. */
 export function installFloorWords(document: unknown): ManifestWord[] {
@@ -410,6 +483,8 @@ export function installFloorWords(document: unknown): ManifestWord[] {
     if (block['settingsTable'] !== undefined) out.push({ word: 'addOn.settingsTable', path: 'addOn.settingsTable' });
     if (block['ledgers'] !== undefined) out.push({ word: 'addOn.ledgers', path: 'addOn.ledgers' });
     if (block['adjuster'] !== undefined) out.push({ word: 'addOn.adjuster', path: 'addOn.adjuster' });
+    if (block['checker'] !== undefined) out.push({ word: 'addOn.checker', path: 'addOn.checker' });
+    if (block['panels'] !== undefined) out.push({ word: 'addOn.panels', path: 'addOn.panels' });
     if (block['words'] !== undefined) out.push({ word: 'addOn.words', path: 'addOn.words' });
     if (block['recordTabs'] !== undefined) out.push({ word: 'addOn.recordTabs', path: 'addOn.recordTabs' });
     // Pages that also need the data kit.
@@ -434,6 +509,15 @@ export function installFloorWords(document: unknown): ManifestWord[] {
       for (const [column, value] of Object.entries(writes)) {
         if (isDoc(value) && value['person'] !== undefined) out.push({ word: 'step.person', path: `${at}.writes.values.${column}` });
         if (isDoc(value) && (value['token'] === 'recordTable' || value['token'] === 'recordKey')) out.push({ word: 'step.recordTokens', path: `${at}.writes.values.${column}` });
+      }
+    });
+    // Its link key opening a row as the row's own link; a read for a session of the app's own sign-in.
+    list(document['publicAccess']).forEach((entry, e) => {
+      if (!isDoc(entry)) return;
+      if (isDoc(entry['claim']) && entry['claim']['own'] === true) out.push({ word: 'publicAccess.ownLink', path: `publicAccess.${String(e)}.claim.own` });
+      if (Array.isArray(entry['methods']) && entry['methods'].includes('DELETE')) out.push({ word: 'publicAccess.ownDelete', path: `publicAccess.${String(e)}.methods` });
+      if (entry['level'] !== undefined && entry['claim'] === undefined && entry['claimedBy'] === undefined && entry['visibleWith'] === undefined) {
+        out.push({ word: 'publicAccess.sessionRead', path: `publicAccess.${String(e)}.level` });
       }
     });
     // An amount Adminium decides for a ledger's action (what a card may pay).
@@ -463,6 +547,12 @@ export function installFloorWords(document: unknown): ManifestWord[] {
     if (document['navLinks'] !== undefined) out.push({ word: 'navLinks', path: 'navLinks' });
     // The app's people tables.
     if (document['people'] !== undefined) out.push({ word: 'people', path: 'people' });
+    list(document['people']).forEach((entry, e) => {
+      list(isDoc(entry) ? entry['copies'] : undefined).forEach((copy, c) => {
+        if (isDoc(copy) && copy['addOn'] !== undefined) out.push({ word: 'people.addOnCopies', path: `people.${String(e)}.copies.${String(c)}.addOn` });
+        if (isDoc(copy) && copy['holds'] === 'details') out.push({ word: 'people.copyDetails', path: `people.${String(e)}.copies.${String(c)}.holds` });
+      });
+    });
   }
 
   list(schema['tables']).forEach((table, t) => {
@@ -471,6 +561,7 @@ export function installFloorWords(document: unknown): ManifestWord[] {
     if (table['indexes'] !== undefined) out.push({ word: 'table.indexes', path: `${at}.indexes` });
     if (table['postings'] !== undefined) out.push({ word: 'table.postings', path: `${at}.postings` });
     if (table['adjust'] !== undefined) out.push({ word: 'table.adjust', path: `${at}.adjust` });
+    if (table['check'] !== undefined) out.push({ word: 'table.check', path: `${at}.check` });
     if (table['belongs'] !== undefined) out.push({ word: 'table.belongs', path: `${at}.belongs` });
     list(table['belongs']).forEach((way, w) => {
       if (isDoc(way) && isDoc(way['through']) && way['through']['while'] !== undefined) out.push({ word: 'listing.while', path: `${at}.belongs.${String(w)}.through.while` });
@@ -488,6 +579,7 @@ export function installFloorWords(document: unknown): ManifestWord[] {
     if (table['occupies'] !== undefined) out.push({ word: 'table.occupies', path: `${at}.occupies` });
     if (table['removal'] !== undefined) out.push({ word: 'table.removal', path: `${at}.removal` });
     if (table['keep'] !== undefined) out.push({ word: 'table.keep', path: `${at}.keep` });
+    if (table['expire'] !== undefined) out.push({ word: 'table.expire', path: `${at}.expire` });
     if (isDoc(table['states']) && table['states']['actions'] !== undefined) out.push({ word: 'states.actions', path: `${at}.states.actions` });
     list(isDoc(table['states']) ? table['states']['actions'] : undefined).forEach((action, a) => {
       if (isDoc(action) && action['handOver'] !== undefined) out.push({ word: 'states.handOver', path: `${at}.states.actions.${String(a)}.handOver` });
@@ -519,6 +611,11 @@ export function installFloorWords(document: unknown): ManifestWord[] {
       if (rules['linkable'] !== undefined) out.push({ word: 'column.linkable', path: `${here}.linkable` });
       if (isDoc(rules['linkable']) && rules['linkable']['same'] !== undefined) out.push({ word: 'linkable.same', path: `${here}.linkable.same` });
       if (rules['file'] !== undefined) out.push({ word: 'column.file', path: `${here}.file` });
+      const file = isDoc(rules['file']) ? rules['file'] : null;
+      if (file !== null && file['upload'] !== undefined) out.push({ word: 'file.upload', path: `${here}.file.upload` });
+      if (file !== null && list(file['accept']).includes('tiff')) out.push({ word: 'file.tiff', path: `${here}.file.accept` });
+      if (file !== null && typeof file['maxBytes'] === 'number' && file['maxBytes'] > FILE_COLUMN_EARLIER_MAX_BYTES) out.push({ word: 'file.large', path: `${here}.file.maxBytes` });
+      if (isDoc(rules['file']) && list(rules['file']['accept']).some((kind) => typeof kind === 'string' && ASSET_KINDS.has(kind))) out.push({ word: 'file.assetKinds', path: `${here}.file.accept` });
       if (rules['changes'] !== undefined) out.push({ word: 'column.changes', path: `${here}.changes` });
       if (rules['history'] !== undefined) out.push({ word: 'column.history', path: `${here}.history` });
       for (const key of ['announce', 'plainText', 'customerKey', 'codeLast4'] as const) {
@@ -537,6 +634,11 @@ export function installFloorWords(document: unknown): ManifestWord[] {
         else if (bound !== undefined && ((type !== 'date' && type !== 'timestamptz') || (isDoc(bound) && bound['days'] !== undefined))) out.push({ word: 'bounds.other', path: `${here}.${side}` });
       }
       if (isDoc(rules['stamp']) && rules['stamp']['strict'] !== undefined) out.push({ word: 'stamp.strict', path: `${here}.stamp.strict` });
+      if (rules['band'] !== undefined) out.push({ word: 'column.band', path: `${here}.band` });
+      if (isDoc(rules['stamp']) && isDoc(rules['stamp']['set']) && rules['stamp']['set']['addWorkingDays'] !== undefined) {
+        out.push({ word: 'stamp.addWorkingDays', path: `${here}.stamp.set.addWorkingDays` });
+      }
+      if (rules['formula'] !== undefined && roundsUpOrDown(rules['formula'])) out.push({ word: 'formula.ceilFloor', path: `${here}.formula` });
       if (rules['stamp'] !== undefined && rules['requiredWhen'] !== undefined) out.push({ word: 'requiredWhen.stamp', path: `${here}.requiredWhen` });
     });
   });
@@ -724,6 +826,15 @@ export function installFloorWords(document: unknown): ManifestWord[] {
     if (isDoc(entry) && entry['consent'] !== undefined) out.push({ word: 'publicAccess.consent', path: `publicAccess.${String(e)}.consent` });
     if (isDoc(entry) && entry['key'] === 'forms') out.push({ word: 'publicAccess.forms', path: `publicAccess.${String(e)}.key` });
     if (isDoc(entry) && entry['source'] !== undefined) out.push({ word: 'publicAccess.forms.source', path: `publicAccess.${String(e)}.source` });
+    if (isDoc(entry) && entry['appColumn'] !== undefined) out.push({ word: 'publicAccess.appColumn', path: `publicAccess.${String(e)}.appColumn` });
+    // A guest's uploads, on the entry or on any level of its child rows.
+    const uploadsIn = (node: unknown, path: string): void => {
+      if (!isDoc(node)) return;
+      if (node['uploads'] !== undefined) out.push({ word: 'publicAccess.uploads', path: `${path}.uploads` });
+      for (const [name, child] of Object.entries(isDoc(node['children']) ? node['children'] : {})) uploadsIn(child, `${path}.children.${name}`);
+    };
+    uploadsIn(entry, `publicAccess.${String(e)}`);
+    if (isDoc(entry) && entry['assets'] !== undefined) out.push({ word: 'publicAccess.assets', path: `publicAccess.${String(e)}.assets` });
   });
   return out;
 }

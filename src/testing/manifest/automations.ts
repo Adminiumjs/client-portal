@@ -445,7 +445,7 @@ export function templateRequiredPlaceholdersOf(content: { subject: string; prehe
 const NUMBERS = ['int', 'bigint', 'decimal', 'money', 'float'];
 const DATES = ['date', 'timestamptz'];
 /** The rules through which Adminium fills a column itself. */
-const DECIDING = ['copy', 'sequence', 'code', 'rollup', 'stamp', 'formula', 'format', 'lookup', 'perNight', 'customerKey', 'codeLast4'];
+const DECIDING = ['copy', 'sequence', 'code', 'rollup', 'stamp', 'formula', 'format', 'lookup', 'band', 'perNight', 'customerKey', 'codeLast4'];
 
 /**
  * Everything wrong with a manifest's shipped rules that the manifest itself

@@ -159,12 +159,15 @@ export const SLOT_REGISTRY = [
   },
   {
     // The only slot whose host is Adminium itself rather than an example app,
-    // which is why its payload carries a table name.
+    // which is why its payload carries a table name. Adminium draws an
+    // add-on's screen on a record page from `addOn.panels` (record-panels.ts),
+    // gated three ways; a fill of this slot is kept and drawn as nothing (a
+    // package that declares one with no file is never an error).
     id: 'record.editor.panel',
     surface: 'admin',
     fill: 'multi',
-    payload: 'the table name, the record, and write handles',
-    renders: "a panel inside the generated dashboard's record editor",
+    payload: "the table and the record, the key of the add-on's row it links to, and the data kit of the add-on's own tables: it writes only those",
+    renders: "a panel inside the generated dashboard's record page, declared as `addOn.panels`",
   },
   {
     /*

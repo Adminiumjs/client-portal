@@ -78,7 +78,7 @@ export type ValidateManifestResult =
   | { ok: false; issues: ManifestIssue[]; warnings: ManifestIssue[] };
 
 /** Rules that fill a column, so an insert may leave it out. */
-const FILLING_RULES = ['copy', 'sequence', 'code', 'rollup', 'stamp', 'formula', 'format', 'default', 'lookup', 'perNight'] as const;
+const FILLING_RULES = ['copy', 'sequence', 'code', 'rollup', 'stamp', 'formula', 'format', 'default', 'lookup', 'band', 'perNight'] as const;
 
 /** A setting key that reads like bank details (an IBAN, an account or routing number). */
 const BANK_SETTING = /(^|_)(bank|iban|swift|routing)(_|$)|account_?(number|no|name)|sort_?code/i;

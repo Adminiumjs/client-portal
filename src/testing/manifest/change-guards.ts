@@ -85,7 +85,7 @@ export type ChangeGuard = z.infer<typeof changeGuardSchema>;
 export const changeGuardsSchema = z.array(changeGuardSchema).min(1).max(8);
 
 /** The column rules through which Adminium decides a column's value: nobody changes one, so no guard holds anything there. */
-const DECIDED: readonly string[] = ['copy', 'sequence', 'code', 'rollup', 'stamp', 'formula', 'format', 'lookup', 'perNight', 'customerKey', 'codeLast4'];
+const DECIDED: readonly string[] = ['copy', 'sequence', 'code', 'rollup', 'stamp', 'formula', 'format', 'lookup', 'band', 'perNight', 'customerKey', 'codeLast4'];
 
 interface GuardedColumn extends ColumnShape {
   rules?: Record<string, unknown> | undefined;

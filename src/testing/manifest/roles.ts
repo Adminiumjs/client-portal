@@ -708,7 +708,8 @@ export function privateShapeIssues(
     states?: { timed?: unknown; effects?: readonly { via?: string }[] | undefined; children?: Readonly<Record<string, { moveOnCreate?: string | undefined }>> | undefined } | undefined;
     postings?: unknown;
     adjust?: unknown;
-    columns: readonly { ref: string; type?: string; references?: string | undefined; rules?: { rollup?: { from: string } | undefined; copy?: { via: string } | undefined; lookup?: { table: unknown } | undefined } | undefined }[];
+    check?: unknown;
+    columns: readonly { ref: string; type?: string; references?: string | undefined; rules?: { rollup?: { from: string } | undefined; copy?: { via: string } | undefined; lookup?: { table: unknown } | undefined; band?: { table: string } | undefined } | undefined }[];
   }[],
 ): ReferenceIssue[] {
   const held = new Set(tables.filter((table) => table.private === true).map((table) => table.ref));
@@ -730,6 +731,7 @@ export function privateShapeIssues(
       // What Adminium does by itself, for everybody: a ledger's postings, a price rule, a move when a moment passes.
       if (table.postings !== undefined) out.push({ path: at('postings'), message: said(table.ref, 'no ledger takes its rows') });
       if (table.adjust !== undefined) out.push({ path: at('adjust'), message: said(table.ref, 'no price rule reads its rows') });
+      if (table.check !== undefined) out.push({ path: at('check'), message: said(table.ref, "no add-on's design check reads its rows") });
       if (table.states?.timed !== undefined) out.push({ path: at('states', 'timed'), message: said(table.ref, 'nothing moves its rows by itself') });
       // A row of another table made by somebody the private row is not theirs moves it no more than a move of one does.
       for (const [child, rule] of Object.entries(table.states?.children ?? {})) {
@@ -744,6 +746,8 @@ export function privateShapeIssues(
       if (copied !== undefined && held.has(copied)) out.push({ path: at('columns', c, 'rules', 'copy', 'via'), message: said(copied, 'nothing is copied out of it') });
       const looked = rules?.lookup?.table;
       if (typeof looked === 'string' && held.has(looked)) out.push({ path: at('columns', c, 'rules', 'lookup', 'table'), message: said(looked, 'nothing is looked up in it') });
+      const banded = rules?.band?.table;
+      if (banded !== undefined && held.has(banded)) out.push({ path: at('columns', c, 'rules', 'band', 'table'), message: said(banded, 'no band is picked from it') });
     });
     (table.states?.effects ?? []).forEach((effect, e) => {
       const target = effect.via === undefined ? undefined : pointsAt(effect.via);
