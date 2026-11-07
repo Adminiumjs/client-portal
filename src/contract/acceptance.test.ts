@@ -33,9 +33,10 @@
  *      come due on their days, go only when approved, go with the words a
  *      person edited, are skipped when overtaken, paid or voided; the third's
  *      follow-up refused never sends it twice;
- *   8. ANOTHER CONNECTION — an app installed on one connection is refused on
- *      a second (the plan says where it is; an install sent anyway is refused
- *      and writes nothing there), so a client's key keeps to its own;
+ *   8. ANOTHER CONNECTION — the app installed a second time, onto another
+ *      connection, is a copy of its own (its own install, address, screens
+ *      config and tables there), and the studio's install, outbox, desk and
+ *      rows are untouched by it; a client's key keeps to its own;
  *   9. DAYS — a date reaches a client's page as the day it is, on every
  *      engine; the link's page greets a client by the first name the app
  *      declares for them.
@@ -1454,27 +1455,87 @@ describe.skipIf(why !== null)(`the Client Portal's acceptance checks against a b
         return third;
       };
 
-      // After the reminders: were a second install let through, it would move what the outbox and the desk run against.
-      it("refuses an app already installed onto a second connection: the plan says where it is, and an install sent anyway writes nothing", async () => {
+      // After the reminders: a second install must leave what the outbox and the desk run against exactly where it was.
+      it("installs the app a second time onto another connection as a copy of its own, and the studio's install, outbox, desk and rows are untouched", async () => {
         const as = desks[5]!;
         const app = appBundle();
         const conn = await thirdConnection(as);
+        const appTables = Object.keys(real).sort();
+        const tablesOf = async (connection: string) => {
+          expect([200, 202]).toContain((await as.post(`/api/v1/connections/${connection}/introspect`)).status);
+          return until(async () => {
+            const schema = await as.get<{ model?: { tables: { id: string; name: string }[] } }>(`/api/v1/connections/${connection}/schema`);
+            return schema.status === 200 && schema.body.model !== undefined ? schema.body.model.tables : undefined;
+          }, `connection ${connection}'s schema`, 60_000);
+        };
+        /*
+         * The studio's install as it stands: every row of every table of the app, by key.
+         * The outbox (`messages`) is compared by what each row is, not by its send
+         * state: Adminium's outbox goes on sending (and skipping) the earlier checks'
+         * emails while this one runs, and that is the outbox working, not moving.
+         */
+        const SENDING = new Set(["status", "sent_at", "error", "skip_reason", "effect_at", "effect_error"]);
+        const snapshot = async () =>
+          Object.fromEntries(
+            await Promise.all(
+              appTables.map(async (ref) => {
+                const all = (await rows(ref, as)).map((row) => (ref === "messages" ? Object.fromEntries(Object.entries(row).filter(([column]) => !SENDING.has(column))) : row));
+                return [ref, Object.fromEntries(all.map((row) => [String(row.id), row]))] as const;
+              }),
+            ),
+          );
+        const studioTablesBefore = (await tablesOf(connectionId)).map((t) => t.name).sort();
+        const before = await snapshot();
+        const firstConfigBefore = ok(await admin.get<{ connectionId: string; installId?: string; slug?: string; tables: Record<string, string> }>("/apps/clients/staff/surface-config.json"));
+
+        // The plan onto the third connection: installable, and nothing says the app is elsewhere.
         const plan = ok(await as.post<{ plan: { installable: boolean; checksum: string; problems: { code: string; connectionId?: string; message?: string }[] } }>("/api/v1/apps/plan", { key: app.key, version: app.version, connectionId: conn })).plan;
         console.info(`[second install, ${engine}] planned onto a second connection: installable ${String(plan.installable)} ${JSON.stringify(plan.problems).slice(0, 300)}`);
-        expect(plan.installable).toBe(false);
-        expect(plan.problems.filter((p) => p.code === "APP_INSTALLED_ELSEWHERE").map((p) => p.connectionId)).toEqual([connectionId]);
-        const installed = await as.post("/api/v1/apps/install", { key: app.key, version: app.version, connectionId: conn, planChecksum: plan.checksum });
-        expect([installed.status, installed.code, installed.details["connectionId"]]).toEqual([409, "APP_INSTALLED_ELSEWHERE", connectionId]);
-        // Where it was: installed once, on the studio's connection; the second database holds only what it held.
-        const apps = ok(await as.get<{ apps: { key: string; connectionId: string }[] }>("/api/v1/apps")).apps.filter((a) => a.key === app.key);
-        expect(apps.map((a) => a.connectionId)).toEqual([connectionId]);
-        expect([200, 202]).toContain((await as.post(`/api/v1/connections/${conn}/introspect`)).status);
-        const tables = await until(async () => {
-          const schema = await as.get<{ model?: { tables: { name: string }[] } }>(`/api/v1/connections/${conn}/schema`);
-          return schema.status === 200 && schema.body.model !== undefined ? schema.body.model.tables.map((t) => t.name) : undefined;
-        }, "the second connection's schema", 60_000);
-        expect(tables).toEqual(["unrelated"]);
-      }, 120_000);
+        expect(plan.installable).toBe(true);
+        expect(plan.problems.map((p) => p.code)).not.toContain("APP_INSTALLED_ELSEWHERE");
+        const installed = ok(await as.post<{ schema: { created: string[] } }>("/api/v1/apps/install", { key: app.key, version: app.version, connectionId: conn, planChecksum: plan.checksum }));
+        // Its own tables, by the same names as the studio's: each database holds its own copy.
+        expect([...installed.schema.created].sort()).toEqual(Object.values(real).sort());
+
+        // Two copies, each on its own connection, each its own install.
+        const copies = ok(await as.get<{ apps: { key: string; connectionId: string | null; installId?: string; slug?: string }[] }>("/api/v1/apps")).apps.filter((a) => a.key === app.key);
+        expect(copies.map((a) => a.connectionId).sort()).toEqual([connectionId, conn].sort());
+        const first = copies.find((a) => a.connectionId === connectionId)!;
+        const second = copies.find((a) => a.connectionId === conn)!;
+        expect(typeof first.installId === "string" && typeof second.installId === "string" && first.installId !== second.installId).toBe(true);
+        expect([first.slug, second.slug]).toEqual(["", `third-${engine}`]);
+
+        // The second copy's screens: at its own address, naming its own install, slug and database.
+        const secondConfig = ok(await admin.get<{ connectionId: string; installId?: string; slug?: string; tables: Record<string, string> }>(`/apps/clients/${second.slug!}/staff/surface-config.json`));
+        expect([secondConfig.installId, secondConfig.slug, secondConfig.connectionId]).toEqual([second.installId, second.slug, conn]);
+        // The first copy's screens: still the studio's, by the same install, slug, database and tables.
+        const firstConfig = ok(await admin.get<{ connectionId: string; installId?: string; slug?: string; tables: Record<string, string> }>("/apps/clients/staff/surface-config.json"));
+        expect([firstConfig.installId, firstConfig.slug, firstConfig.connectionId, firstConfig.tables]).toEqual([first.installId, "", connectionId, firstConfigBefore.tables]);
+        expect(firstConfigBefore.installId).toBe(first.installId);
+
+        // Nothing moved on the studio's database: no table added or taken, no row of the app's changed, added or gone.
+        expect((await tablesOf(connectionId)).map((t) => t.name).sort()).toEqual(studioTablesBefore);
+        const after = await snapshot();
+        for (const ref of appTables) expect(after[ref], `${ref} on the studio's database`).toEqual(before[ref]);
+
+        // The second database holds what it held, and the app's own tables, empty but for what an install seeds.
+        const third = await tablesOf(conn);
+        expect(third.map((t) => t.name).sort()).toEqual(["unrelated", ...Object.values(real)].sort());
+        const thirdMessages = third.find((t) => t.name === real["messages"])!;
+        const thirdOutbox = ok(await as.get<{ data: Row[] }>(`/api/v1/data/${conn}/${encodeURIComponent(thirdMessages.id)}?limit=200`)).data;
+        expect(thirdOutbox).toEqual([]);
+
+        // The studio's outbox still runs against the studio: an invoice sent now is held its three reminders there, and none is written on the second database.
+        const client = await newClient({ contact_name: "Second Install" }, as);
+        const project = await make("projects", { client_id: client.id, name: "After the second install" }, as);
+        const { doc } = await document("invoices", { client_id: client.id, project_id: project.id, title: "After the second install", terms: "on-receipt", ladder: "firm" }, [{ qty: "1", rate: "250" }], true, as);
+        const reminders = await until(async () => {
+          const found = (await rows("messages", as, { column: "invoice_id", op: "eq", value: doc.id })).filter((m) => String(m["kind"]).startsWith("invoice-rung-"));
+          return found.length === 3 ? found : undefined;
+        }, "the studio's three reminders after the second install");
+        expect(reminders.map((m) => m["status"])).toEqual(["held", "held", "held"]);
+        expect(ok(await as.get<{ data: Row[] }>(`/api/v1/data/${conn}/${encodeURIComponent(thirdMessages.id)}?limit=200`)).data).toEqual([]);
+      }, 300_000);
 
       it("keeps a client's session on its own connection, with a second connection beside it", async () => {
         const as = desks[5]!;
