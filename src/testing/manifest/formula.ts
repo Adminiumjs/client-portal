@@ -58,7 +58,7 @@ import { z } from 'zod';
 import { NUMERIC_TYPES, type ColumnShape, type ReferenceIssue } from './refs.ts';
 
 /** A snake_case column of the same row. */
-const columnName = z.string().regex(/^[a-z][a-z0-9_]*$/, 'a column of the same row');
+const columnName = z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/, 'a column of the same row');
 
 export type FormulaExpr =
   | number
@@ -508,10 +508,60 @@ function sameValue(stored: unknown, literal: string | number | boolean): boolean
  * `scale` places, or `null` when an input it needs is empty or a divisor is
  * zero. `row` holds the stored row with the new values over it.
  */
-export function evaluateFormula(expr: FormulaExpr, row: Readonly<Record<string, unknown>>, scale: number): string | null {
-  if (typeof expr === 'object' && 'join' in expr) return joinText(expr.join, row);
+export function evaluateFormula(expr: FormulaExpr, row: Readonly<Record<string, unknown>>, scale: number, keep: FormulaKeep = {}): string | null {
+  if (typeof expr === 'object' && 'join' in expr) {
+    const joined = joinText(expr.join, row);
+    if (joined === null) return null;
+    const text = keep.normalize === undefined ? joined : normalizedText(keep.normalize, joined);
+    // A joined text longer than its column holds is cut to it (by characters), never refused: a long name is still a name.
+    return keep.maxLength !== undefined && [...text].length > keep.maxLength ? [...text].slice(0, keep.maxLength).join('').trimEnd() : text;
+  }
   const value = evaluate(expr, row, scale);
-  return value === null ? null : ratioText(value, scale);
+  if (value === null) return null;
+  const text = ratioText(value, scale);
+  return keep.normalize === undefined ? text : normalizedText(keep.normalize, text);
+}
+
+/** `column.normalize`: how a `text` value is kept, whoever writes it or works it out. */
+export type NormalizeRule = 'trim' | 'email' | 'code';
+
+/**
+ * `text` as a column with `normalize: how` keeps it: `trim` without spaces at
+ * either end, `email` trimmed and in lower case, `code` as a code is compared
+ * (upper case, spaces and dashes left out). The one rule for a typed value
+ * and a worked-out one, on the server and in an app's demo.
+ */
+export function normalizedText(how: NormalizeRule, text: string): string {
+  if (how === 'email') return text.trim().toLowerCase();
+  if (how === 'code') return text.toUpperCase().replace(/[\s-]+/g, '');
+  return text.trim();
+}
+
+/**
+ * What a formula column keeps of the value worked out: its `normalize` rule,
+ * then, for a join, its longest (cut there rather than refused).
+ */
+export interface FormulaKeep {
+  normalize?: NormalizeRule | undefined;
+  maxLength?: number | undefined;
+}
+
+/**
+ * A manifest column's {@link FormulaKeep}: its `normalize`, and for a join
+ * the shorter of its `maxLength` and its `validation.maxLength`. Passed to
+ * {@link evaluateFormula}, a demo keeps the value the server would store.
+ */
+export function formulaKeepOf(column: {
+  maxLength?: number | undefined;
+  rules?: { formula?: FormulaExpr | undefined; normalize?: NormalizeRule | undefined; validation?: { maxLength?: number | undefined } | undefined } | undefined;
+}): FormulaKeep {
+  const formula = column.rules?.formula;
+  const lengths = [column.maxLength, column.rules?.validation?.maxLength].filter((n): n is number => typeof n === 'number' && n > 0);
+  const joined = typeof formula === 'object' && 'join' in formula && lengths.length > 0 ? Math.min(...lengths) : undefined;
+  return {
+    ...(column.rules?.normalize === undefined ? {} : { normalize: column.rules.normalize }),
+    ...(joined === undefined ? {} : { maxLength: joined }),
+  };
 }
 
 function evaluate(expr: FormulaExpr, row: Readonly<Record<string, unknown>>, scale: number): Ratio | null {

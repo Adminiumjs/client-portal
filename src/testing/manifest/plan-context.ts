@@ -65,6 +65,7 @@ import { MYSQL_UNIQUE_KEY_BYTES, uniqueSetBytes, uniqueTextWidth } from './key-b
 import { ledgerIndexes } from './ledger-indexes.ts';
 import { typeConflict } from './plan-types.ts';
 import { installsLikeAnApp, type Manifest, type RequiredColumn, type RequiredTable } from './schema.ts';
+import { namesItsTable, realTableName, splitTableName } from './table-names.ts';
 
 export type {
   ContextTableAction as TableAction,
@@ -361,11 +362,13 @@ export function planWithContext(
         ? record.table
         : target !== undefined
           ? target.table
-          : prefix === null
-            ? table.ref
-            : `${prefix}${table.ref}`;
+          : realTableName(table, prefix);
   }
   const realNames = new Set(Object.values(names));
+  // SQLite, and MySQL where `lower_case_table_names` is set, take `Orders` and `orders` for one table.
+  const foldsCase = context.dialect !== 'postgres';
+  const liveFolded = new Map<string, string[]>();
+  if (foldsCase) for (const t of model.tables) liveFolded.set(t.ref.toLowerCase(), [...(liveFolded.get(t.ref.toLowerCase()) ?? []), t.ref]);
 
   const tables: InstallTablePlan[] = [];
   for (const table of required) {
@@ -378,15 +381,17 @@ export function planWithContext(
     const holders = context.others.filter((o) => o.table === real && o.state !== 'dropped');
     const choice = context.choices?.[table.ref];
 
-    if (byteLength(real) > limit) {
+    if (byteLength(splitTableName(real).name) > limit) {
       problems.push({
         code: 'IDENTIFIER_TOO_LONG',
         table: table.ref,
         message: `"${real}" is longer than this database allows (${String(limit)} bytes). Choose a shorter prefix.`,
       });
     }
+    problems.push(...tableNameProblems(table, real, context, record, foldsCase ? (liveFolded.get(splitTableName(real).name.toLowerCase()) ?? []) : []));
     for (const column of table.columns) {
-      if (column.type !== 'fk') continue;
+      // A table under its own name gets its foreign keys' names cut short and hashed (`foreignKeyName`).
+      if (column.type !== 'fk' || namesItsTable(table)) continue;
       const fk = `fk_${real}_${column.ref}`;
       if (byteLength(fk) > limit) {
         problems.push({
@@ -575,7 +580,8 @@ export function planWithContext(
          * that may not edit such a table would refuse the whole update, and
          * one stray row in it would stop an update that asked for nothing.
          */
-        if (plan.action === 'reuse' && plan.adopted !== true && column.type === 'fk' && column.references !== undefined && have.linksTo === null) {
+        // A link no foreign key keeps (`relation.constraint: false`) is never given one.
+        if (plan.action === 'reuse' && plan.adopted !== true && column.type === 'fk' && column.references !== undefined && have.linksTo === null && column.relation?.constraint !== false) {
           if (carriesLinkTo(have, column.references, required, names, live, context.dialect)) plan.edits.push({ kind: 'add-link', column: column.ref, to: column.references });
         }
         /*
@@ -738,7 +744,7 @@ export function planWithContext(
   }
 
   for (const table of required) {
-    if (table.ref.startsWith('adminium_') || names[table.ref]!.startsWith('adminium_')) {
+    if (table.ref.startsWith('adminium_') || splitTableName(names[table.ref]!).name.toLowerCase().startsWith('adminium_')) {
       problems.push({
         code: 'RESERVED_TABLE',
         table: table.ref,
@@ -778,6 +784,50 @@ export function planWithContext(
 }
 
 /**
+ * Why a table's own name or schema cannot be used on this database: a schema
+ * anywhere but Postgres (MySQL's schema is the database itself, SQLite's are
+ * `main`, `temp` and attached files), the schema Adminium's own tables are
+ * in, and — where the engine ignores case — a table already there whose name
+ * differs from this one only by case, which a create would silently take for
+ * it. The app's own table, found again, is never refused.
+ */
+function tableNameProblems(
+  table: RequiredTable,
+  real: string,
+  context: PlanContext,
+  record: PlanContext['records'][string] | undefined,
+  sameFolded: readonly string[],
+): PlanProblem[] {
+  if (!namesItsTable(table)) return [];
+  const out: PlanProblem[] = [];
+  const { schema, name } = splitTableName(real);
+  if (table.schema !== undefined && context.dialect !== 'postgres') {
+    out.push({
+      code: 'TABLE_NAME_REFUSED',
+      table: table.ref,
+      message: `"${table.ref}" is kept in the schema "${table.schema}", and only Postgres keeps tables in schemas. Take the schema out of the file to install it on ${context.dialect === 'mysql' ? 'MySQL' : 'SQLite'}.`,
+    });
+  }
+  if (schema !== null && context.metaSchema !== undefined && context.metaSchema !== null && schema === context.metaSchema) {
+    out.push({
+      code: 'TABLE_NAME_REFUSED',
+      table: table.ref,
+      message: `"${table.ref}" would go in the schema "${schema}", where Adminium keeps its own tables on this database. Choose another schema.`,
+    });
+  }
+  const own = record !== undefined && record.state !== 'dropped' && record.table === real;
+  const other = sameFolded.find((found) => found !== name);
+  if (other !== undefined && !own) {
+    out.push({
+      code: 'TABLE_NAME_REFUSED',
+      table: table.ref,
+      message: `This database already has a table "${other}", which it takes for "${name}": it does not tell names apart by case. Rename one of them.`,
+    });
+  }
+  return out;
+}
+
+/**
  * The name of the unique index a table's set of columns is kept by:
  * `uq_<table>_<a>_<b>`, as a column's own is named. When that is longer than
  * 63 bytes (the portable limit: Postgres cuts longer names short, MySQL
@@ -807,8 +857,28 @@ export function indexSetName(realTable: string, columns: readonly string[], take
   return shortName('ix', realTable, columns, taken);
 }
 
-/** `<kind>_<table>_<columns>`, or — too long, or taken — the table cut short and a hash of the table and columns. */
-function shortName(kind: 'uq' | 'ix', realTable: string, columns: readonly string[], taken: ReadonlySet<string>): string {
+/**
+ * The name of the foreign key a link column is kept by: `fk_<table>_<column>`,
+ * shortened and hashed like {@link uniqueSetName} when it would not fit.
+ * Postgres cuts a longer name at 63 bytes, and two links cut alike would then
+ * be one name.
+ */
+export function foreignKeyName(realTable: string, column: string): string {
+  return shortName('fk', realTable, [column], new Set());
+}
+
+/** The name of the unique rule one column (or a number with its parent) is kept by: `uq_<table>_<column>`, shortened and hashed like {@link foreignKeyName}. */
+export function uniqueColumnName(realTable: string, column: string): string {
+  return shortName('uq', realTable, [column], new Set());
+}
+
+/**
+ * `<kind>_<table>_<columns>`, or — too long, or taken — the table cut short
+ * and a hash of the table and columns. The table is named without its schema:
+ * a name is the schema's own on Postgres, and no other engine has one.
+ */
+function shortName(kind: 'uq' | 'ix' | 'fk', real: string, columns: readonly string[], taken: ReadonlySet<string>): string {
+  const realTable = splitTableName(real).name;
   const plain = `${kind}_${realTable}_${columns.join('_')}`;
   if (byteLength(plain) <= IDENTIFIER_LIMIT.postgres && !taken.has(plain)) return plain;
   for (let salt = 0; ; salt += 1) {

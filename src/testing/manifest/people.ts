@@ -163,6 +163,13 @@ export const LINK_PATH = /^([a-z][a-z0-9_]*)\.([a-z][a-z0-9_]*)$/;
  * is a link column of that table back to the person, when it has one. On a
  * table of an add-on the app requires (`addOn`), `via` is the app's own link
  * into that table, as `table.column`, and is always said.
+ *
+ * `from` (an add-on's table only) reaches rows one or two links further into
+ * the add-on: the copy's table's own links, followed back to the table the
+ * app's link names. A design's versions are the person's because their
+ * design is (`table: "design_versions", from: ["design_id"]`), and a
+ * version's files because their version is (`from: ["version_id",
+ * "design_id"]`). A copy column that holds files takes its files with it.
  */
 const copySchema = z
   .object({
@@ -172,11 +179,13 @@ const copySchema = z
     column: refSchema,
     holds: z.enum(COPY_HOLDS),
     via: z.string().min(1).max(129).optional(),
+    from: z.array(refSchema).min(1).max(2).optional(),
   })
   .strict()
   .superRefine((copy, ctx) => {
     if (copy.addOn === undefined) {
       if (copy.via !== undefined && !refSchema.safeParse(copy.via).success) ctx.addIssue({ code: 'custom', path: ['via'], message: 'a link column of the copy\'s table, back to the person' });
+      if (copy.from !== undefined) ctx.addIssue({ code: 'custom', path: ['from'], message: 'a copy follows the add-on\'s own links ("from") only on a table of an add-on' });
     } else if (copy.via === undefined || !LINK_PATH.test(copy.via)) {
       ctx.addIssue({ code: 'custom', path: ['via'], message: 'a copy on an add-on\'s table is reached through the app\'s link into it, as "table.column" (order_lines.design_id)' });
     }
@@ -326,7 +335,7 @@ export function peopleIssues<C extends PeopleColumn>(
     (entry.copies ?? []).forEach((copy, c) => {
       const here = (...rest: (string | number)[]) => at('copies', c, ...rest);
       if (isAddOnCopy(copy)) {
-        const id = `${copy.addOn}:${copy.table}.${copy.column}`;
+        const id = `${copy.addOn}:${copy.table}.${copy.column}${copy.from === undefined ? '' : `<${copy.from.join('<')}`}`;
         if (seen.has(id)) out.push({ path: here('column'), message: `"${copy.table}.${copy.column}" of "${copy.addOn}" is listed twice` });
         seen.add(id);
         if (!(m.addOns?.requires ?? []).some((required) => required.key === copy.addOn)) {
@@ -344,8 +353,11 @@ export function peopleIssues<C extends PeopleColumn>(
         const link = index.column(lineTable!, linkColumn!);
         const bound = link?.rules?.addOnLink;
         if (link === undefined) out.push({ path: here('via'), message: `"${lineTable!}" has no column "${linkColumn!}"` });
-        else if (bound === undefined || bound.addOn !== copy.addOn || bound.table !== copy.table) {
+        // With `from`, the link names the table the copy's own links lead back to: the add-on's to have, checked where it is installed.
+        else if (bound === undefined || bound.addOn !== copy.addOn || (copy.from === undefined && bound.table !== copy.table)) {
           out.push({ path: here('via'), message: `"${copy.via}" is not a link into "${copy.addOn}"'s table "${copy.table}" (rules.addOnLink)` });
+        } else if (copy.from !== undefined && bound.table === copy.table) {
+          out.push({ path: here('from'), message: `"${copy.via}" names "${copy.table}" itself, so its rows are reached without "from"` });
         }
         // The line reaches the person as the app's own copies do: it is one of their tables, or links to one.
         const lineColumns = m.requiredSchema.tables.find((table) => table.ref === lineTable)?.columns ?? [];

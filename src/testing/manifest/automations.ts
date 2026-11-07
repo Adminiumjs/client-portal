@@ -23,8 +23,11 @@
  *
  *  - tables are the manifest's own, by their short names; no connection;
  *  - a notice goes to the manifest's own roles, an email to a column of the
- *    record through one of the manifest's own templates: never a fixed
- *    address, a user, a web address or a document profile's id;
+ *    record through one of the manifest's own templates: never a user or a
+ *    document profile's id. A fixed address and a web address are never
+ *    written at all: a step that sends to one (`to: { kind: "fixed" }`, a
+ *    `webhook`) carries no address and arrives switched off, for the owner
+ *    to fill in after the install;
  *  - a title or a notice's text may be given in several languages; the
  *    install keeps the one the instance speaks.
  *
@@ -35,7 +38,7 @@
  */
 import { z } from 'zod';
 
-import { MAIL_CLASSES } from './mail-classes.ts';
+import { MAIL_CLASSES, MAIL_PURPOSES } from './mail-classes.ts';
 import { placeholderNames, requiredNamesOfEmail, showWhenNames } from './placeholders.ts';
 import { bcp47TagSchema, refSchema, type ReferenceIssue } from './refs.ts';
 
@@ -126,6 +129,8 @@ export const manifestTriggerSchema = z.discriminatedUnion('kind', [
       /** `updated` only: run only when this column's value changed. */
       changedColumn: refSchema.optional(),
       when: z.array(manifestConditionSchema).max(8).optional(),
+      /** Also notice rows written around Adminium (an import, the app's own code), by polling. Default: only what Adminium writes. */
+      watch: z.boolean().optional(),
     })
     .strict(),
   z
@@ -161,7 +166,7 @@ const writeValue = z.union([
     .object({
       setting: settingRef,
       /** Who a staff column is given when the setting names nobody who signs in: a staff column of the record, or one link further. */
-      else: z.object({ staff: z.string().regex(/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)?$/, 'a column, or <link column>.<column>') }).strict().optional(),
+      else: z.object({ staff: z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$/, 'a column, or <link column>.<column>') }).strict().optional(),
     })
     .strict(),
   z
@@ -185,7 +190,7 @@ const values = z.record(refSchema, writeValue);
 
 const roleKey = z.string().regex(/^[a-z][a-z0-9-]*$/, 'a role key');
 /** A staff column of the record, or one of the row a link of it names: `owner_id`, `deal_id.owner_id`. */
-const staffPath = z.string().regex(/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)?$/, 'a column, or <link column>.<column>');
+const staffPath = z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$/, 'a column, or <link column>.<column>');
 /** What later steps call a row a step made. */
 const stepName = z.string().regex(/^[a-z][a-z0-9_]{0,39}$/, 'a step name is snake_case, at most 40 characters');
 
@@ -207,6 +212,8 @@ export const manifestActionSchema = z.discriminatedUnion('kind', [
         z.object({ kind: z.literal('field'), column: refSchema }).strict(),
         z.object({ kind: z.literal('staff'), column: staffPath }).strict(),
         z.object({ kind: z.literal('listed'), table: refSchema }).strict(),
+        /** Addresses the owner types after the install: a file never carries one, and the rule arrives switched off. */
+        z.object({ kind: z.literal('fixed') }).strict(),
       ]),
       /**
        * Where a reply goes: to the person a staff column of the record names
@@ -221,6 +228,8 @@ export const manifestActionSchema = z.discriminatedUnion('kind', [
        * it is never stopped.
        */
       class: z.enum(MAIL_CLASSES).optional(),
+      /** A marketing mail's reason to write: the consent purpose whose answer lets it go (newsletter when none is said). */
+      purpose: z.enum(MAIL_PURPOSES).optional(),
       /** What fills a placeholder of the template that the record does not. */
       vars: z
         .record(z.string().regex(/^[A-Za-z0-9_.-]{1,120}$/), z.string().max(2000))
@@ -311,6 +320,36 @@ export const manifestActionSchema = z.discriminatedUnion('kind', [
     })
     .strict(),
   z.object({ kind: z.literal('record.update'), values }).strict(),
+  /**
+   * A call to a web address. The address, and any header's value, are never
+   * written in a file (a webhook's address is often its key): the step
+   * arrives empty and its rule switched off, for the owner to fill in.
+   */
+  z
+    .object({
+      kind: z.literal('webhook'),
+      method: z.enum(['POST', 'PUT']).optional(),
+      /** `slack`: a `{ text }` message to a Slack webhook. */
+      bodyKind: z.enum(['json', 'text', 'slack']).optional(),
+      /** What is sent: text, which may carry `{{record.<column>}}`. */
+      body: z.string().max(8000).optional(),
+      /** The name of a header the owner gives a value after the install (`Authorization`). */
+      headerName: z.string().regex(/^[A-Za-z0-9!#$%&'*+.^_`|~-]{1,120}$/, 'a header name').optional(),
+    })
+    .strict(),
+  /** Draws one of the app's documents for the record: the document of `kind` on `table` (and of `addOn`, when two draw that kind). */
+  z
+    .object({
+      kind: z.literal('document.render'),
+      document: z
+        .object({
+          table: refSchema,
+          kind: z.string().regex(/^[a-z][a-z0-9-]*$/, 'a document kind'),
+          addOn: z.string().regex(/^[a-z][a-z0-9-]{1,79}$/, 'an add-on key').optional(),
+        })
+        .strict(),
+    })
+    .strict(),
   /**
    * A step an add-on gives (its `addOn.steps`): which add-on, which step, and
    * what fills each of the step's inputs: text, which may carry `{{record.<column>}}`.
@@ -850,6 +889,19 @@ export function automationIssues(m: {
           }
           return;
         }
+        if (action.kind === 'webhook') {
+          tokens(action.body, here('body'));
+          return;
+        }
+        if (action.kind === 'document.render') {
+          // The document's own table: the rule's record is the row it is drawn for.
+          if (record === undefined) out.push({ path: here(), message: 'this rule runs for no record, so there is no row to draw a document for' });
+          tableAt(action.document.table, here('document', 'table'));
+          if (record !== undefined && action.document.table !== record.ref) {
+            out.push({ path: here('document', 'table'), message: `the rule's record is a row of "${record.ref}": it draws a document of that table, not of "${action.document.table}"` });
+          }
+          return;
+        }
         if (action.kind === 'add-on.step') {
           for (const [name, value] of Object.entries(action.inputs)) tokens(value, here('inputs', name));
           // Another add-on's step is checked where the rule is installed: this manifest cannot see it.
@@ -868,12 +920,16 @@ export function automationIssues(m: {
           return;
         }
         // An email: one of the manifest's own templates, to a column of the record, and only one a rule can fill.
-        if (record === undefined) out.push({ path: here(), message: 'this rule runs for no record, so there is no address to send to' });
+        // Typed addresses need no record: they are the owner's, filled in after the install.
+        if (record === undefined && action.to.kind !== 'fixed') out.push({ path: here(), message: 'this rule runs for no record, so there is no address to send to' });
         if (action.to.kind === 'staff') staffAt(action.to.column, here('to', 'column'));
         else if (action.to.kind === 'listed') listedAt(action.to.table, here('to', 'table'));
-        else column(record, action.to.column, here('to', 'column'));
+        else if (action.to.kind === 'field') column(record, action.to.column, here('to', 'column'));
         if (action.class !== undefined && action.to.kind !== 'field') {
           out.push({ path: here('class'), message: 'a mail to staff is never stopped, so it has no class: "class" is said of a mail to the record\'s own address (to.kind "field")' });
+        }
+        if (action.purpose !== undefined && action.class !== 'marketing') {
+          out.push({ path: here('purpose'), message: 'a purpose is said of a marketing mail ("class": "marketing") only' });
         }
         if (action.replyTo !== undefined) staffAt(action.replyTo.staff, here('replyTo', 'staff'));
         const template = templates.get(action.templateKey);

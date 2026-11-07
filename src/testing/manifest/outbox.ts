@@ -41,7 +41,7 @@ import { z } from 'zod';
 
 import type { AddOnNeeds } from './add-ons.ts';
 import { formulaColumns, type FormulaExpr } from './formula.ts';
-import { OTHERWISE_BLOCKS, placeholderPattern } from './placeholders.ts';
+import { namesAPlaceholder, OTHERWISE_BLOCKS, placeholderPattern, rowPictureName } from './placeholders.ts';
 import { MAIL_CLASSES, MAIL_PURPOSES } from './mail-classes.ts';
 import { personalColumn, unlistedColumn } from './public-access.ts';
 import { reachedOnlyByUndo, type StateMove } from './states.ts';
@@ -455,7 +455,8 @@ const emailBlockSchema = z
   .refine((block) => block.otherwise === undefined || block.showWhen !== undefined, { message: '"otherwise" is what a block says when its "showWhen" value is missing: it needs a "showWhen"', path: ['otherwise'] })
   .refine((block) => block.otherwise === undefined || OTHERWISE_BLOCKS.includes(block.block), { message: 'only a text or a heading block can say other words ("otherwise")', path: ['otherwise'] });
 
-const emailContentSchema = z
+/** One language of a mail: its subject, blocks and footer. */
+export const emailContentSchema = z
   .object({
     subject: z.string().min(1).max(200),
     preheader: z.string().min(1).max(200).optional(),
@@ -477,6 +478,34 @@ const templateVariableSchema = z
     /^(?:appName|addOn\.[a-z][a-z0-9-]*\.[A-Za-z][A-Za-z0-9_]*|[a-z_][a-z0-9_]*(?:\.[a-z_][a-z0-9_]*)*)$/,
     'a variable such as patient.name or appName',
   );
+
+/** The marks a mail's brand may show: one of the twelve the renderer ships, or the workspace's logo (the template store's `emailMarkSchema`). */
+export const EMAIL_BRAND_MARKS = ['hexagon', 'circle', 'square', 'triangle', 'gem', 'zap', 'flame', 'leaf', 'star', 'heart', 'command', 'box', 'logo'] as const;
+
+/** A mail's own brand, as the template store keeps it. Its sender is checked against the configured senders when it sends. */
+export const emailTemplateBrandSchema = z
+  .object({
+    name: z.string().max(80),
+    mark: z.enum(EMAIL_BRAND_MARKS),
+    accent: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'a six-digit hex colour'),
+    fromName: z.string().max(120),
+    fromEmail: z.string().max(320),
+  })
+  .strict();
+
+/** The most files one mail carries. */
+export const EMAIL_ATTACHMENTS_MAX = 20;
+
+/** A file of the app's package a mail carries: a relative path, never out of the package. */
+export const emailTemplateAttachmentSchema = z
+  .object({
+    file: z
+      .string()
+      .min(1)
+      .max(200)
+      .regex(/^(?!\/)(?!.*(?:^|\/)\.\.?(?:\/|$))[A-Za-z0-9._/-]+$/, 'a file of the package, by its relative path'),
+  })
+  .strict();
 
 export const emailTemplateSchema = z
   .object({
@@ -503,6 +532,14 @@ export const emailTemplateSchema = z
       })
       .strict()
       .optional(),
+    /** A `template` an outbox or a rule sends (the default), or a `campaign` the owner sends to an audience. */
+    kind: z.enum(['template', 'campaign']).optional(),
+    /** What the mail is for: `transactional` (the default), `lifecycle` or `marketing`. */
+    category: z.enum(['transactional', 'lifecycle', 'marketing']).optional(),
+    /** The mail's own name, mark, colour and sender, in place of the workspace's. */
+    brand: emailTemplateBrandSchema.optional(),
+    /** Files of the package the mail carries, each by its path in the package (`emails/terms.pdf`). */
+    attachments: z.array(emailTemplateAttachmentSchema).min(1).max(EMAIL_ATTACHMENTS_MAX).optional(),
     /** The variables it reads, for the editor's list. */
     vars: z.array(templateVariableSchema).max(60).optional(),
     /** The template in each language it ships, US English always among them. */
@@ -640,7 +677,9 @@ export function outboxIssues(
       }
     };
     for (const rule of (m as { automations?: { graph?: unknown }[] }).automations ?? []) collect(rule.graph);
-    const unsent = [...templates].filter((key) => !byRules.has(key));
+    // A campaign is sent by its owner, to an audience: nothing in the app sends it.
+    const campaigns = new Set((m.emailTemplates ?? []).filter((template) => template.kind === 'campaign').map((template) => template.key));
+    const unsent = [...templates].filter((key) => !byRules.has(key) && !campaigns.has(key));
     if (unsent.length > 0) out.push({ path: ['emailTemplates'], message: `templates are sent through an outbox or by a rule's step, and nothing sends ${unsent.map((key) => `"${key}"`).join(', ')}: this app declares no outbox` });
     return out;
   }
@@ -1123,6 +1162,17 @@ const sectionRowsDataSchema = z
 export const emailRowsDataSchema = z.union([outboxRowsDataSchema, sectionRowsDataSchema]);
 export type EmailRowsData = z.infer<typeof emailRowsDataSchema>;
 
+/**
+ * A picture from a row's file column (`email.image` with `fileId:
+ * "{{job.photo}}"`): the kinds of file it may be, and the most it may weigh.
+ * A file that is neither is never sent: the picture is left out, or the
+ * message is not sent when the image is `required`.
+ */
+export const ROW_PICTURE_TYPES: readonly string[] = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+/** The `file.accept` kinds a picture's column takes at least one of. */
+const ROW_PICTURE_ACCEPTS: readonly string[] = ['png', 'jpeg', 'gif', 'webp'];
+export const ROW_PICTURE_MAX_BYTES = 2 * 1024 * 1024;
+
 /** A QR code of a code column, as the whole value of an image: `{{ticket.code.qr}}`. */
 const QR_VALUE = /^\{\{\s*([A-Za-z0-9_.-]+)\.qr\s*\}\}$/;
 
@@ -1176,6 +1226,30 @@ function emailBlockIssues(
     return null;
   };
 
+  /** Why an image's `fileId` placeholder shows no picture from a row's file column, or null. */
+  const pictureIssue = (fileId: unknown): string | null => {
+    const name = rowPictureName(fileId);
+    if (name === null) return 'a picture from a row is written {{<link>.<file column>}}, as the whole value of "fileId"';
+    if (name.startsWith('row.')) return 'a row of a list shows no picture of its own';
+    const parts = name.split('.');
+    if (parts.length < 2) return `{{${name}}} names no row: write {{<link>.<file column>}}`;
+    const prefix = parts.slice(0, -1).join('.');
+    const column = parts.at(-1)!;
+    const table = prefixTable(prefix);
+    if (table === undefined) return `"${prefix}" is not a row this message reaches: one of the outbox's links, or a row one of them points at`;
+    const found = index.column(table, column) as (ReturnType<typeof index.column> & { rules?: { file?: { accept?: unknown; maxCount?: unknown } } }) | undefined;
+    if (found === undefined) return `"${table}" has no column "${column}"`;
+    const file = found.rules?.file;
+    if (found.type !== 'text' || file === undefined) return `"${table}.${column}" is not a file column holding one file`;
+    const accepts = Array.isArray(file.accept) ? file.accept : [];
+    if (!accepts.some((kind) => typeof kind === 'string' && ROW_PICTURE_ACCEPTS.includes(kind))) return `"${table}.${column}" takes no picture (png, jpeg, gif or webp)`;
+    const kept = unlisted(table, column);
+    if (kept !== null) return `"${table}.${column}" is ${kept}, which an email never shows`;
+    const shape = index.table(table);
+    if (shape !== undefined && personalColumn(shape as never, column) !== null) return `"${table}.${column}" is personal data, which an email never shows`;
+    return null;
+  };
+
   templates.forEach((template, t) => {
     let rowsOf: string | undefined;
     for (const [locale, content] of Object.entries(template.locales)) {
@@ -1203,6 +1277,13 @@ function emailBlockIssues(
           if (size !== undefined && (typeof size !== 'number' || !Number.isInteger(size) || size < 80 || size > 200)) {
             out.push({ path: at('data', 'size'), message: 'a QR code is 80 to 200 pixels across' });
           }
+        }
+        // A picture from a row's file column: one placeholder, of a file column of a row the message reaches, never personal.
+        if (block.block === 'email.image' && namesAPlaceholder(block.data?.['fileId'])) {
+          const issue = pictureIssue(block.data?.['fileId']);
+          if (issue !== null) out.push({ path: at('data', 'fileId'), message: issue });
+          const required = block.data?.['required'];
+          if (required !== undefined && typeof required !== 'boolean') out.push({ path: at('data', 'required'), message: 'an image\'s "required" is true or false' });
         }
         if (block.block !== 'email.rows') {
           // Only a block that lists rows has a row to read.

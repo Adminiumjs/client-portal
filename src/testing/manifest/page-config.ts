@@ -14,7 +14,7 @@
  */
 /**
  * What a records page says of itself beside its form: `config.tabs`,
- * `config.filters` and `config.bulk` on a `page-crud` page.
+ * `config.filters`, `config.bulk` and `config.columns` on a `page-crud` page.
  *
  *  - `tabs` words a tab the page already has for a child table: what it says
  *    while empty, and whether it offers "New". It makes no tab and renames
@@ -22,6 +22,8 @@
  *  - `filters` names the columns the list is filtered by, at most six.
  *  - `bulk` is an action on the rows ticked in the list: one row of a child
  *    table for each ("Reorder" on a list of stock points).
+ *  - `columns` names the columns the list opens on, in order, at most eight;
+ *    every other column of the table is still there to switch on.
  *
  * Every name is the manifest's own (a table or column ref), checked here
  * against `requiredSchema`, so a typo is refused long before an install.
@@ -34,6 +36,48 @@ import { refSchema, scalarSchema, textOrLabels, wordsOrLabels, valueFits, type C
 export const PAGE_FILTER_CONTROLS = ['one-of', 'any-of', 'yes-no', 'record', 'date-range', 'number-range'] as const;
 export type PageFilterControl = (typeof PAGE_FILTER_CONTROLS)[number];
 
+/**
+ * The controls a field of a page's `config.form` may name: the widgets' own
+ * list (`FORM_CONTROLS`), which the install reads the form with. A control
+ * outside it is no form at all there, so it is refused here first, by name,
+ * rather than passing this check and failing the install.
+ */
+export const PAGE_FORM_CONTROLS = [
+  'text',
+  'title',
+  'textarea',
+  'mono',
+  'email',
+  'url',
+  'phone',
+  'password',
+  'number',
+  'currency',
+  'stepper',
+  'slider',
+  'date',
+  'time',
+  'datetime',
+  'select',
+  'segmented',
+  'pill-switch',
+  'choice-cards',
+  'toggle-row',
+  'check-row',
+  'chips',
+  'reference',
+  'reference-chips',
+  'image',
+  'avatar',
+  'attachments',
+  'picture',
+  'json',
+  'readonly',
+  'calendar',
+] as const;
+/** The controls a form's field over a related table (`relation`) may name. */
+export const PAGE_FORM_RELATION_CONTROLS = ['reference-chips', 'check-rows', 'child-rows'] as const;
+
 export const pageTabsSchema = z.record(
   refSchema,
   z.object({ empty: textOrLabels.optional(), emptyBody: wordsOrLabels.optional(), noNew: z.literal(true).optional() }).strict(),
@@ -44,6 +88,13 @@ export const pageFiltersSchema = z
   .array(z.object({ column: refSchema, control: z.enum(PAGE_FILTER_CONTROLS).optional(), label: textOrLabels.optional() }).strict())
   .max(6);
 export type PageFilters = z.infer<typeof pageFiltersSchema>;
+
+/** The most columns a list opens on: what a grid shows before it scrolls sideways. */
+export const PAGE_COLUMNS_MAX = 8;
+
+/** The columns a list opens on, in order: the manifest's own refs of the page's table. */
+export const pageColumnsSchema = z.array(refSchema).min(1).max(PAGE_COLUMNS_MAX);
+export type PageColumns = z.infer<typeof pageColumnsSchema>;
 
 export const pageBulkActionSchema = z
   .object({
@@ -113,7 +164,42 @@ function placeholdersOf(message: unknown): string[] {
   return texts.flatMap((text) => [...text.matchAll(/\{([^{}]*)\}/g)].map((match) => match[1] ?? ''));
 }
 
-/** Every problem with the pages' `config.tabs`, `config.filters` and `config.bulk`, against the manifest's own tables. */
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
+
+/**
+ * Each control a page's form names that the install could not read it with:
+ * a column's, a related table's, a child row's column's. Only the controls —
+ * the rest of the form is checked at install, against the tables as they are
+ * made. A file column takes its own control by naming none (or `attachments`,
+ * `image`, `picture`): there is no `file` control.
+ */
+function formControlIssues(form: unknown, at: (...rest: (string | number)[]) => (string | number)[]): ReferenceIssue[] {
+  if (!isRecord(form) || !Array.isArray(form['sections'])) return [];
+  const out: ReferenceIssue[] = [];
+  const known = (control: unknown, list: readonly string[]) => control === undefined || (typeof control === 'string' && list.includes(control));
+  const refuse = (path: (string | number)[], control: unknown, list: readonly string[]) =>
+    out.push({ path, message: `${JSON.stringify(control)} is not a form control: a field takes ${list.map((name) => `"${name}"`).join(', ')}, or none for the column's own` });
+  form['sections'].forEach((section: unknown, s: number) => {
+    if (!isRecord(section) || !Array.isArray(section['fields'])) return;
+    section['fields'].forEach((field: unknown, f: number) => {
+      if (!isRecord(field)) return;
+      const here = (...rest: (string | number)[]) => at('form', 'sections', s, 'fields', f, ...rest);
+      if (typeof field['relation'] === 'string') {
+        if (!known(field['control'], PAGE_FORM_RELATION_CONTROLS)) refuse(here('control'), field['control'], PAGE_FORM_RELATION_CONTROLS);
+        if (Array.isArray(field['columns'])) {
+          field['columns'].forEach((child: unknown, c: number) => {
+            if (isRecord(child) && !known(child['control'], PAGE_FORM_CONTROLS)) refuse(here('columns', c, 'control'), child['control'], PAGE_FORM_CONTROLS);
+          });
+        }
+      } else if (typeof field['column'] === 'string' && !known(field['control'], PAGE_FORM_CONTROLS)) {
+        refuse(here('control'), field['control'], PAGE_FORM_CONTROLS);
+      }
+    });
+  });
+  return out;
+}
+
+/** Every problem with the pages' `config.tabs`, `config.filters`, `config.columns` and `config.bulk`, and the controls their forms name, against the manifest's own tables. */
 export function pageConfigIssues<C extends RuledColumn>(pages: readonly PageShape[], index: TableIndex<C>): ReferenceIssue[] {
   const out: ReferenceIssue[] = [];
   pages.forEach((page, p) => {
@@ -143,6 +229,8 @@ export function pageConfigIssues<C extends RuledColumn>(pages: readonly PageShap
       return column !== undefined && column.type === 'fk' && column.references === own;
     };
 
+    out.push(...formControlIssues(page.config?.['form'], at));
+
     const tabs = parse('tabs', pageTabsSchema);
     for (const ref of Object.keys(tabs ?? {})) {
       const child = index.table(ref);
@@ -163,6 +251,20 @@ export function pageConfigIssues<C extends RuledColumn>(pages: readonly PageShap
       const controls = pageFilterControls(column);
       if (controls.length === 0) out.push({ path: at('filters', f, 'column'), message: `"${own!}.${filter.column}" cannot be filtered that way: a list filters by a link, a yes/no, a choice, a date or a number` });
       else if (filter.control !== undefined && !controls.includes(filter.control)) out.push({ path: at('filters', f, 'control'), message: `"${own!}.${filter.column}" cannot be filtered that way: it takes ${controls.map((control) => `"${control}"`).join(' or ')}` });
+    });
+
+    // The columns the list opens on: each a column of the page's table staff may see, each once.
+    const listed = parse('columns', pageColumnsSchema);
+    const named = new Set<string>();
+    (listed ?? []).forEach((ref, c) => {
+      if (!index.has(own!, ref)) {
+        out.push({ path: at('columns', c), message: `"${ref}" is not a column of the page's table "${own!}"` });
+        return;
+      }
+      if (named.has(ref)) out.push({ path: at('columns', c), message: `"${ref}" is named twice` });
+      named.add(ref);
+      const kept = keptFromStaff(index.table(own!)!, ref);
+      if (kept !== null) out.push({ path: at('columns', c), message: `"${own!}.${ref}" is ${kept}: no list shows it` });
     });
 
     const bulk = parse('bulk', pageBulkSchema);

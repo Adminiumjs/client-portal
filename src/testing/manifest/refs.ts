@@ -23,8 +23,34 @@
  */
 import { z } from 'zod';
 
-/** A snake_case identifier: a table or column ref. */
-export const refSchema = z.string().regex(/^[a-z][a-z0-9_]*$/, 'must be a snake_case identifier');
+import { columnNameIssue } from './table-names.ts';
+
+/** A snake_case identifier. */
+export const SNAKE_REF = /^[a-z][a-z0-9_]*$/;
+
+/**
+ * A table or column ref: snake_case, or the name a column of a self-made app
+ * has in its own database (`orderDate`). Only a self-made app may declare such
+ * a column (`columnRefIssues`); anywhere else the name matches no column, and
+ * the cross-reference checks refuse it.
+ */
+export function isRef(value: string): boolean {
+  return SNAKE_REF.test(value) || (COLUMN_NAME.test(value) && columnNameIssue(value) === null);
+}
+
+/**
+ * The names a self-made app's column may keep: a letter or `_` first, then
+ * letters, digits, `_`, `$`, `-` and spaces. Never a time, a number or a path
+ * (`24:00`, `2pm`, `a.b`), so a field that takes a column or a value still
+ * reads a value as a value.
+ */
+const COLUMN_NAME = /^[A-Za-z_][A-Za-z0-9_ $-]*$/;
+
+/** A table or column ref (see `isRef`). */
+export const refSchema = z.string().refine(isRef, 'must be a snake_case identifier');
+
+/** A column of the row, or one link further (`deal_id.owner_id`, `dealId.ownerId`): names without spaces. */
+export const COLUMN_PATH = /^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$/;
 
 /** A BCP 47 tag, the way every label map in a manifest is keyed (`de-DE`). */
 export const bcp47TagSchema = z.string().regex(/^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/, 'keyed by BCP 47 tag');

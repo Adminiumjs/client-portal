@@ -395,12 +395,16 @@ const agreeTargetSchema = z.union([
  * A value of the row that must agree with another: `column` (followed along
  * `path` through foreign keys) equals, is at most, or is at least the target.
  * `when` applies it only to rows whose value (along its own `path`) is one of
- * `in`.
+ * `in`. `length: true` compares how many characters a text value has, with
+ * `lte` alone: a line's lettering no longer than its product allows
+ * (`{ "column": "lettering", "length": true, "lte": { "via": "product_id",
+ * "column": "lettering_limit" } }`), refused as `too-long`.
  */
 export const agreeSchema = z
   .object({
     column: refSchema,
     path: pathSchema.optional(),
+    length: z.literal(true).optional(),
     when: z.object({ path: pathSchema.optional(), in: z.array(scalarSchema).min(1).max(32) }).strict().optional(),
     eq: agreeTargetSchema.optional(),
     lte: agreeTargetSchema.optional(),
@@ -536,8 +540,29 @@ export const publicAccessSchema = z
   .object({
     table: refSchema,
     kind: z.enum(['records', 'availability']).optional(),
-    /** `DELETE` only on an add-on's own link: its holder removes their own row while it is in a state the entry names. */
-    methods: z.array(z.enum(['GET', 'POST', 'PATCH', 'DELETE'])).min(1),
+    /**
+     * `DELETE` only on an add-on's own link: its holder removes their own row while it is in a state the entry names.
+     * A file made on an Adminium (publisher `local`) may also replace (`PUT`), remove (`DELETE`) and write many rows
+     * at a time (`BATCH`), each behind a claim, as `PATCH` is.
+     */
+    methods: z.array(z.enum(['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'BATCH'])).min(1),
+    /** The endpoint's own address (`/open_orders`), in place of the one Adminium names. A file made on an Adminium only. */
+    path: z.string().regex(/^\/[a-z][A-Za-z0-9_]{0,63}$/, 'a path is "/" and a ref: a lower-case letter, then letters, digits and _').optional(),
+    /** How many rows a page holds, and in what order. A file made on an Adminium only. */
+    pagination: z
+      .object({
+        defaultLimit: z.number().int().min(1).max(200),
+        maxLimit: z.number().int().min(1).max(200),
+        /** `column.asc` or `column.desc`. */
+        order: z.string().regex(/^[a-z][a-z0-9_]*\.(asc|desc)$/, 'an order is "column.asc" or "column.desc"').optional(),
+      })
+      .strict()
+      .refine((pages) => pages.defaultLimit <= pages.maxLimit, { message: 'the default page is no longer than the longest', path: ['defaultLimit'] })
+      .optional(),
+    /** How many requests a guest may make in a window. A file made on an Adminium only. */
+    rateLimit: z.object({ requests: z.number().int().min(1).max(10_000), window: z.enum(['1s', '1m', '1h']) }).strict().optional(),
+    /** What a reply is: rows wrapped in `data`, a bare list, or one row. A file made on an Adminium only. */
+    response: z.enum(['wrapped', 'array', 'single']).optional(),
     select: z.array(refSchema).optional(),
     writable: z.array(refSchema).optional(),
     filters: z.array(z.union([valueFilterSchema, relativeFilterSchema])).optional(),
@@ -852,6 +877,8 @@ interface PublicAccessContext {
    * they are read with.
    */
   ridesAppKeys?: boolean | undefined;
+  /** The manifest is a file made on an Adminium (publisher `local`): its entries may use the wider methods and fields. */
+  local?: boolean | undefined;
   /** The table's limits, as it declares them (absent: the caller does not say). */
   capacityOf?: (table: string) => Capacity | undefined;
   publicKeys: Readonly<Record<string, PublicKey>> | undefined;
@@ -1208,17 +1235,37 @@ export function publicAccessIssues(entries: readonly PublicAccess[], ctx: Public
 
     // A change to an existing row, from a browser, only behind a claim: the
     // guest reaches their own row (or a child of it) and nothing else.
-    if (patches && entry.claim === undefined && entry.visibleWith === undefined && (entry.claimedBy === undefined || entry.claimedBy.optional === true)) {
+    const claimed = entry.claim !== undefined || entry.visibleWith !== undefined || (entry.claimedBy !== undefined && entry.claimedBy.optional !== true);
+    if (patches && !claimed) {
       out.push({ path: at('methods'), message: 'PATCH is allowed only with a claim' });
     }
     /*
      * A removal from a browser: only through an add-on's own link (a shopper
      * deleting their own saved draft), on the entry that opens the row by it.
-     * Nothing else a guest holds removes a row.
+     * Nothing else a guest holds removes a row — but in a file made on an
+     * Adminium, whose owner made the endpoint by hand: there a removal, a
+     * replacement and a batch are each held behind a claim, as a change is.
      */
     if (entry.methods.includes('DELETE')) {
       const ownLink = ctx.ridesAppKeys === true && entry.key !== undefined && entry.claim !== undefined && 'by' in entry.claim && entry.claim.own === true;
-      if (!ownLink) out.push({ path: at('methods'), message: "DELETE is allowed only on an add-on's own link, the entry that opens the row by it (claim by token, own)" });
+      if (!ownLink && ctx.local !== true) out.push({ path: at('methods'), message: "DELETE is allowed only on an add-on's own link, the entry that opens the row by it (claim by token, own)" });
+      else if (!ownLink && !claimed) out.push({ path: at('methods'), message: 'DELETE is allowed only with a claim' });
+    }
+    for (const method of ['PUT', 'BATCH'] as const) {
+      if (!entry.methods.includes(method)) continue;
+      if (ctx.local !== true) out.push({ path: at('methods'), message: `${method} is read only from a file made on an Adminium (publisher "local")` });
+      else if (!claimed) out.push({ path: at('methods'), message: `${method} is allowed only with a claim` });
+    }
+    for (const field of ['path', 'pagination', 'rateLimit', 'response'] as const) {
+      if (entry[field] !== undefined && ctx.local !== true) out.push({ path: at(field), message: `"${field}" is read only from a file made on an Adminium (publisher "local")` });
+    }
+    // An app's own key is granted every entry, and an app's pages read rows wrapped in `data`.
+    if (entry.response !== undefined && entry.response !== 'wrapped' && ctx.local === true) {
+      out.push({ path: at('response'), message: `an app's own key reads rows wrapped in { data }, so its entries reply "wrapped", not "${entry.response}"` });
+    }
+    const ordered = entry.pagination?.order;
+    if (ordered !== undefined && !has(entry.table, ordered.slice(0, ordered.lastIndexOf('.')))) {
+      out.push({ path: at('pagination', 'order'), message: `"${entry.table}" has no column "${ordered.slice(0, ordered.lastIndexOf('.'))}"` });
     }
     // Nothing a server decides may be written by a browser.
     const decided = ctx.decided(entry.table);
@@ -2117,8 +2164,16 @@ function agreeIssues(index: TableIndex, table: string, parent: string | undefine
       other = index.column(via.references, target.column);
       if (other === undefined) out.push({ path: at(test, 'column'), message: `"${via.references}" has no column "${target.column}"` });
     }
-  } else if (typeof reached !== 'string' && !agreeValueFits(reached.column, target.value)) {
+  } else if (agree.length !== true && typeof reached !== 'string' && !agreeValueFits(reached.column, target.value)) {
     out.push({ path: at(test, 'value'), message: `${JSON.stringify(target.value)} is not a value of "${reached.table}.${reached.column.ref}"` });
+  }
+  if (agree.length === true) {
+    // How many characters a text has, at most a number: the text is the row's, the most is a number.
+    if (test !== 'lte') out.push({ path: at(test), message: 'a length is compared with lte (at most so many characters)' });
+    if (typeof reached !== 'string' && reached.column.type !== 'text') out.push({ path: at('length'), message: `"${reached.table}.${reached.column.ref}" is not text, so it has no length` });
+    if (other !== undefined && !NUMBERS.includes(other.type)) out.push({ path: at(test), message: `"${other.ref}" is not a number, so it is no most characters` });
+    if ('value' in target && (typeof target.value !== 'number' || !Number.isInteger(target.value) || target.value < 0)) out.push({ path: at(test, 'value'), message: 'the most characters is a whole number' });
+    return out;
   }
   if (typeof reached !== 'string') {
     if (test !== 'eq' && !NUMBERS.includes(reached.column.type)) {

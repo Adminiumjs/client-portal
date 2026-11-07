@@ -261,6 +261,12 @@ export type AddOnNavGroup = z.infer<typeof addOnNavGroupSchema>;
 export const addOnBlockSchema = z
   .object({
     attaches: z.array(attachTargetSchema).min(1),
+    /**
+     * `server`: kept once per server (a payment provider: two businesses share
+     * one provider account). Absent: installed per database, on its host
+     * install's database — its settings, roles and keys are each business's own.
+     */
+    scope: z.enum(['server']).optional(),
     provides: z.array(providesSchema).optional(),
     consumes: z.array(consumesSchema).optional(),
     slots: z.array(slotFillSchema).optional(),

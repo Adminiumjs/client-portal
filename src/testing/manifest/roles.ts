@@ -628,8 +628,23 @@ export function belongsIssues<C extends ColumnShape>(tables: readonly BelongsTab
   return out;
 }
 
-/** What a role may do on a table of an add-on: read it, add rows, change rows. Never delete, export or import. */
-export const ROLE_ADD_ON_ACTIONS = ['read', 'create', 'update'] as const;
+/**
+ * What a role may do on a table of an add-on: read it, see its personal
+ * columns in clear (`read_pii`, beside `read`), add rows, change rows, remove
+ * rows. Never export or import. A remove, and an add or a change on a table a
+ * ledger's code writes, only where the add-on allows it (`appGrants`).
+ */
+export const ROLE_ADD_ON_ACTIONS = ['read', 'create', 'update', 'read_pii', 'delete'] as const;
+
+/** The actions a grant's column lists narrow: what a read shows, what an update changes, what a new row is given. */
+export const ROLE_ADD_ON_COLUMN_ACTIONS = ['read', 'create', 'update'] as const;
+
+/**
+ * The most add-on tables one role is granted. A shop's owner reads a
+ * designer's tables (about a dozen), a stock add-on's, a carrier's and a
+ * calendar's besides: some twenty, with room for one more add-on.
+ */
+export const ROLE_ADD_ON_TABLES_MAX = 24;
 
 /**
  * A grant on a table of an add-on the app names, by the add-on's key and the
@@ -641,13 +656,13 @@ export const roleAddOnTableSchema = z
   .object({
     addOn: z.string().regex(/^[a-z][a-z0-9-]{1,79}$/, 'an add-on key'),
     table: refSchema,
-    actions: z.array(z.enum(ROLE_ADD_ON_ACTIONS)).min(1).max(3),
+    actions: z.array(z.enum(ROLE_ADD_ON_ACTIONS)).min(1).max(ROLE_ADD_ON_ACTIONS.length),
     limit: roleLimitSchema.optional(),
   })
   .strict();
 export type RoleAddOnTable = z.infer<typeof roleAddOnTableSchema>;
 
-export const roleAddOnTablesSchema = z.array(roleAddOnTableSchema).min(1).max(12);
+export const roleAddOnTablesSchema = z.array(roleAddOnTableSchema).min(1).max(ROLE_ADD_ON_TABLES_MAX);
 
 /** Every problem of the roles' grants on add-on tables that the app's own manifest can see. */
 export function roleAddOnTableIssues(roles: readonly { key: string; tables?: readonly RoleAddOnTable[] | undefined }[], named: ReadonlySet<string>): ReferenceIssue[] {
@@ -661,6 +676,8 @@ export function roleAddOnTableIssues(roles: readonly { key: string; tables?: rea
       if (seen.has(pair)) out.push({ path: at('table'), message: `"${role.key}" is granted "${grant.table}" of "${grant.addOn}" twice` });
       seen.add(pair);
       if (new Set(grant.actions).size !== grant.actions.length) out.push({ path: at('actions'), message: 'an action is listed once' });
+      // Personal columns in clear are a way of reading: never without the read itself.
+      if (grant.actions.includes('read_pii') && !grant.actions.includes('read')) out.push({ path: at('actions'), message: '"read_pii" shows the personal columns of what the role reads: give it "read" too' });
       // A limit narrows what the grant gives: there must be something to narrow.
       const limit = grant.limit;
       if (limit === undefined) return;
@@ -670,7 +687,7 @@ export function roleAddOnTableIssues(roles: readonly { key: string; tables?: rea
       for (const action of ROW_LIMIT_ACTIONS) {
         const written = limit.rows?.[action];
         if (written === undefined) continue;
-        // An add-on's grant is read, create and update: its rows are never deleted through one.
+        // Which rows a remove reaches narrows a grant that removes.
         if (!(grant.actions as readonly string[]).includes(action)) out.push({ path: at('limit', 'rows', action), message: `the grant has no "${action}", so there is nothing for its rows to limit` });
         // An add-on's table does not say whose its rows are yet: its rows are limited by a value only.
         reachList(written).forEach((reach, n) => {

@@ -41,6 +41,8 @@ const ACCEPTS: Readonly<Record<RequiredColumn['type'], readonly string[] | null>
   timestamptz: ['timestamptz', 'timestamp'],
   uuid: ['uuid', 'varchar', 'text'],
   blob: ['binary'],
+  // A clock time: a `time` column, or text that holds one (`HH:MM`).
+  time: ['time', 'text', 'varchar'],
   fk: null,
 };
 

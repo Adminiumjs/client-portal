@@ -37,6 +37,21 @@
 /** A placeholder's name: letters, digits, `_`, `.` and `-`. */
 const NAME = '[A-Za-z0-9_.-]+';
 
+/**
+ * A picture from a row's file column, as an image's `fileId`: the whole value
+ * one placeholder with no backup (`{{job.photo}}`), and the name it reads; null
+ * for anything else (a library file's own id, a placeholder among other text).
+ */
+export function rowPictureName(fileId: unknown): string | null {
+  if (typeof fileId !== 'string') return null;
+  return new RegExp(`^\\{\\{\\s*(${NAME})\\s*\\}\\}$`).exec(fileId.trim())?.[1] ?? null;
+}
+
+/** Whether an image's `fileId` is written as a placeholder at all (a whole one or not): never a library file's id. */
+export function namesAPlaceholder(fileId: unknown): boolean {
+  return typeof fileId === 'string' && fileId.includes('{{');
+}
+
 /** One placeholder, anywhere in a text. A fresh expression each call: a shared global one keeps its place between readers. */
 export function placeholderPattern(): RegExp {
   return new RegExp(`\\{\\{\\s*(${NAME})\\s*(?:\\|([^{}]*))?\\}\\}`, 'g');

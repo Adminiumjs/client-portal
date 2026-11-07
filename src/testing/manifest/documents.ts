@@ -107,7 +107,7 @@ export type PairSource = z.infer<typeof pairSourceSchema>;
 const nightlySourceSchema = z
   .object({
     nightly: refSchema,
-    columns: z.record(slotId, z.string().regex(/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)?$/, 'a night\'s column, or <rate via>.<column>')),
+    columns: z.record(slotId, z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$/, 'a night\'s column, or <rate via>.<column>')),
   })
   .strict();
 
@@ -140,6 +140,37 @@ const statementSourceSchema = z
   })
   .strict();
 
+/** The options an operator sets on a profile in Studio, as stored there: what the document is drawn in and on. */
+export const documentOptionsSchema = z
+  .object({
+    locale: z.string().regex(/^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/, 'a language tag').optional(),
+    paper: z.string().regex(/^[a-z0-9-]{1,20}$/, 'a paper size').optional(),
+    formats: z.array(z.enum(['html', 'pdf'])).min(1).max(2).optional(),
+    /** What a document number starts with (`INV-`). */
+    prefix: z.string().max(20).optional(),
+    /** Texts printed as written, by slot. */
+    literals: z
+      .record(slotId, z.union([z.string().max(2000), z.number(), z.boolean()]))
+      .refine((values) => Object.keys(values).length <= 32, 'at most 32 texts')
+      .optional(),
+  })
+  .strict();
+
+export const documentTriggerSchema = z
+  .object({
+    event: z.enum(['record.created', 'record.updated']),
+    /** `record.updated` only: when this column changes, and with `value`, when it becomes that value. */
+    when: z.object({ column: refSchema, value: z.union([z.string().max(200), z.number(), z.boolean()]).optional() }).strict().optional(),
+  })
+  .strict();
+
+export const documentDeliverSchema = z
+  .object({
+    store: z.boolean().optional(),
+    emailSlot: slotId.optional(),
+  })
+  .strict();
+
 export const appDocumentSchema = z
   .object({
     kind: z.string().regex(/^[a-z][a-z0-9-]*$/, 'a document kind'),
@@ -161,6 +192,12 @@ export const appDocumentSchema = z
     requestValues: z.array(slotId).min(1).max(8).optional(),
     /** Only rows whose column holds one of the values have this document (a receipt for money taken, not given back). */
     where: whereSchema.optional(),
+    /** How it is drawn: its language, paper, formats, number prefix and fixed texts. The operator's to change afterwards. */
+    options: documentOptionsSchema.optional(),
+    /** Drawn by itself when a row is made, or when a column of it changes (to a value, when one is given). */
+    trigger: documentTriggerSchema.optional(),
+    /** Where a drawn document goes: kept, and emailed to the address of a slot. The slot arrives empty, for the owner to choose. */
+    deliver: documentDeliverSchema.optional(),
   })
   .strict();
 export type AppDocument = z.infer<typeof appDocumentSchema>;
@@ -314,6 +351,10 @@ export function appDocumentIssues(
     }
     out.push(...mappingIssues(doc.table, doc.mapping, ctx.index, at, ctx.perNight ?? (() => new Map()), ctx.unlisted, ctx.addOns));
     if (doc.where !== undefined && !ctx.index.has(doc.table, doc.where.column)) out.push({ path: at('where', 'column'), message: `"${doc.table}" has no column "${doc.where.column}"` });
+    if (doc.trigger?.when !== undefined) {
+      if (doc.trigger.event !== 'record.updated') out.push({ path: at('trigger', 'when'), message: 'a changed column is said of a row that is updated ("event": "record.updated")' });
+      else if (!ctx.index.has(doc.table, doc.trigger.when.column)) out.push({ path: at('trigger', 'when', 'column'), message: `"${doc.table}" has no column "${doc.trigger.when.column}"` });
+    }
     (doc.requestValues ?? []).forEach((slot, n) => {
       if (doc.requestValues!.indexOf(slot) !== n) out.push({ path: at('requestValues', n), message: `"${slot}" is listed twice` });
       // A mapped slot prints the row; a value sent for it would print something the row does not say.

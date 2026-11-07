@@ -135,9 +135,17 @@ export interface PlanProblem {
     | 'TABLE_TAKEN'
     | 'IDENTIFIER_TOO_LONG'
     | 'PREFIX_COLLISION'
+    // A self-made app's real table name or schema this database cannot take: a schema off Postgres, the
+    // meta store's own, a name that differs only by case from a table already there where case is ignored.
+    | 'TABLE_NAME_REFUSED'
     // Added by the server, which can see the pages and read their forms.
     | 'PAGE_SLUG_TAKEN'
     | 'PAGE_FORM_INVALID'
+    // A page of the app at an address a page here already has, with no answer, or one that cannot be done.
+    | 'PAGE_SLUG_UNANSWERED'
+    | 'PAGE_SLUG_ANSWER_INVALID'
+    // A self-made app's page or view that cannot be read here: a newer version, a source install's id, a table it does not declare.
+    | 'PAGE_ENVELOPE_INVALID'
     | 'ROLE_INVALID'
     // An email the app ships that the renderer cannot draw.
     | 'EMAIL_TEMPLATE_INVALID'
@@ -150,16 +158,31 @@ export interface PlanProblem {
     | 'UNIQUE_DUPLICATES'
     // Added by the server, which can read the rows: a link a table lacks, which rows already there break.
     | 'LINK_ORPHANS'
-    // Added by the server, which knows where each app is installed: the app runs on another connection.
+    // No longer added (an app may be installed once per database); kept so an older plan still reads.
     | 'APP_INSTALLED_ELSEWHERE'
+    // Added by the server, which knows where each app is installed: another copy runs another version.
+    | 'ONE_VERSION_PER_APP'
     // An update that would take a shape off a table another installed app shares under it.
     | 'SHAPE_IN_USE'
     // Added by the server: a public endpoint this app would add under a name another app's endpoint already has.
-    | 'SHARE_REF_TAKEN';
+    | 'SHARE_REF_TAKEN'
+    // Added by the server, which knows what is installed on this database: an app this one requires (`apps.requires`)
+    // is not there, is another publisher's, runs a version outside the range, or does not keep a table this app names.
+    | 'REQUIRED_APP_MISSING'
+    | 'REQUIRED_APP_PUBLISHER'
+    | 'REQUIRED_APP_VERSION'
+    | 'REQUIRED_APP_TABLE'
+    // Added by the server: with "use the existing tables", a table that is there cannot be used as it is (it would be
+    // changed, renamed, or is not offered for reuse).
+    | 'EXISTING_TABLE_UNUSABLE'
+    // Added by the server: a self-made app's file installed onto the very database it was saved from (D12).
+    | 'SAVED_FROM_HERE'
+    // Added by the server: a deployment-wide part whose logo or favicon its package does not hold as it says.
+    | 'INSTANCE_INVALID';
   message: string;
   table: string;
   column?: string;
-  /** `APP_INSTALLED_ELSEWHERE` only: the connection the app is installed on. */
+  /** `ONE_VERSION_PER_APP` (and the older `APP_INSTALLED_ELSEWHERE`) only: the connection the other copy is on. */
   connectionId?: string;
 }
 
@@ -245,6 +268,11 @@ export interface PlanContext {
   /** The operator's answers per shape (`menu@1`): use another app's tables, or keep separate ones. */
   shares?: Readonly<Record<string, ShareChoice>> | undefined;
   dialect: 'postgres' | 'mysql' | 'sqlite';
+  /**
+   * The schema Adminium's own tables are in, when they share this database
+   * (Postgres only): no app's table is made there under a schema it names.
+   */
+  metaSchema?: string | null | undefined;
 }
 
 export type TableClass = 'new' | 'own-leftover' | 'shared' | 'taken';

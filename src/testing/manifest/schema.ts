@@ -51,6 +51,8 @@ import { conditionIssues, stateConditionSchema, statesIssues, statesSchema, type
 import { MOMENT_LIMITS, clockTimeSchema, momentIssues, momentSchema, settingRefSchema } from './refs.ts';
 import {
   NUMERIC_TYPES,
+  SNAKE_REF,
+  isRef,
   labelsSchema,
   refSchema,
   scalarSchema,
@@ -63,9 +65,14 @@ import {
   type TableIndex,
 } from './refs.ts';
 import { compareSemver, parseSemverRange } from './semver.ts';
+import { appIconSchema, pageEnvelopeFieldSchema, pageViewsSchema, provenanceSchema, savedAppIssues } from './saved-apps.ts';
+import { appsBlockSchema, requiredAppIssues } from './app-requires.ts';
+import { instanceIssues, instanceSchema } from './instance.ts';
 import { assistantIssues, type AssistantTableShape } from './assistant.ts';
 import { stepsIssues, type StepTableShape } from './steps.ts';
 import { WORD_FLOORS, installFloorWords } from './words.ts';
+import { savedPartsIssues, savedPartsShape } from './saved-parts.ts';
+import { tableNameIssue, tableSchemaIssue } from './table-names.ts';
 import { mailClassFloorIssues } from './mail-class.ts';
 import { keepSchema, peopleIssues, peopleSchema, publicConsentIssues } from './people.ts';
 import { expireIssues, expireSchema } from './expire.ts';
@@ -264,6 +271,8 @@ export const COLUMN_TYPES = [
   'uuid',
   'fk',
   'blob',
+  // A time of day with no date and no zone (`time` on Postgres and MySQL, kept as text by SQLite).
+  'time',
 ] as const;
 
 /** Optional semantic pre-seed so widgets auto-instantiate. */
@@ -1094,9 +1103,29 @@ export function defaultIssue(c: {
   }
 }
 
+/**
+ * A link column's own words: the name Adminium gives the link, `remove` (the
+ * database keeps the foreign key and Adminium does not show the link) or
+ * `constraint: false` (Adminium shows the link and no foreign key is made for
+ * it, as for a link a person added in Studio).
+ */
+export const columnRelationSchema = z
+  .object({
+    label: z.string().min(1).max(120).optional(),
+    remove: z.literal(true).optional(),
+    constraint: z.literal(false).optional(),
+  })
+  .strict()
+  .refine((r) => r.label !== undefined || r.remove !== undefined || r.constraint !== undefined, { message: 'a relation says label, remove or constraint' })
+  .refine((r) => r.remove === undefined || (r.label === undefined && r.constraint === undefined), {
+    message: 'a link Adminium does not show has no label, and its foreign key stays: remove alone',
+  });
+export type ColumnRelation = z.infer<typeof columnRelationSchema>;
+
 export const requiredColumnSchema = z
   .object({
-    ref: z.string().regex(/^[a-z][a-z0-9_]*$/, 'column ref must be a snake_case identifier'),
+    // snake_case; a self-made app's column may keep its own name (`columnRefIssues`).
+    ref: z.string().refine(isRef, 'column ref must be a snake_case identifier'),
     type: z.enum(COLUMN_TYPES),
     semantic: z.enum(COLUMN_SEMANTICS).optional(),
     role: z.enum(COLUMN_ROLES).optional(),
@@ -1141,6 +1170,18 @@ export const requiredColumnSchema = z
      * lock reads the rows it needs and not the whole table.
      */
     index: z.literal(true).optional(),
+    /**
+     * `decimal` / `money` only: the digits kept in all, beside `scale`
+     * (`decimal(10,2)`). Without it a decimal is made with 19. At least as
+     * many as the places after the point (4 when `scale` says none).
+     */
+    precision: z.number().int().min(1).max(65).optional(),
+    /** Kept off forms and lists, or shown again (`false`): installed as the column's hidden mark, which the operator may change. */
+    hidden: z.boolean().optional(),
+    /** An `int` column that holds a yes or a no (a `smallint` flag): read, written and shown as one on every engine. */
+    yesNo: z.literal(true).optional(),
+    /** A link's own words (an `fk` column): what Adminium calls it, that Adminium does not show it, or that no foreign key keeps it. */
+    relation: columnRelationSchema.optional(),
     /** Rules Adminium keeps on the column once installed (see `columnRulesSchema`). */
     rules: columnRulesSchema.optional(),
     /**
@@ -1167,6 +1208,22 @@ export const requiredColumnSchema = z
     message: 'scale applies to a decimal or money column only',
     path: ['scale'],
   })
+  .refine((c) => c.precision === undefined || c.type === 'decimal' || c.type === 'money', {
+    message: 'precision applies to a decimal or money column only',
+    path: ['precision'],
+  })
+  .refine((c) => c.precision === undefined || c.precision >= (typeof c.scale === 'number' ? c.scale : 4), {
+    message: 'precision counts every digit, so it is at least the places after the point (4 when scale gives none)',
+    path: ['precision'],
+  })
+  .refine((c) => c.yesNo === undefined || c.type === 'int', {
+    message: 'yesNo marks an int column as a yes or a no (a bool column is one already)',
+    path: ['yesNo'],
+  })
+  .refine((c) => c.relation === undefined || c.type === 'fk', {
+    message: 'relation describes a link: an fk column only',
+    path: ['relation'],
+  })
   .refine((c) => c.unique === undefined || (c.role !== 'pk' && !['json', 'blob'].includes(c.type) && (c.type !== 'text' || c.maxLength !== undefined)), {
     message: 'unique needs a column that can be indexed: not the key, not json or blob, text with maxLength',
     path: ['unique'],
@@ -1182,6 +1239,20 @@ export const tableIndexesSchema = z.array(z.array(refSchema).min(1).max(4)).min(
 export const requiredTableSchema = z
   .object({
     ref: z.string().regex(/^[a-z][a-z0-9_]*$/, 'table ref must be a snake_case identifier'),
+    /**
+     * A self-made app's table under the name a person gave it by hand
+     * (`Order Lines`), beside its ref. Absent, the real name is the ref (or
+     * `<prefix><ref>`). See `table-names.ts`.
+     */
+    name: z.string().superRefine((name, ctx) => {
+      const issue = tableNameIssue(name);
+      if (issue !== null) ctx.addIssue({ code: 'custom', message: issue });
+    }).optional(),
+    /** A self-made app's table in a Postgres schema other than the connection's own (`sales`). */
+    schema: z.string().superRefine((schema, ctx) => {
+      const issue = tableSchemaIssue(schema);
+      if (issue !== null) ctx.addIssue({ code: 'custom', message: issue });
+    }).optional(),
     columns: z.array(requiredColumnSchema).min(1),
     /**
      * A shape other apps may share, `<name>@<version>` (`menu@1`). Two apps
@@ -1245,6 +1316,20 @@ export const requiredTableSchema = z
     appGrants: appGrantsSchema.optional(),
     /** What a removal of a row takes (a reason) and keeps (the removed row's history, read through a parent): see `removal.ts`. */
     removal: removalSchema.optional(),
+    /** Left out of Adminium: no list, form or link shows it. Installed as the table's exclude mark. */
+    exclude: z.literal(true).optional(),
+    /**
+     * The source had "existing customers may get marketing mail" on for this
+     * people table. An install never switches it on: that is the word of
+     * somebody who sends campaigns here, with their own tick.
+     */
+    existingCustomers: z.literal(true).optional(),
+    /** The table's postings, and its price rule, kept switched off apart from the rules themselves. */
+    switchedOff: z
+      .object({ postings: z.array(z.string().regex(/^[a-z][a-z0-9-]*$/, 'a posting id')).min(1).max(6).optional(), adjust: z.literal(true).optional() })
+      .strict()
+      .refine((off) => off.postings !== undefined || off.adjust !== undefined, { message: 'a switch names postings, adjust, or both' })
+      .optional(),
     /** The law makes the business keep its rows (`{law: 'tax'}`): an erasure leaves them, and says why (see `people.ts`). */
     keep: keepSchema.optional(),
     /** An add-on's own rows let go some days after a moment of theirs, unless a column holds a value (see `expire.ts`). */
@@ -1384,7 +1469,12 @@ export const requiredSchemaSchema = z
  */
 export const shapePartSchema = z
   .object({
-    columns: z.array(requiredColumnSchema).min(1).max(60),
+    // An add-on's own columns are always snake_case: only a self-made app keeps a column's own name.
+    columns: z
+      .array(requiredColumnSchema)
+      .min(1)
+      .max(60)
+      .refine((columns) => columns.every((column) => SNAKE_REF.test(column.ref)), 'column ref must be a snake_case identifier'),
     states: statesSchema.optional(),
     indexes: tableIndexesSchema.optional(),
     postings: postingsSchema.optional(),
@@ -1431,7 +1521,7 @@ export const shapeDefinitionSchema = z
       .object({
         producers: z.array(outboxProducerSchema).min(1).max(16),
         templates: z
-          .array(emailTemplateSchema.omit({ key: true }).extend({ kind: z.string().min(1).max(40) }).strict())
+          .array(emailTemplateSchema.omit({ key: true, category: true, brand: true, attachments: true }).extend({ kind: z.string().min(1).max(40) }).strict())
           .max(16)
           .optional(),
       })
@@ -1537,6 +1627,10 @@ export const pageSchema = z
     feature: z.string().regex(/^[a-z][a-z0-9-]{0,39}$/, 'a feature id').optional(),
     /** The part of the app the page belongs to: hidden and refused while it is off (see `modules.ts`). */
     module: moduleIdSchema.optional(),
+    /** A self-made app's page as a person arranged it, in place of `config` (see `saved-apps.ts`). */
+    envelope: pageEnvelopeFieldSchema.optional(),
+    /** A self-made app's shared views of the page, each as stored (see `saved-apps.ts`). */
+    views: pageViewsSchema.optional(),
   })
   .strict();
 
@@ -1693,6 +1787,12 @@ export const frontendSchema = z
     /** Whether the side starts switched on. Absent means on. */
     enabled: z.boolean().optional(),
     /**
+     * The side reads its instance base and sends `X-Adminium-Install`, so a
+     * later install of the app (on another database) gets its screens too.
+     * Without it, only the first install's screens open.
+     */
+    instances: z.literal(true).optional(),
+    /**
      * Where a record opens on this side, by table: `{ "deals": "/deals/{id}" }`.
      * A notice about such a record, its e-mail's button and a search hit then
      * open the app's own screen for somebody who may open this side, and the
@@ -1719,7 +1819,13 @@ export const optionListSchema = z
     values: z
       .array(
         z
-          .object({ value: z.string().min(1).max(256), label: textOrLabels.optional(), tone: z.string().max(32).optional() })
+          .object({
+            value: z.string().min(1).max(256),
+            label: textOrLabels.optional(),
+            tone: z.string().max(32).optional(),
+            /** A line under the answer where it is chosen. */
+            description: z.string().min(1).max(512).optional(),
+          })
           .strict(),
       )
       .min(1)
@@ -2318,6 +2424,8 @@ function perNightIssues(
 export function appReferenceIssues(
   m: {
     key: string;
+    /** Absent: not a file made on an Adminium. */
+    publisher?: { id: string } | undefined;
     requiredSchema: { tables: readonly RequiredTableShape[]; prefixed?: true | undefined };
     publicAccess?: readonly PublicAccess[] | undefined;
     publicKeys?: z.infer<typeof publicKeysSchema> | undefined;
@@ -3145,6 +3253,7 @@ export function appReferenceIssues(
       answersAvailability: (table) => tables.get(table)?.capacity !== undefined || tables.get(table)?.booking !== undefined,
       addOns: new Set([...(m.kind === 'add-on' ? [m.key] : []), ...[...(m.addOns?.requires ?? []), ...(m.addOns?.suggests ?? [])].map((need) => need.key)]),
       ridesAppKeys: m.kind === 'add-on',
+      local: m.publisher?.id === LOCAL_PUBLISHER_ID,
       capacityOf: (table) => tables.get(table)?.capacity,
       figures: figureColumns(m.requiredSchema.tables),
       mailsOnCreate: (table) => (m.outbox?.producers ?? []).some((producer) => 'onCreate' in producer && producer.onCreate.table === table),
@@ -3860,6 +3969,8 @@ export const appManifestSchema = z
     pages: z.array(pageSchema).min(1),
     settings: z.array(settingSchema).optional(),
     ...installBlocksShape,
+    /** Report documents, invoice layouts, scheduled reports and payments: a file made on an Adminium only (see `saved-parts.ts`). */
+    ...savedPartsShape,
     widgets: z.array(manifestWidgetSchema).optional(),
     capabilities: z.array(capabilitySchema).optional(),
     /**
@@ -3886,6 +3997,14 @@ export const appManifestSchema = z
     maps: z.literal(true).optional(),
     /** The tables that hold the app's people and companies, and where else a person is copied (see `people.ts`). */
     people: peopleSchema.optional(),
+    /** Where a self-made app was saved (see `saved-apps.ts`). */
+    provenance: provenanceSchema.optional(),
+    /** A self-made app's icon, a lucide name (see `saved-apps.ts`). */
+    icon: appIconSchema.optional(),
+    /** The other apps a self-made app needs on its database (see `app-requires.ts`). */
+    apps: appsBlockSchema.optional(),
+    /** A self-made app's part that is the whole deployment's: its look, languages, wording and system emails (see `instance.ts`). */
+    instance: instanceSchema.optional(),
   })
   .strict()
   .refine(capabilitiesNotContradictory, { ...CAPS_MESSAGE, path: [...CAPS_MESSAGE.path] })
@@ -3903,8 +4022,12 @@ export const appManifestSchema = z
       ctx.addIssue({ code: 'custom', message: issue.message, path: issue.path });
     }
     for (const issue of appSeedIssues(m)) ctx.addIssue({ code: 'custom', message: issue.message, path: issue.path });
+    for (const issue of savedAppIssues(m)) ctx.addIssue({ code: 'custom', message: issue.message, path: issue.path });
+    for (const issue of requiredAppIssues(m)) ctx.addIssue({ code: 'custom', message: issue.message, path: issue.path });
+    for (const issue of instanceIssues(m)) ctx.addIssue({ code: 'custom', message: issue.message, path: issue.path });
     for (const issue of moduleIssues(m)) ctx.addIssue({ code: 'custom', message: issue.message, path: issue.path });
     for (const issue of leftOutIssues(m)) ctx.addIssue({ code: 'custom', message: issue.message, path: issue.path });
+    for (const issue of savedPartsIssues(m, tableIndex(m.requiredSchema.tables))) ctx.addIssue({ code: 'custom', message: issue.message, path: issue.path });
     // A calendar page's named columns, against the app's own tables.
     for (const issue of pageCalendarIssues(m.pages, tableIndex(m.requiredSchema.tables))) {
       ctx.addIssue({ code: 'custom', message: issue.message, path: issue.path });
@@ -3965,6 +4088,8 @@ export const addOnManifestSchema = z
     // An add-on keeps no people of its own: a tick on its public entry has nobody to be kept for.
     for (const issue of publicConsentIssues(m, tableIndex(m.requiredSchema?.tables ?? []))) ctx.addIssue({ code: 'custom', message: issue.message, path: issue.path });
     for (const issue of addOnModuleIssues(m)) ctx.addIssue({ code: 'custom', message: issue.message, path: issue.path });
+    // An add-on is never self-made: a page envelope, views and the table marks are read the same way as an app's.
+    for (const issue of savedAppIssues(m)) ctx.addIssue({ code: 'custom', message: issue.message, path: issue.path });
     // From its floor on, an add-on's foreign keys name its own tables only; older manifests keep pointing at the database's.
     for (const issue of hostReferenceIssues(m)) ctx.addIssue({ code: 'custom', message: issue.message, path: issue.path });
     // Add-ons released before the floor keep the page refs they shipped with.
