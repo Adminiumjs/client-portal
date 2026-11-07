@@ -175,7 +175,7 @@ export interface PlanProblem {
     // Added by the server: with "use the existing tables", a table that is there cannot be used as it is (it would be
     // changed, renamed, or is not offered for reuse).
     | 'EXISTING_TABLE_UNUSABLE'
-    // Added by the server: a self-made app's file installed onto the very database it was saved from (D12).
+    // Added by the server: a self-made app's file installed onto the very database it was saved from.
     | 'SAVED_FROM_HERE'
     // Added by the server: a deployment-wide part whose logo or favicon its package does not hold as it says.
     | 'INSTANCE_INVALID';
@@ -316,6 +316,8 @@ export interface InstallTablePlan {
   offers: TableOffer[];
   /** Why reuse is NOT offered on a taken table, for a person. */
   reuseRefusal?: string | undefined;
+  /** The columns of a taken table that refuse a row without a value and that the app never fills: why reuse is not offered. */
+  reuseRequires?: string[] | undefined;
   /** For `rename-existing`: what the existing table is renamed to. */
   renameExistingTo?: string | undefined;
   /** For `share`: the app whose table this is. */

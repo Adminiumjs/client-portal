@@ -500,6 +500,7 @@ export function planWithContext(
       plan.offers = ['alt-prefix'];
       if (foreign.length === 0) plan.offers.unshift('reuse');
       else {
+        plan.reuseRequires = foreign.map((c) => c.ref);
         plan.reuseRefusal =
           `It requires ${foreign.map((c) => `"${c.ref}"`).join(', ')}, which this ${noun} never fills, ` +
           `so every row the ${noun} saves there would be refused.`;

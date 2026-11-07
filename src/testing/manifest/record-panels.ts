@@ -18,7 +18,7 @@
  * An add-on keeps rows that rows of an app's tables link to (an order line's
  * design, a product's set-up). A record tab lists such rows where they are
  * declared; a panel is the add-on's own code drawn there instead: an editor
- * of the linked row, a preview of it. It is plan 51's add-on page, drawn in
+ * of the linked row, a preview of it. It is the add-on's own page code, drawn in
  * a tab of the record page rather than on a page of its own:
  *
  *  - declared here, beside the add-on's pages and record tabs: `on` names the
