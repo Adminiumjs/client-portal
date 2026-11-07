@@ -61,6 +61,15 @@ export type TableOfRef = Readonly<Record<string, string>>;
 /** `apps/server/src/security/csrf.ts` — leg B's header. */
 const CSRF_HEADER = "x-adminium-csrf";
 
+/**
+ * `apps/server/src/installs/resolve.ts` — which install of this app a call is
+ * from. One app may be installed once per database; each install's sides are
+ * served a `surface-config.json` naming its own `installId`, and every call
+ * says it back so the server acts on that install (add-on routes included:
+ * the server reads it as "this database's install of that add-on").
+ */
+export const INSTALL_HEADER = "x-adminium-install";
+
 /** `apps/server/src/routes/data/schema.ts` — `limit` is `.max(200)`. */
 const PAGE_MAX = 200;
 
@@ -81,6 +90,13 @@ export interface SessionPortOptions {
    * deployment this app ships as and ambiguous the moment there are two.
    */
   connectionId?: string | undefined;
+  /**
+   * This install's id, from the staff config (`surface-config.json`). Sent as
+   * {@link INSTALL_HEADER} on every call when present; absent (an Adminium
+   * older than installs per database), nothing is sent and the key alone
+   * names the app, as it always did.
+   */
+  installId?: string | null | undefined;
   /**
    * The staff config's own facts (`surface-config.json`), when the till was
    * served one: the signed-in person's token and the venue's zone and money.
@@ -262,6 +278,8 @@ function buildTransport(opts: SessionPortOptions): SessionTransport {
    */
   let pausedNames: string[] = [];
 
+  const installId = typeof opts.installId === "string" && opts.installId.length > 0 ? opts.installId : null;
+
   async function call<T>(path: string, init?: RequestInit): Promise<T> {
     const mutating = (init?.method ?? "GET").toUpperCase() !== "GET";
     const send = () =>
@@ -272,6 +290,7 @@ function buildTransport(opts: SessionPortOptions): SessionTransport {
           accept: "application/json",
           ...(init?.body !== undefined ? { "content-type": "application/json" } : {}),
           ...(mutating && csrfToken !== null ? { [CSRF_HEADER]: csrfToken } : {}),
+          ...(installId !== null ? { [INSTALL_HEADER]: installId } : {}),
           ...init?.headers,
         },
       });

@@ -16,7 +16,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-import { createSessionTransport, rateLimitWait, SessionPortError, sessionPort } from "./sessionSource.ts";
+import { createSessionTransport, INSTALL_HEADER, rateLimitWait, SessionPortError, sessionPort } from "./sessionSource.ts";
 
 interface Call {
   url: string;
@@ -255,6 +255,42 @@ describe("writes", () => {
     await t.mutate("/api/v1/data/conn-1/payments", "POST", { values: {} });
     expect(calls.at(-1)!.headers["x-adminium-csrf"]).toBe("staff-token-2");
     expect(calls.some((c) => c.url.startsWith("/api/v1/bootstrap") || c.url.startsWith("/api/v1/connections"))).toBe(false);
+  });
+
+  it("says which install it is on every call, reads and writes alike, when the config names one", async () => {
+    const { calls, fetchImpl } = harness({
+      "/api/v1/data/conn-2/payments": { data: [] },
+      "/api/v1/add-ons/offers/look-up": { data: [] },
+    });
+    const t = createSessionTransport({
+      tableOfRef: MAP,
+      connectionId: "conn-2",
+      installId: "install-2",
+      staff: { csrfToken: "staff-token", timezone: "Europe/Lisbon" },
+      fetchImpl,
+    });
+    await t.port.config();
+    await t.port.list("payments", { limit: 10, offset: 0 });
+    await t.get("/api/v1/add-ons/offers/look-up");
+    await t.mutate("/api/v1/data/conn-2/payments", "POST", { values: {} });
+    expect(calls).toHaveLength(3);
+    for (const call of calls) expect(call.headers[INSTALL_HEADER]).toBe("install-2");
+  });
+
+  it("sends no install header when the config names none (an older Adminium)", async () => {
+    for (const installId of [undefined, null, ""]) {
+      const { calls, fetchImpl } = harness({ "/api/v1/data/conn-1/payments": { data: [] } });
+      const t = createSessionTransport({
+        tableOfRef: MAP,
+        connectionId: "conn-1",
+        installId,
+        staff: { csrfToken: "staff-token" },
+        fetchImpl,
+      });
+      await t.port.list("payments", { limit: 10, offset: 0 });
+      await t.mutate("/api/v1/data/conn-1/payments", "POST", { values: {} });
+      for (const call of calls) expect(INSTALL_HEADER in call.headers).toBe(false);
+    }
   });
 
   it("reads only the rows asked for, in the order asked", async () => {

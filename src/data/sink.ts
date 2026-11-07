@@ -45,7 +45,7 @@
  * Only a found action key counts as saved: every other unique clash (an email
  * another client has) is a refusal the screen must show.
  */
-import type { SessionTransport } from "./sessionSource.ts";
+import { INSTALL_HEADER, type SessionTransport } from "./sessionSource.ts";
 import type { DeskWrites, RowValues } from "./ports.ts";
 import { normalise } from "./rows.ts";
 import type { Id, TableRef, Tables } from "./types.ts";
@@ -118,14 +118,53 @@ export const isOwnKeyClash = (error: SinkError, values: RowValues): boolean =>
 export interface SessionSinkOptions {
   /** The signed-in person's CSRF token, for the two writes that are not JSON through the transport. */
   csrfToken: () => string | null;
+  /**
+   * This install's id (the staff config's `installId`): sent as
+   * `X-Adminium-Install` on the calls the transport cannot carry, as the
+   * transport sends it on its own, and what picks this install's copy of an
+   * add-on from the add-ons' list. Absent from an older Adminium.
+   */
+  installId?: string | null;
   /** Test seam. */
   fetchImpl?: typeof fetch;
 }
 
 const keyOf = (id: Id): string => encodeURIComponent(String(id));
 
+/** One row of `GET /api/v1/add-ons`, as far as the desk reads it. */
+export interface AddOnListRow {
+  key: string;
+  settings?: { key: string }[];
+  settingValues?: Record<string, unknown>;
+  /** The add-on's own install (Adminium 0.3.49+): one add-on may be installed once per database. */
+  installId?: string;
+  attachments?: { attachedTo: string; enabled: boolean; installId?: string; hostInstall?: string }[];
+}
+
+/**
+ * THIS install's copy of an add-on, from the add-ons' list.
+ *
+ * An add-on may be installed once per database, so the list can hold two rows
+ * of one key; each attachment names the app install it joins
+ * (`hostInstall`). The row attached to this install is the one meant; reading
+ * the first by key could show another practice's settings. An Adminium older
+ * than installs per database sends no install fields and one row per key:
+ * then the key alone picks it, as before. A single row of the key is that
+ * copy whatever it is attached to (a copy kept once per server).
+ */
+export function addOnRowFor(rows: readonly AddOnListRow[], addOnKey: string, installId: string | null | undefined): AddOnListRow | undefined {
+  const ofKey = rows.filter((a) => a.key === addOnKey);
+  if (installId === null || installId === undefined || installId === "") return ofKey[0];
+  const mine = ofKey.find((a) => (a.attachments ?? []).some((at) => at.hostInstall === installId));
+  if (mine !== undefined) return mine;
+  const knowsInstalls = ofKey.some((a) => a.installId !== undefined || (a.attachments ?? []).some((at) => at.hostInstall !== undefined));
+  if (!knowsInstalls || ofKey.length === 1) return ofKey[0];
+  return undefined;
+}
+
 export function sessionSink(transport: SessionTransport, tableOf: Readonly<Record<TableRef, string>>, opts: SessionSinkOptions): DeskWrites {
   const doFetch = opts.fetchImpl ?? globalThis.fetch.bind(globalThis);
+  const installId = typeof opts.installId === "string" && opts.installId !== "" ? opts.installId : null;
   const path = async (ref: TableRef, id?: Id): Promise<string> => {
     const conn = await transport.connection();
     const base = `/api/v1/data/${encodeURIComponent(conn)}/${encodeURIComponent(tableOf[ref])}`;
@@ -157,6 +196,7 @@ export function sessionSink(transport: SessionTransport, tableOf: Readonly<Recor
           accept: "application/json",
           ...(body === undefined ? {} : { "content-type": contentType }),
           ...(token === null || method === "GET" ? {} : { "x-adminium-csrf": token }),
+          ...(installId === null ? {} : { [INSTALL_HEADER]: installId }),
         },
         ...(body === undefined ? {} : { body }),
       });
@@ -218,8 +258,8 @@ export function sessionSink(transport: SessionTransport, tableOf: Readonly<Recor
      * `GET /api/v1/add-ons` (any signed-in person; no secret is in it).
      */
     async addOnSettings(addOnKey) {
-      const reply = await raw<{ addOns?: { key: string; settings?: { key: string }[]; settingValues?: Record<string, unknown> }[] }>("/api/v1/add-ons", "GET");
-      const addOn = (reply.addOns ?? []).find((a) => a.key === addOnKey);
+      const reply = await raw<{ addOns?: AddOnListRow[] }>("/api/v1/add-ons", "GET");
+      const addOn = addOnRowFor(reply.addOns ?? [], addOnKey, installId);
       return addOn === undefined ? null : { values: addOn.settingValues ?? {}, declared: (addOn.settings ?? []).map((s) => s.key) };
     },
     async saveAddOnSettings(addOnKey, values) {

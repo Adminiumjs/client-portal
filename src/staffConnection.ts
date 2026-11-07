@@ -87,6 +87,13 @@ export function configBase(bakedBase: string, pathname: string): string {
  */
 export interface StaffConfig {
   connectionId: string | null;
+  /**
+   * Which install of this app the screens are (one app may be installed once
+   * per database). Sent back as `X-Adminium-Install` on every call, so the
+   * server acts on this install. Null from an Adminium older than installs
+   * per database: then nothing is sent and the key alone names the app.
+   */
+  installId: string | null;
   appName: string | null;
   tables: Record<string, string>;
   settings: Record<string, unknown>;
@@ -188,6 +195,7 @@ export async function loadStaffConfig(opts: StaffConfigOptions = {}): Promise<St
     const user = record(d.user);
     return {
       connectionId: text(d.connectionId),
+      installId: text(d.installId),
       appName: text(d.appName),
       tables: Object.fromEntries(
         Object.entries(record(d.tables)).filter((entry): entry is [string, string] => typeof entry[1] === "string"),

@@ -215,6 +215,7 @@ async function bootDesk(): Promise<void> {
   const transport = createSessionTransport({
     tableOfRef: tables,
     ...(staff.connectionId === null ? {} : { connectionId: staff.connectionId }),
+    installId: staff.installId,
     ...(staff.csrfToken === null
       ? {}
       : {
@@ -244,7 +245,7 @@ async function bootDesk(): Promise<void> {
     addOns: Object.fromEntries(Object.entries(staff.addOns).map(([key, addOn]) => [key, { values: addOn.settings, declared: Object.keys(addOn.settings) }])),
   });
   desk.setDeskReads(sessionDeskReads(transport, (ref) => desk.can(ref, "read")));
-  desk.setDeskWrites(sessionSink(transport, tables, { csrfToken: () => csrf }));
+  desk.setDeskWrites(sessionSink(transport, tables, { csrfToken: () => csrf, installId: staff.installId }));
   onSignedOut(() => useUi.setState({ signedOut: true }));
   useUi.setState({ persona: "studio", view: "home", theme: systemTheme() });
   await Promise.all([desk.loadDesk(), desk.loadAddOnSettings("invoices")]);
