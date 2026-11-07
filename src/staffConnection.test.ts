@@ -109,6 +109,7 @@ describe("loadStaffConfig", () => {
     expect(await loadStaffConfig({ hostedStaff: true, base: "/apps/pos/staff/", fetchImpl })).toEqual({
       connectionId: "con_42",
       installId: "ins_7",
+      installSlug: "",
       appName: null,
       tables: { tickets: "pos_tickets" },
       settings: { business_type: "retail" },
@@ -133,6 +134,8 @@ describe("loadStaffConfig", () => {
     expect(config?.addOns).toEqual({});
     // An Adminium older than installs per database names none: the screens then send no install header.
     expect(config?.installId).toBeNull();
+    // The app's own mount is the install that owns the plain addresses.
+    expect(config?.installSlug).toBe("");
   });
 
   it("is null outside a hosted staff build", async () => {

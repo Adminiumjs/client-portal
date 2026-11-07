@@ -94,6 +94,15 @@ export interface StaffConfig {
    * per database: then nothing is sent and the key alone names the app.
    */
   installId: string | null;
+  /**
+   * This install's address slug: `""` for the install that owns the plain
+   * addresses (`/apps/clients/staff/`), `kiln` for `/apps/clients/kiln/staff/`.
+   * What Adminium names a later install's own copies by (its email
+   * templates: `clients-kiln-invoice-sent`). Taken from the document when the
+   * server says it, else from the mount the screens were opened at; null on a
+   * mapped domain, which serves every install at `/` and so cannot tell.
+   */
+  installSlug: string | null;
   appName: string | null;
   tables: Record<string, string>;
   settings: Record<string, unknown>;
@@ -177,6 +186,19 @@ function addOnsOf(value: unknown): Record<string, StaffAddOn> {
   return out;
 }
 
+/**
+ * The install slug a config base names: `""` for the app's own mount
+ * (`/apps/<key>/<side>/`), the slug of an instance mount
+ * (`/apps/<key>/<slug>/<side>/`), null for anything else (a mapped domain's `/`).
+ */
+export function slugOfBase(base: string): string | null {
+  const parts = base.split("/").filter((p) => p !== "");
+  if (parts[0] !== "apps") return null;
+  if (parts.length === 3) return "";
+  if (parts.length === 4) return parts[2] ?? null;
+  return null;
+}
+
 /** The whole staff config, or null outside a hosted staff build or when none answers. */
 export async function loadStaffConfig(opts: StaffConfigOptions = {}): Promise<StaffConfig | null> {
   const hostedStaff = opts.hostedStaff ?? (HOSTED && SURFACE_SIDE === "staff");
@@ -196,6 +218,7 @@ export async function loadStaffConfig(opts: StaffConfigOptions = {}): Promise<St
     return {
       connectionId: text(d.connectionId),
       installId: text(d.installId),
+      installSlug: typeof d.slug === "string" ? d.slug : slugOfBase(base),
       appName: text(d.appName),
       tables: Object.fromEntries(
         Object.entries(record(d.tables)).filter((entry): entry is [string, string] => typeof entry[1] === "string"),

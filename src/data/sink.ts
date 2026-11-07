@@ -45,6 +45,7 @@
  * Only a found action key counts as saved: every other unique clash (an email
  * another client has) is a refusal the screen must show.
  */
+import { APP_KEY } from "../surface-nav.ts";
 import { INSTALL_HEADER, type SessionTransport } from "./sessionSource.ts";
 import type { DeskWrites, RowValues } from "./ports.ts";
 import { normalise } from "./rows.ts";
@@ -125,8 +126,32 @@ export interface SessionSinkOptions {
    * add-on from the add-ons' list. Absent from an older Adminium.
    */
   installId?: string | null;
+  /**
+   * This install's address slug (the staff config's `installSlug`): `""` or
+   * absent for the install that owns the plain addresses. A later install's
+   * email templates are stored under keys of their own, and this names them.
+   */
+  installSlug?: string | null;
   /** Test seam. */
   fetchImpl?: typeof fetch;
+}
+
+/**
+ * The key Adminium stores one install's copy of a template this app ships
+ * under: the key itself for the install that owns the plain addresses,
+ * `<app>-<slug>-<rest>` for a later one (`clients-invoice-sent` →
+ * `clients-kiln-invoice-sent`), cut to the column's 80. The same rule as the
+ * engine's `installTemplateKey` (`apps/server/src/installs/resolve.ts`): the
+ * templates route takes the stored key as it is and reads no install header,
+ * so the desk must name it.
+ *
+ * Only this app's own templates move: they are the keys that start with
+ * `<app>-`. Adminium's own (`sign-in-link`) are one per server.
+ */
+export function installTemplateKey(templateKey: string, appKey: string, slug: string | null | undefined): string {
+  const head = `${appKey}-`;
+  if (slug === null || slug === undefined || slug === "" || !templateKey.startsWith(head)) return templateKey;
+  return `${head}${slug}-${templateKey.slice(head.length)}`.slice(0, 80);
 }
 
 const keyOf = (id: Id): string => encodeURIComponent(String(id));
@@ -274,7 +299,7 @@ export function sessionSink(transport: SessionTransport, tableOf: Readonly<Recor
     async emailTemplate(key, locale) {
       try {
         const reply = await raw<{ id?: string; name?: string; document?: { subject?: string; preheader?: string; blocks?: { id?: string; block?: string; data?: Record<string, unknown> }[]; footer?: string } }>(
-          `/api/v1/email-templates/${encodeURIComponent(key)}/${encodeURIComponent(locale)}`,
+          `/api/v1/email-templates/${encodeURIComponent(installTemplateKey(key, APP_KEY, opts.installSlug))}/${encodeURIComponent(locale)}`,
           "GET",
         );
         if (typeof reply.id !== "string" || reply.document === undefined) return null;
