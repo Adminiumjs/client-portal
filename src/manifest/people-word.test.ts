@@ -49,7 +49,8 @@ describe("the studio's clients", () => {
         ],
       },
     ]);
-    expect([MIN_ADMINIUM, manifest.compatibility.minAdminiumVersion]).toEqual(["0.3.38", "0.3.38"]);
+    // 0.3.38 first read who the clients are; the floor has since moved on (0.3.49, installs per database).
+    expect([MIN_ADMINIUM, manifest.compatibility.minAdminiumVersion]).toEqual(["0.3.49", "0.3.49"]);
   });
 
   it("are not the studio's own team, whose table is called people", () => {

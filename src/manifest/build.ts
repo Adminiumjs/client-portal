@@ -32,8 +32,9 @@ import { TABLES } from "./tables.ts";
  * so a client opens them again, and it asks for Adminium 0.3.28. 0.2.6
  * changes no table: it tells Adminium who the clients are and where they are
  * copied, that every email is service mail, and which tables the law keeps.
+ * 0.2.7 changes no table: a studio may install the app once per database.
  */
-export const VERSION = "0.2.6";
+export const VERSION = "0.2.7";
 
 /**
  * The Adminium release that first reads everything below: formulas, numbers
@@ -50,8 +51,10 @@ export const VERSION = "0.2.6";
  * 0.3.30 serves a client only a file attached to the row they read.
  * 0.3.38 is the first that reads who the clients are and where they are
  * copied (`people`), each email's class, and the tables the law keeps.
+ * 0.3.49 is the first that installs an app once per database and reads which
+ * install a call is from (`frontends[].instances`).
  */
-export const MIN_ADMINIUM = "0.3.38";
+export const MIN_ADMINIUM = "0.3.49";
 
 const ENV = {
   VITE_ADMINIUM_API_BASE_URL: { required: false, example: "https://admin.example.com" },
@@ -118,8 +121,8 @@ export function buildManifest(opts: { laterPages?: boolean } = {}): Record<strin
     },
     capabilities: ["email-delivery", "file-storage", "realtime"],
     frontends: [
-      { side: "staff", kind: "spa", entry: "index.html", env: ENV, placement: "external", routes: STAFF_ROUTES },
-      { side: "customer", kind: "spa", entry: "index.html", env: ENV, routes: CUSTOMER_ROUTES },
+      { side: "staff", kind: "spa", entry: "index.html", env: ENV, placement: "external", instances: true, routes: STAFF_ROUTES },
+      { side: "customer", kind: "spa", entry: "index.html", env: ENV, instances: true, routes: CUSTOMER_ROUTES },
     ],
     addOns: ADD_ONS,
     documents: DOCUMENTS,

@@ -3,7 +3,7 @@
   "manifestVersion": 1,
   "key": "clients",
   "name": "Client Portal",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "publisher": {
     "id": "adminium",
     "name": "Adminium",
@@ -19,7 +19,7 @@
     "crm"
   ],
   "compatibility": {
-    "minAdminiumVersion": "0.3.38",
+    "minAdminiumVersion": "0.3.49",
     "engines": [
       "sqlite",
       "postgres",
@@ -52,6 +52,7 @@
         }
       },
       "placement": "external",
+      "instances": true,
       "routes": {
         "home": "/",
         "schedule": "/schedule",
@@ -85,6 +86,7 @@
           "example": "adm_pub_..."
         }
       },
+      "instances": true,
       "routes": {
         "find": "/",
         "link": "/c",

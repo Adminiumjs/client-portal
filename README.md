@@ -22,8 +22,11 @@ rather than lorem ipsum.
 
 ## What it needs
 
-- **Adminium 0.3.38 or later.** Update Adminium first, then the app: 0.2.6
-  changes no table and updates an install of 0.2.0 or later in place.
+- **Adminium 0.3.49 or later.** Update Adminium first, then the app: 0.2.7
+  changes no table and updates an install of 0.2.0 or later in place. From
+  0.2.7 a studio may install the app once per database: each install's
+  screens open at their own address and say which install they are on every
+  call, so a second database's desk reads and writes its own studio.
 - **Invoices & Receipts 1.0.5 or later**, which installs with the app.
 - A database on **SQLite, Postgres or MySQL**. The app creates its own tables
   there, under names Adminium gives them.
