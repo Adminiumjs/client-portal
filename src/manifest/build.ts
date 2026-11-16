@@ -33,8 +33,13 @@ import { TABLES } from "./tables.ts";
  * changes no table: it tells Adminium who the clients are and where they are
  * copied, that every email is service mail, and which tables the law keeps.
  * 0.2.7 changes no table: a studio may install the app once per database.
+ * 0.2.8 moves the invoices onto the invoice shape's second version: the
+ * payments gain the columns an online payment fills (the rows already there
+ * keep every value), and a client may pay an invoice online once the studio's
+ * Adminium takes payments. It asks for Adminium 0.3.60 and Invoices &
+ * Receipts 1.0.13.
  */
-export const VERSION = "0.2.7";
+export const VERSION = "0.2.8";
 
 /**
  * The Adminium release that first reads everything below: formulas, numbers
@@ -53,8 +58,12 @@ export const VERSION = "0.2.7";
  * copied (`people`), each email's class, and the tables the law keeps.
  * 0.3.49 is the first that installs an app once per database and reads which
  * install a call is from (`frontends[].instances`).
+ * 0.3.60 is the first that lets an app's invoices be paid online
+ * (`payments.payables`, arriving switched off), gives an app's role the
+ * refund of its own payments (`payments:@:refund`), and answers a client's
+ * page whether it may pay online now, and where.
  */
-export const MIN_ADMINIUM = "0.3.49";
+export const MIN_ADMINIUM = "0.3.60";
 
 const ENV = {
   VITE_ADMINIUM_API_BASE_URL: { required: false, example: "https://admin.example.com" },
@@ -93,6 +102,19 @@ export const CUSTOMER_ROUTES = {
   brief: "/brief",
   handover: "/h",
   enquire: "/enquire",
+};
+
+/**
+ * Paying an invoice online. The invoices are built on the add-on's invoice
+ * shape, which already says what is owed and where a payment lands, so the
+ * app says only where the pay page sends a client back (their invoices) and
+ * that the receipt is the app's own email (`payment-receipt`, sent on every
+ * recorded payment), so a client never gets two. Adminium installs it switched
+ * off: someone who manages payments switches the app on in Payments, and until
+ * then every screen and email reads as it always has.
+ */
+export const PAYMENTS = {
+  payables: [{ table: "invoices", shape: true, returnTo: CUSTOMER_ROUTES.invoices, receipt: "app" }],
 };
 
 /** `laterPages`: also the pages declared for later — only the test that proves they install asks. */
@@ -135,6 +157,7 @@ export function buildManifest(opts: { laterPages?: boolean } = {}): Record<strin
     people: PEOPLE,
     outbox: OUTBOX,
     emailTemplates: emailTemplates(KINDS),
+    payments: PAYMENTS,
     sampleData: { file: "seeds/clients.sample.json" },
   };
 }

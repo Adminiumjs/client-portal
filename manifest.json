@@ -3,7 +3,7 @@
   "manifestVersion": 1,
   "key": "clients",
   "name": "Client Portal",
-  "version": "0.2.7",
+  "version": "0.2.8",
   "publisher": {
     "id": "adminium",
     "name": "Adminium",
@@ -19,7 +19,7 @@
     "crm"
   ],
   "compatibility": {
-    "minAdminiumVersion": "0.3.49",
+    "minAdminiumVersion": "0.3.60",
     "engines": [
       "sqlite",
       "postgres",
@@ -105,7 +105,7 @@
     "requires": [
       {
         "key": "invoices",
-        "range": ">=1.0.5",
+        "range": ">=1.0.13",
         "reason": {
           "en-US": "Proposals, invoices, receipts and payment reminders are made by this add-on.",
           "de-DE": "Angebote, Rechnungen, Quittungen und Zahlungserinnerungen macht dieses Add-on.",
@@ -6650,7 +6650,7 @@
           "zh-TW": "發票"
         },
         "keyField": "number",
-        "builtOn": "invoices/invoice@1",
+        "builtOn": "invoices/invoice@2",
         "part": "document",
         "columns": [
           {
@@ -7076,7 +7076,7 @@
               "rollup": {
                 "from": "payments",
                 "via": "document_id",
-                "sum": "amount",
+                "sum": "net_amount",
                 "where": {
                   "column": "voided",
                   "eq": false
@@ -7612,7 +7612,7 @@
           "zh-CN": "发票明细",
           "zh-TW": "發票明細"
         },
-        "builtOn": "invoices/invoice@1",
+        "builtOn": "invoices/invoice@2",
         "part": "lines",
         "columns": [
           {
@@ -8021,7 +8021,7 @@
           "zh-TW": "付款紀錄"
         },
         "keyField": "number",
-        "builtOn": "invoices/invoice@1",
+        "builtOn": "invoices/invoice@2",
         "part": "payments",
         "columns": [
           {
@@ -8116,6 +8116,56 @@
             }
           },
           {
+            "ref": "refunded_amount",
+            "type": "decimal",
+            "scale": "currency",
+            "default": 0,
+            "rules": {
+              "validation": {
+                "min": 0
+              }
+            },
+            "label": {
+              "en-US": "Refunded",
+              "de-DE": "Erstattet",
+              "fr-FR": "Remboursé",
+              "da-DK": "Refunderet",
+              "cs-CZ": "Vráceno",
+              "ar-EG": "المبلغ المسترد",
+              "zh-CN": "已退款",
+              "zh-TW": "已退款"
+            }
+          },
+          {
+            "ref": "net_amount",
+            "type": "decimal",
+            "scale": "currency",
+            "nullable": true,
+            "rules": {
+              "formula": {
+                "sub": [
+                  "amount",
+                  {
+                    "coalesce": [
+                      "refunded_amount",
+                      0
+                    ]
+                  }
+                ]
+              }
+            },
+            "label": {
+              "en-US": "Kept after refunds",
+              "de-DE": "Nach Erstattungen behalten",
+              "fr-FR": "Conservé après remboursements",
+              "da-DK": "Beholdt efter refusioner",
+              "cs-CZ": "Ponecháno po vrácení",
+              "ar-EG": "المتبقي بعد الاسترداد",
+              "zh-CN": "退款后保留",
+              "zh-TW": "退款後保留"
+            }
+          },
+          {
             "ref": "currency",
             "type": "text",
             "maxLength": 3,
@@ -8146,7 +8196,8 @@
               "card",
               "cheque",
               "cash",
-              "other"
+              "other",
+              "online"
             ],
             "default": "bank-transfer",
             "label": {
@@ -8211,6 +8262,16 @@
                     "ar-EG": "أخرى",
                     "zh-CN": "其他",
                     "zh-TW": "其他"
+                  },
+                  "online": {
+                    "en-US": "Online",
+                    "de-DE": "Online",
+                    "fr-FR": "En ligne",
+                    "da-DK": "Online",
+                    "cs-CZ": "Online",
+                    "ar-EG": "عبر الإنترنت",
+                    "zh-CN": "在线",
+                    "zh-TW": "線上"
                   }
                 }
               }
@@ -8230,6 +8291,77 @@
               "ar-EG": "ملاحظة الدفع",
               "zh-CN": "付款备注",
               "zh-TW": "付款備註"
+            }
+          },
+          {
+            "ref": "payment_ref",
+            "type": "text",
+            "maxLength": 64,
+            "nullable": true,
+            "unique": true,
+            "label": {
+              "en-US": "Online payment reference",
+              "de-DE": "Referenz der Online-Zahlung",
+              "fr-FR": "Référence du paiement en ligne",
+              "da-DK": "Reference for onlinebetaling",
+              "cs-CZ": "Reference online platby",
+              "ar-EG": "مرجع الدفع عبر الإنترنت",
+              "zh-CN": "在线付款参考号",
+              "zh-TW": "線上付款參考號"
+            }
+          },
+          {
+            "ref": "provider",
+            "type": "text",
+            "maxLength": 40,
+            "nullable": true,
+            "label": {
+              "en-US": "Paid through",
+              "de-DE": "Bezahlt über",
+              "fr-FR": "Payé via",
+              "da-DK": "Betalt via",
+              "cs-CZ": "Zaplaceno přes službu",
+              "ar-EG": "دُفعت عبر",
+              "zh-CN": "付款渠道",
+              "zh-TW": "付款管道"
+            }
+          },
+          {
+            "ref": "approval_code",
+            "type": "text",
+            "maxLength": 12,
+            "nullable": true,
+            "label": {
+              "en-US": "Card approval code",
+              "de-DE": "Genehmigungscode der Karte",
+              "fr-FR": "Code d’autorisation de la carte",
+              "da-DK": "Kortets godkendelseskode",
+              "cs-CZ": "Autorizační kód karty",
+              "ar-EG": "رمز موافقة البطاقة",
+              "zh-CN": "银行卡授权码",
+              "zh-TW": "信用卡授權碼"
+            }
+          },
+          {
+            "ref": "card_last4",
+            "type": "text",
+            "maxLength": 4,
+            "nullable": true,
+            "rules": {
+              "validation": {
+                "minLength": 4,
+                "maxLength": 4
+              }
+            },
+            "label": {
+              "en-US": "Card's last four digits",
+              "de-DE": "Letzte vier Ziffern der Karte",
+              "fr-FR": "Quatre derniers chiffres de la carte",
+              "da-DK": "Kortets sidste fire cifre",
+              "cs-CZ": "Poslední čtyři číslice karty",
+              "ar-EG": "آخر أربعة أرقام في البطاقة",
+              "zh-CN": "银行卡后四位",
+              "zh-TW": "信用卡末四碼"
             }
           },
           {
@@ -12597,6 +12729,8 @@
             "currency",
             "method",
             "method_note",
+            "approval_code",
+            "card_last4",
             "paid_on",
             "client_id",
             "client_key"
@@ -12791,7 +12925,8 @@
         "table:@messages:read_pii",
         "table:@running_costs:read_pii",
         "table:@events:read_pii",
-        "addOn:invoices:settings"
+        "addOn:invoices:settings",
+        "payments:@:refund"
       ]
     }
   ],
@@ -13462,8 +13597,10 @@
         "document_id",
         "number",
         "amount",
+        "refunded_amount",
         "currency",
         "method",
+        "provider",
         "paid_on"
       ],
       "filters": [
@@ -20905,6 +21042,16 @@
       }
     }
   ],
+  "payments": {
+    "payables": [
+      {
+        "table": "invoices",
+        "shape": true,
+        "returnTo": "/invoices",
+        "receipt": "app"
+      }
+    ]
+  },
   "sampleData": {
     "file": "seeds/clients.sample.json"
   }

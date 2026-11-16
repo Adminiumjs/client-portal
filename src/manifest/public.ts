@@ -266,7 +266,9 @@ export const PUBLIC_ACCESS = [
   {
     table: "payments",
     methods: ["GET"],
-    select: ["id", "document_id", "number", "amount", "currency", "method", "paid_on"],
+    // `provider` says a payment was taken online (the client's page reads "Paid online"), and
+    // `refunded_amount` what was given back of it; the service's own reference never leaves the desk.
+    select: ["id", "document_id", "number", "amount", "refunded_amount", "currency", "method", "provider", "paid_on"],
     // A voided payment, and why, never reach the client.
     filters: [{ column: "voided", op: "eq", value: false }],
     documents: ["receipt"],

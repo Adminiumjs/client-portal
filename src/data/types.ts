@@ -490,7 +490,7 @@ export interface InvoiceLine {
   client_key: string | null;
 }
 
-export type PaymentMethod = "bank-transfer" | "card" | "cheque" | "cash" | "other";
+export type PaymentMethod = "bank-transfer" | "card" | "cheque" | "cash" | "other" | "online";
 /** A row of `payments`. */
 export interface Payment {
   id: Id;
@@ -498,9 +498,15 @@ export interface Payment {
   number_seq: number | null;
   number: string | null;
   amount: Decimal;
+  refunded_amount: Decimal;
+  net_amount: Decimal | null;
   currency: string | null;
   method: PaymentMethod;
   method_note: string | null;
+  payment_ref: string | null;
+  provider: string | null;
+  approval_code: string | null;
+  card_last4: string | null;
   paid_on: Day;
   recorded_by: string | null;
   recorded_at: Instant | null;
@@ -623,7 +629,7 @@ export const COLUMN_KINDS = {
   time_entries: { id: "int", project_id: "int", client_id: "int", milestone_id: "int", person_id: "int", date: "day", hours: "decimal", logged_hours: "decimal", running_for: "int", started_at: "instant", clock_stopped: "bool", stopped_at: "instant" },
   invoices: { id: "int", number_seq: "int", issued_on: "day", due_on: "day", tax_rate: "decimal", subtotal: "decimal", tax: "decimal", total: "decimal", paid: "decimal", balance: "decimal", sent_at: "instant", voided_at: "instant", from_quote_id: "int", share_pct: "decimal", client_id: "int", project_id: "int", proposal_id: "int", client_paid_amount: "decimal", client_paid_on: "day", client_paid: "bool", client_paid_at: "instant" },
   invoice_lines: { id: "int", document_id: "int", position: "int", qty: "decimal", rate: "decimal", discount: "decimal", quote_id: "int", share_pct: "decimal", amount: "decimal", client_id: "int", time_entry_id: "int", expense_id: "int" },
-  payments: { id: "int", document_id: "int", number_seq: "int", amount: "decimal", paid_on: "day", recorded_at: "instant", voided: "bool", voided_at: "instant", client_id: "int" },
+  payments: { id: "int", document_id: "int", number_seq: "int", amount: "decimal", refunded_amount: "decimal", net_amount: "decimal", paid_on: "day", recorded_at: "instant", voided: "bool", voided_at: "instant", client_id: "int" },
   messages: { id: "int", created_at: "instant", client_id: "int", proposal_id: "int", invoice_id: "int", payment_id: "int", project_id: "int", deliverable_id: "int", enquiry_id: "int", due: "instant", sent_at: "instant", effect_at: "instant" },
   running_costs: { id: "int", monthly_amount: "decimal", position: "int" },
   events: { id: "int", date: "day", to_date: "day", person_id: "int" },
@@ -656,7 +662,7 @@ export const NULLABLE: Readonly<Record<TableRef, readonly string[]>> = {
   time_entries: ["client_id", "milestone_id", "hours", "logged_hours", "note", "running_for", "started_at", "stopped_at", "client_key"],
   invoices: ["number_seq", "number", "issued_on", "terms", "due_on", "currency", "tax_name", "tax_rate", "subtotal", "tax", "total", "paid", "balance", "ladder", "sent_at", "void_reason", "voided_at", "voided_by", "from_quote_id", "share_pct", "project_id", "proposal_id", "stage", "title", "client_paid_note", "client_paid_amount", "client_paid_on", "client_paid", "client_paid_at", "client_key"],
   invoice_lines: ["description", "rate", "discount", "currency", "quote_id", "share_pct", "amount", "client_id", "time_entry_id", "expense_id", "client_key"],
-  payments: ["number_seq", "number", "currency", "method_note", "recorded_by", "recorded_at", "void_reason", "voided_by", "voided_at", "client_id", "client_key"],
+  payments: ["number_seq", "number", "net_amount", "currency", "method_note", "payment_ref", "provider", "approval_code", "card_last4", "recorded_by", "recorded_at", "void_reason", "voided_by", "voided_at", "client_id", "client_key"],
   messages: ["created_at", "skip_reason", "to", "language", "client_id", "proposal_id", "invoice_id", "payment_id", "project_id", "deliverable_id", "enquiry_id", "subject_override", "body_override", "approved_by", "due", "sent_at", "error", "effect_at", "effect_error", "client_key"],
   running_costs: ["client_key"],
   events: ["to_date", "person_id", "client_key"],

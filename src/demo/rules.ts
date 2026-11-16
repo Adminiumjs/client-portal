@@ -59,7 +59,9 @@ export const DEMO_RULES: DemoRules = {
       "amount": "currency"
     },
     "payments": {
-      "amount": "currency"
+      "amount": "currency",
+      "refunded_amount": "currency",
+      "net_amount": "currency"
     },
     "running_costs": {
       "monthly_amount": "currency"
@@ -1420,6 +1422,7 @@ export const DEMO_RULES: DemoRules = {
     ],
     "payments": [
       "number",
+      "payment_ref",
       "client_key"
     ],
     "messages": [
@@ -1565,6 +1568,9 @@ export const DEMO_RULES: DemoRules = {
     "payments": {
       "amount": {
         "min": 0.001
+      },
+      "refunded_amount": {
+        "min": 0
       }
     },
     "running_costs": {

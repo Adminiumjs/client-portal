@@ -170,7 +170,7 @@ export const COLUMNS: Record<string, Record<string, Fill>> = {
   time_entries: { project_id: REQUIRED, client_id: null, milestone_id: null, person_id: REQUIRED, date: REQUIRED, hours: null, logged_hours: null, note: null, running_for: null, started_at: null, clock_stopped: false, stopped_at: null, client_key: null },
   invoices: { number_seq: null, number: null, status: "draft", issued_on: null, terms: null, due_on: null, currency: null, tax_name: null, tax_rate: null, subtotal: null, tax: null, total: null, paid: null, balance: null, ladder: null, sent_at: null, void_reason: null, voided_at: null, voided_by: null, from_quote_id: null, share_pct: null, client_id: REQUIRED, project_id: null, proposal_id: null, stage: null, title: null, client_paid_note: null, client_paid_amount: null, client_paid_on: null, client_paid: null, client_paid_at: null, client_key: null },
   invoice_lines: { document_id: REQUIRED, position: 0, description: null, qty: 1, rate: null, discount_kind: "amount", discount: null, currency: null, quote_id: null, share_pct: null, amount: null, client_id: null, time_entry_id: null, expense_id: null, client_key: null },
-  payments: { document_id: REQUIRED, number_seq: null, number: null, amount: REQUIRED, currency: null, method: "bank-transfer", method_note: null, paid_on: REQUIRED, recorded_by: null, recorded_at: null, voided: false, void_reason: null, voided_by: null, voided_at: null, client_id: null, client_key: null },
+  payments: { document_id: REQUIRED, number_seq: null, number: null, amount: REQUIRED, refunded_amount: 0, net_amount: null, currency: null, method: "bank-transfer", method_note: null, payment_ref: null, provider: null, approval_code: null, card_last4: null, paid_on: REQUIRED, recorded_by: null, recorded_at: null, voided: false, void_reason: null, voided_by: null, voided_at: null, client_id: null, client_key: null },
   messages: { kind: REQUIRED, status: "queued", created_at: null, skip_reason: null, to: null, language: null, client_id: null, proposal_id: null, invoice_id: null, payment_id: null, project_id: null, deliverable_id: null, enquiry_id: null, subject_override: null, body_override: null, approved_by: null, due: null, sent_at: null, error: null, effect_at: null, effect_error: null, client_key: null },
   running_costs: { label: REQUIRED, monthly_amount: REQUIRED, position: 0, client_key: null },
   events: { date: REQUIRED, to_date: null, title: REQUIRED, kind: "call", person_id: null, client_key: null },
@@ -216,11 +216,12 @@ export const RULES: Rules = {
     { table: "invoices", column: "tax", scale: "currency", expr: {"round":{"div":[{"mul":["subtotal",{"coalesce":["tax_rate",0]}]},100]}} },
     { table: "invoices", column: "total", scale: "currency", expr: {"add":[{"coalesce":["subtotal",0]},{"coalesce":["tax",0]}]} },
     { table: "invoice_lines", column: "amount", scale: "currency", expr: {"if":[{"isNull":"quote_id"},{"max":[0,{"if":[{"eq":["discount_kind","percent"]},{"mul":["qty","rate",{"sub":[1,{"div":[{"coalesce":["discount",0]},100]}]}]},{"sub":[{"mul":["qty","rate"]},{"coalesce":["discount",0]}]}]}]},{"round":{"div":[{"mul":["rate","share_pct"]},100]}}]} },
+    { table: "payments", column: "net_amount", scale: "currency", expr: {"sub":["amount",{"coalesce":["refunded_amount",0]}]} },
   ],
   rollups: [
     { table: "proposals", column: "subtotal", child: "proposal_lines", via: "document_id", sum: "amount", scale: "currency" },
     { table: "invoices", column: "subtotal", child: "invoice_lines", via: "document_id", sum: "amount", scale: "currency" },
-    { table: "invoices", column: "paid", child: "payments", via: "document_id", sum: "amount", scale: "currency", where: {"column":"voided","eq":false}, balance: { column: "balance", of: "total" } },
+    { table: "invoices", column: "paid", child: "payments", via: "document_id", sum: "net_amount", scale: "currency", where: {"column":"voided","eq":false}, balance: { column: "balance", of: "total" } },
   ],
   sequences: [
     { table: "terms_versions", column: "version", scope: null },
