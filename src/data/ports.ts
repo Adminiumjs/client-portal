@@ -198,6 +198,13 @@ export interface DeskWrites {
    * for anyone signed in. Absent where no Adminium says (the demo).
    */
   systemActions?(): Promise<string[]>;
+  /**
+   * An invoice's pay link, to copy: the one a client already holds while it
+   * works (never retired by copying it again), else a new one. Making one
+   * needs the invoice's update grant, as on Adminium's own payment panel.
+   * Absent where no Adminium makes pay links (the demo).
+   */
+  payLink?(invoiceId: Id): Promise<{ url: string; expiresAt: number }>;
 }
 
 /** An email as Adminium's templates keep it: a subject, a preheader, its blocks and a footer. */
@@ -312,6 +319,14 @@ export interface HandoverView {
   file?(ref: "deliverable_versions" | "handover_files", id: Id, column: "file"): Promise<PrivateFile>;
 }
 
+/** Whether a client may pay online now, and whether it is a rehearsal (`test`). */
+export interface PayOnline {
+  online: boolean;
+  test: boolean;
+  /** The demo's stand-in takes the payment itself: no pay page opens, and no money moves. */
+  standIn?: boolean;
+}
+
 export interface PortalPort {
   /** The studio's clock: every day the pages show is on it. */
   timeZone(): string;
@@ -348,6 +363,19 @@ export interface PortalPort {
    * client only; null when there are none or this server cannot say.
    */
   paymentInstructions?(): Promise<string | null>;
+  /**
+   * Whether this client may pay an invoice online now: the studio's Adminium
+   * takes payments, the app is switched on for them and the pay page can be
+   * reached. `test` while someone who manages payments rehearses on this
+   * address. Absent, or `online: false`: every page reads as it always has.
+   */
+  payOnline?(): Promise<PayOnline>;
+  /**
+   * Where this client pays one of their own invoices online now: the pay
+   * page's address, for what the invoice still owes (never an amount the page
+   * sends). Null where the demo's stand-in took the payment itself (`standIn`).
+   */
+  payInvoice?(invoiceId: Id): Promise<{ payUrl: string | null }>;
   /**
    * A short-lived link to a file column's file (a deliverable version, a
    * handover file). The live client fetches files WITH the session instead

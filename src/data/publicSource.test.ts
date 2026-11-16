@@ -286,3 +286,32 @@ describe("the shared handover", () => {
     }
   });
 });
+
+describe("paying online", () => {
+  it("reads as not online — never an error — from a client without the calls, or a refusal", async () => {
+    expect(await (await publicPortalPort(fakeClient().client)).payOnline!()).toEqual({ online: false, test: false });
+    const refused = fakeClient({ payments: { available: async () => Promise.reject(new Error("503")), start: async () => ({ payUrl: "" }) } });
+    expect(await (await publicPortalPort(refused.client)).payOnline!()).toEqual({ online: false, test: false });
+  });
+
+  it("says online and a rehearsal as Adminium answers them", async () => {
+    const live = fakeClient({ payments: { available: async () => ({ online: true }), start: async () => ({ payUrl: "" }) } });
+    expect(await (await publicPortalPort(live.client)).payOnline!()).toEqual({ online: true, test: false });
+    const rehearsal = fakeClient({ payments: { available: async () => ({ online: true, test: true as const }), start: async () => ({ payUrl: "" }) } });
+    expect(await (await publicPortalPort(rehearsal.client)).payOnline!()).toEqual({ online: true, test: true });
+  });
+
+  it("starts a payment for the invoice through the door the client reads it by, and sends no amount", async () => {
+    const start = vi.fn(async () => ({ payUrl: "https://studio.example/pay/AbC" }));
+    const { client } = fakeClient({ payments: { available: async () => ({ online: true }), start } });
+    expect(await (await publicPortalPort(client)).payInvoice!(12)).toEqual({ payUrl: "https://studio.example/pay/AbC" });
+    expect(start).toHaveBeenCalledWith("clients_invoices", "12");
+  });
+
+  it("carries the server's refusal through, and refuses to pretend with a client that cannot start one", async () => {
+    const refusal = Object.assign(new Error("no"), { code: "PUBLIC_PAY_REFUSED", status: 409, params: { reason: "nothing-due" } });
+    const { client } = fakeClient({ payments: { available: async () => ({ online: true }), start: async () => Promise.reject(refusal) } });
+    await expect((await publicPortalPort(client)).payInvoice!(12)).rejects.toMatchObject({ code: "PUBLIC_PAY_REFUSED", params: { reason: "nothing-due" } });
+    await expect((await publicPortalPort(fakeClient().client)).payInvoice!(12)).rejects.toMatchObject({ code: "PUBLIC_CLIENT_TOO_OLD" });
+  });
+});

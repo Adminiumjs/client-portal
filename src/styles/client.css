@@ -1233,6 +1233,84 @@
   margin-block-start: 1px;
 }
 
+/* Paying online: the button and its line, the hand-off, the check on coming back, a payment that did not start. */
+.cl-pay {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.cl-pay-now {
+  width: 100%;
+  height: 46px;
+  justify-content: center;
+  font-size: 14.5px;
+  font-weight: 800;
+}
+.cl-pay-taking,
+.cl-pay-checking {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13.5px;
+  font-weight: 800;
+  color: var(--fg);
+}
+.cl-pay-taking {
+  justify-content: center;
+  height: 46px;
+  border-radius: 11px;
+  background: var(--accent-soft);
+}
+.cl-pay-checking {
+  padding: 14px 15px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.cl-note--warn { background: var(--warn-soft); color: var(--fg); font-size: 13.5px; font-weight: 800; border-radius: 12px; }
+.cl-note--warn svg { color: var(--warn); }
+.cl-note-text {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cl-note-body {
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.55;
+  color: var(--fg-muted);
+}
+.cl-settled-online {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--fg);
+}
+.cl-settled-online svg {
+  flex: 0 0 auto;
+  color: var(--pos);
+}
+/* A rehearsal: only the person rehearsing sees it, across the page's width. */
+.cl-test-band {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--warn-soft);
+  color: var(--fg);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+.cl-test-band svg {
+  flex: 0 0 auto;
+  margin-block-start: 1px;
+  color: var(--warn);
+}
+
 /* ── a project ─────────────────────────────────────────────────────────────── */
 .cl-project-head {
   display: flex;

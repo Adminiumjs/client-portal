@@ -26,7 +26,9 @@
  * are the client's own methods, not a fetch beside it. A client without one
  * (the 0.3.0 release on npm has none of them) answers `PUBLIC_CLIENT_TOO_OLD`
  * here rather than signing nobody in — except the payment instructions, which
- * simply read as "none" and the page says where else to find them.
+ * simply read as "none" and the page says where else to find them, and paying
+ * online (`payments`), which reads as not open, so the page shows the other
+ * ways to pay exactly as before.
  */
 import { listInBrowser } from "./listInBrowser.ts";
 import { normalise, normaliseAll } from "./rows.ts";
@@ -88,6 +90,15 @@ export interface PortalClient {
   openShared?(token: string): Promise<"opened" | "unknown" | "closed">;
   /** An add-on's settings marked for a browser, for a VERIFIED session. */
   addOnSettings?(key: string): Promise<Record<string, unknown>>;
+  /**
+   * Paying online from the app's own page (Adminium 0.3.60): whether the app
+   * takes payments online now, and the pay link of a row this session reads.
+   * A client without it reads as "not online", and the page as it always has.
+   */
+  payments?: {
+    available(signal?: AbortSignal): Promise<{ online: boolean; test?: true }>;
+    start(ref: string, id: string): Promise<{ payUrl: string }>;
+  };
 }
 
 /** A refusal in the page's terms: the server's code and what it named. */
@@ -344,6 +355,24 @@ export async function publicPortalPort(client: PortalClient, opts: PublicPortalO
         return null;
       }
     },
+
+    payOnline: async () => {
+      // A client without the payments calls, or any refusal, reads as "not online": the page as it always was.
+      if (client.payments === undefined) return { online: false, test: false };
+      try {
+        const answer = await client.payments.available();
+        return { online: answer.online === true, test: answer.test === true };
+      } catch {
+        return { online: false, test: false };
+      }
+    },
+    payInvoice: (id) =>
+      guard(async () => {
+        if (client.payments === undefined) throw new PortError("PUBLIC_CLIENT_TOO_OLD", "this public client cannot start a payment");
+        // The invoice is named by the door the client reads it through; the amount is Adminium's, never the page's.
+        const { payUrl } = await client.payments.start(refs.invoices, String(id));
+        return { payUrl };
+      }),
 
     accept: (id, signedName) => guard(async () => one("proposals", await client.update(refs.accept, String(id), { status: "accepted", signed_name: signedName.trim() }))),
     sign: (id, signedName) => guard(async () => one("proposals", await client.update(refs.sign, String(id), { signed_name: signedName.trim() }))),

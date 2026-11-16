@@ -23,6 +23,7 @@ import type { ListCondition } from "../data/snapshotPort.ts";
 import type { Me, PortalPort, PublicStudio } from "../data/ports.ts";
 import { TABLE_REFS, type Id, type TableRef, type Tables } from "../data/types.ts";
 import type { ById, Held } from "./desk.ts";
+import { checkPayments, resetClientPay } from "./clientPay.ts";
 import { useUi } from "./ui.ts";
 
 export type PortalLoad = "idle" | "loading" | "ready" | "failed";
@@ -207,7 +208,8 @@ export async function refreshOpen(): Promise<void> {
  * following the studio. Returns the function that stops.
  */
 export function attachPortalRefresh(target: Pick<Window, "addEventListener" | "removeEventListener"> = window): () => void {
-  const onFocus = () => void refreshOpen();
+  // Back from the pay page's own tab: the invoice being paid shows as it now stands.
+  const onFocus = () => void refreshOpen().then(() => checkPayments());
   target.addEventListener("focus", onFocus);
   const stop = useUi.subscribe((s, before) => {
     if (s.view !== before.view || s.selected !== before.selected) void refreshOpen();
@@ -262,4 +264,5 @@ export function usePortalRow<R extends TableRef>(ref: R, id: Id | null | undefin
 /** Forget the client (sign-out, a test). */
 export function resetPortal(): void {
   usePortal.setState({ load: "idle", loadError: null, me: null, rows: emptyHeld() });
+  resetClientPay();
 }
