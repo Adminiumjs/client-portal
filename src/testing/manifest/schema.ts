@@ -858,6 +858,13 @@ export const columnRulesSchema = z
          * history keeps its own: an app's sample data and an undo.
          */
         strict: z.literal(true).optional(),
+        /**
+         * Never earlier than the date the column holds: when the stamp fires,
+         * the column takes the later of the two (a ready-by told to the
+         * customer never moves forward). An empty column takes the new value.
+         * A date or a timestamptz column only.
+         */
+        notEarlier: z.literal(true).optional(),
       })
       .strict()
       .optional(),
@@ -2816,6 +2823,9 @@ export function appReferenceIssues(
       }
       if (rules.stamp !== undefined) {
         const stamp = rules.stamp;
+        if (stamp.notEarlier === true && column.type !== 'date' && column.type !== 'timestamptz') {
+          out.push({ path: here('stamp', 'notEarlier'), message: 'a stamp kept from moving earlier needs a date or timestamptz column' });
+        }
         const set = stamp.set;
         // A strict stamp is the server's on every write: a staff writer's own word (`byOrigin` with no `staff`) would be theirs.
         if (stamp.strict === true && typeof set === 'object' && 'byOrigin' in set && set.byOrigin.staff === undefined) {
@@ -4391,7 +4401,7 @@ export interface FormsEntry {
   /** The limits on a create nobody signed in for. */
   anonymous: { perValue?: { columns: string[]; n: number }; perKeyHour?: number; perIpHour?: number };
   /** Refused while one of these settings is off. */
-  requireSetting: { table: string; column: string }[];
+  requireSetting: { table: string; column: string; in?: string[] }[];
   /** The part of the app the entry belongs to: closed while it is off. */
   module?: string;
   /** The `writable` text column a form's fixed "Source" value goes into; absent when the entry names none. */
@@ -4427,7 +4437,7 @@ export function formsEntriesOf(m: Manifest): FormsEntry[] {
         ...(anonymous.perKeyHour === undefined ? {} : { perKeyHour: anonymous.perKeyHour }),
         ...(anonymous.perIpHour === undefined ? {} : { perIpHour: anonymous.perIpHour }),
       },
-      requireSetting: (entry.requireSetting ?? []).map((setting) => ({ table: setting.table, column: setting.column })),
+      requireSetting: (entry.requireSetting ?? []).map((setting) => ({ table: setting.table, column: setting.column, ...(setting.in === undefined ? {} : { in: [...setting.in] }) })),
       ...(entry.module === undefined ? {} : { module: entry.module }),
       ...(entry.source === undefined ? {} : { source: entry.source }),
     };
