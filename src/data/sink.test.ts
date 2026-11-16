@@ -221,3 +221,28 @@ describe("a step list", () => {
     await expect(runSteps(newRun(), [{ name: "b", run: async (ctx) => ctx.result("a") }])).rejects.toBeInstanceOf(StepFailure);
   });
 });
+
+describe("an invoice's pay link", () => {
+  const payable = { kind: "shape", connectionId: "conn-1", tableName: TABLE_OF_REF.invoices, rowKey: "12" };
+
+  it("copies the link a client already holds while it works, and makes none", async () => {
+    const mutate = vi.fn(async (path: string) => (path.endsWith("/current") ? { data: { url: "https://studio.example/pay/Held", expiresAt: 1_800_000_000_000 } } : { data: {} }));
+    const sink = sessionSink(transport(mutate as never), TABLE_OF_REF, opts);
+    expect(await sink.payLink!(12)).toEqual({ url: "https://studio.example/pay/Held", expiresAt: 1_800_000_000_000 });
+    expect(mutate.mock.calls).toEqual([["/api/v1/payments/links/current", "POST", payable]]);
+  });
+
+  it("makes one when there is none, as the invoice's own shape record", async () => {
+    const mutate = vi.fn(async (path: string) => (path.endsWith("/current") ? { data: null } : { data: { link: { url: "https://studio.example/pay/New", expiresAt: 1_800_000_000_000 }, replaced: false } }));
+    const sink = sessionSink(transport(mutate as never), TABLE_OF_REF, opts);
+    expect(await sink.payLink!(12)).toEqual({ url: "https://studio.example/pay/New", expiresAt: 1_800_000_000_000 });
+    expect(mutate.mock.calls.map((c) => c[0])).toEqual(["/api/v1/payments/links/current", "/api/v1/payments/links"]);
+    expect(mutate.mock.calls[1]).toEqual(["/api/v1/payments/links", "POST", payable]);
+  });
+
+  it("carries the server's refusal through (no update grant on the invoice)", async () => {
+    const mutate = vi.fn(async () => Promise.reject(fail(403, "FORBIDDEN")));
+    const sink = sessionSink(transport(mutate as never), TABLE_OF_REF, opts);
+    await expect(sink.payLink!(12)).rejects.toMatchObject({ status: 403, code: "FORBIDDEN" });
+  });
+});

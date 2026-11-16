@@ -59,6 +59,8 @@ export const SAME_AS_ENGLISH: readonly SameAsEnglish[] = [
   { text: "For", locales: ["da-DK"], why: "Danish for “for”, naming the invoice a receipt is for" },
   { text: "Send", locales: ["da-DK"], why: "Danish for “send”, the imperative of sende" },
   { text: "Online", locales: ["de-DE", "da-DK", "cs-CZ"], why: "a payment made on the internet is paid online in German, Danish and Czech" },
+  { text: "Online · {provider}", locales: ["de-DE", "da-DK", "cs-CZ"], why: "the same word, online, beside the name of the service that took the payment" },
+  { text: "{number} · Online · {provider} · {amount}", locales: ["de-DE", "da-DK", "cs-CZ"], why: "the same word, online, among a payment's number, service and amount" },
   { text: "Start", locales: ["da-DK"], why: "Danish for starting a clock" },
   { text: "Stop", locales: ["da-DK"], why: "Danish for stopping a clock" },
   { text: "Under {amount}", locales: ["da-DK"], why: "Danish for “under” an amount" },

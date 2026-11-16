@@ -21,7 +21,7 @@
  */
 import type { Day, Decimal, Id, Invoice, Payment, Proposal, RunningCost } from "../../data/types.ts";
 import { daysBetween } from "../../data/venueTime.ts";
-import { decimalValue, isPositive, minorUnits, sumDecimals } from "../../lib/money.ts";
+import { decimalValue, isPositive, keptAmount, minorUnits, sumDecimals } from "../../lib/money.ts";
 import { isInDate, isOverdue } from "../../state/desk.ts";
 
 export type AgingKey = "current" | "d30" | "d60" | "d61";
@@ -103,7 +103,8 @@ export function chart(input: MoneyInputs): MonthBar[] {
     return {
       month,
       invoiced: sum(invoiced.map((i) => i.total), input.currency),
-      collected: sum(collected.map((p) => p.amount), input.currency),
+      // What was refunded of a payment taken online was never kept.
+      collected: sum(collected.map((p) => keptAmount(p, minorUnits(input.currency))), input.currency),
       invoices: invoiced.length,
       payments: collected.length,
     };
@@ -117,7 +118,7 @@ export type DrillRow = { kind: "invoice"; invoice: Invoice; day: Day; amount: De
 export function drill(month: string, input: MoneyInputs): DrillRow[] {
   const rows: DrillRow[] = [
     ...invoicedIn(month, input).map((invoice) => ({ kind: "invoice" as const, invoice, day: invoice.issued_on!, amount: invoice.total })),
-    ...collectedIn(month, input).map((payment) => ({ kind: "payment" as const, payment, invoice: input.invoices[payment.document_id], day: payment.paid_on, amount: payment.amount })),
+    ...collectedIn(month, input).map((payment) => ({ kind: "payment" as const, payment, invoice: input.invoices[payment.document_id], day: payment.paid_on, amount: keptAmount(payment, minorUnits(input.currency)) })),
   ];
   return rows.sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : a.kind === b.kind ? 0 : a.kind === "invoice" ? -1 : 1));
 }

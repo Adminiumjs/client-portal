@@ -856,3 +856,40 @@
     box-shadow: none;
   }
 }
+
+/* A payment taken online: the service's chip, and "Refunded" once money went back. */
+.inv-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+}
+/* The row's one action, after the entry as it always was; a payment taken online carries its chips there, at the end. */
+.inv-ledger-tail {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: 0 0 auto;
+}
+.inv-ledger-tail:has(.inv-chip) {
+  margin-inline-start: auto;
+}
+.inv-ledger-tail:empty {
+  display: none;
+}
+.inv-chip--online {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.inv-chip--refunded {
+  background: var(--surface-3);
+  color: var(--fg-muted);
+}
+.inv-ledger-row--refund .inv-ledger-label {
+  color: var(--fg-muted);
+}

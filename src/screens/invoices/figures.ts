@@ -97,6 +97,8 @@ export const newestFirst = (a: Invoice, b: Invoice): number => (b.number_seq ?? 
 export type LedgerRow =
   | { kind: "total"; day: Day | null; amount: Decimal | null; balance: Decimal | null }
   | { kind: "payment"; payment: Payment; balance: Decimal | null }
+  /** What was given back of a payment taken online (its `refunded_amount`): the balance goes back up by it. */
+  | { kind: "refund"; payment: Payment; amount: Decimal; balance: Decimal | null }
   | { kind: "closing"; balance: Decimal | null; settled: boolean; lastPaid: Day | null };
 
 /** A payment's order down the ledger: the day it arrived, then the order it was recorded. */
@@ -107,7 +109,8 @@ export const paymentsOf = (payments: readonly Payment[], invoiceId: Id): Payment
 
 /**
  * One invoice's ledger. The running balance is the stored total less each
- * unvoided payment so far (blank beside a voided one); the closing line is the
+ * unvoided payment so far (blank beside a voided one), and back up by what was
+ * refunded of one, on a line of its own under it; the closing line is the
  * stored balance, never a sum.
  */
 export function ledger(invoice: Invoice, payments: readonly Payment[]): LedgerRow[] {
@@ -123,6 +126,10 @@ export function ledger(invoice: Invoice, payments: readonly Payment[]): LedgerRo
     kept.push(payment);
     running = running === null ? null : sumDecimals([running, `-${payment.amount}`], scale);
     rows.push({ kind: "payment", payment, balance: running });
+    if (isPositive(payment.refunded_amount)) {
+      running = running === null ? null : sumDecimals([running, payment.refunded_amount], scale);
+      rows.push({ kind: "refund", payment, amount: payment.refunded_amount, balance: running });
+    }
   }
   const settled = invoice.status === "sent" && isSettled(invoice);
   rows.push({ kind: "closing", balance: invoice.balance, settled, lastPaid: kept.length === 0 ? null : kept[kept.length - 1]!.paid_on });

@@ -322,6 +322,21 @@ export function sessionSink(transport: SessionTransport, tableOf: Readonly<Recor
       const held = reply.data?.systemActions;
       return Array.isArray(held) ? held.filter((a): a is string => typeof a === "string") : [];
     },
+    /*
+     * An invoice's pay link, as Adminium's payment panel makes it: the one a
+     * client already holds while it works (`POST /payments/links/current`),
+     * else a new one (`POST /payments/links`). Each asks the invoice's update
+     * grant; the invoices are an invoice shape's, so the record is a `shape`.
+     */
+    async payLink(invoiceId) {
+      const payable = { kind: "shape", connectionId: await transport.connection(), tableName: tableOf.invoices, rowKey: String(invoiceId) };
+      const current = await send<{ data?: { url?: string; expiresAt?: number } | null }>("/api/v1/payments/links/current", "POST", payable);
+      if (typeof current.data?.url === "string" && typeof current.data.expiresAt === "number") return { url: current.data.url, expiresAt: current.data.expiresAt };
+      const made = await send<{ data?: { link?: { url?: string; expiresAt?: number } } }>("/api/v1/payments/links", "POST", payable);
+      const link = made.data?.link;
+      if (typeof link?.url !== "string" || typeof link.expiresAt !== "number") throw new SinkError("the pay link came back empty", "refused", 500, "PAY_LINK_EMPTY");
+      return { url: link.url, expiresAt: link.expiresAt };
+    },
     async testEmail(templateId, to, document) {
       const reply = await raw<{ queued?: number }>(`/api/v1/email-templates/${encodeURIComponent(templateId)}/test-send`, "POST", JSON.stringify({ to, document }), "application/json");
       return { queued: reply.queued ?? 0 };

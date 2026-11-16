@@ -106,3 +106,17 @@ export function isPositive(value: Decimal | null | undefined): boolean {
   const n = decimalValue(value);
   return n !== null && n > 0;
 }
+
+/**
+ * What a payment still counts for, once its refunds are taken off: what an
+ * invoice's `paid` sums (the invoice shape's `net_amount`). A payment the
+ * studio recorded by hand is never refunded, so it counts in full.
+ */
+export function keptAmount(payment: { amount: Decimal; refunded_amount?: Decimal | null }, scale = 2): Decimal {
+  return isPositive(payment.refunded_amount) ? sumDecimals([payment.amount, `-${payment.refunded_amount!}`], scale) : payment.amount;
+}
+
+/** Whether a payment was made online: the service that took it is named (only Adminium writes it). */
+export function madeOnline(payment: { provider?: string | null }): boolean {
+  return typeof payment.provider === "string" && payment.provider.trim() !== "";
+}
