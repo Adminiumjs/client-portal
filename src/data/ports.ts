@@ -319,6 +319,16 @@ export interface HandoverView {
   file?(ref: "deliverable_versions" | "handover_files", id: Id, column: "file"): Promise<PrivateFile>;
 }
 
+/**
+ * How an invoice's newest online payment stands, as Adminium says it: `none`
+ * (none was started), `open` (a checkout is open and the service has not said
+ * yet), `confirming` (the bank is confirming it; some ways take days), `paid`
+ * (the money arrived; the invoice says so once it is recorded), `failed` (it
+ * did not finish; nothing was taken) or `expired` (the time to pay on the
+ * service's page ran out; nothing was taken).
+ */
+export type PayState = "none" | "open" | "confirming" | "paid" | "failed" | "expired";
+
 /** Whether a client may pay online now, and whether it is a rehearsal (`test`). */
 export interface PayOnline {
   online: boolean;
@@ -376,6 +386,13 @@ export interface PortalPort {
    * sends). Null where the demo's stand-in took the payment itself (`standIn`).
    */
   payInvoice?(invoiceId: Id): Promise<{ payUrl: string | null }>;
+  /**
+   * How the newest online payment of one of this client's invoices stands,
+   * for the client who comes back from the pay page or opens the invoice
+   * again: Adminium's one word (`PayState`), nothing else of it. Absent: the
+   * page reads the invoice alone.
+   */
+  payState?(invoiceId: Id): Promise<PayState>;
   /**
    * A short-lived link to a file column's file (a deliverable version, a
    * handover file). The live client fetches files WITH the session instead

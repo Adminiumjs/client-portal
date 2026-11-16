@@ -1269,6 +1269,10 @@
 }
 .cl-note--warn { background: var(--warn-soft); color: var(--fg); font-size: 13.5px; font-weight: 800; border-radius: 12px; }
 .cl-note--warn svg { color: var(--warn); }
+/* The bank is confirming a payment: in place of every way to pay. */
+.cl-note--bank { background: var(--info-soft); color: var(--fg); font-size: 14px; font-weight: 800; border-radius: 12px; }
+.cl-note--bank svg { color: var(--info); }
+.cl-note--bank .cl-note-body { line-height: 1.6; }
 .cl-note-text {
   display: flex;
   flex-direction: column;

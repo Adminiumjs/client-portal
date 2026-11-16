@@ -6,7 +6,9 @@
  *   open     "Pay now", while the studio's Adminium takes the invoices
  *            online (`state/clientPay.ts`: the pay page opens in a tab of
  *            its own, and the invoice is read again when the client comes
- *            back); How to pay (the studio's payment instructions, when
+ *            back, with how the payment stands: didn't finish or ran out
+ *            say so beside Pay now; the bank confirming it says so instead
+ *            of every way to pay); How to pay (the studio's payment instructions, when
  *            Adminium serves them to the signed-in client) with the invoice
  *            number to quote; "I've sent a payment" — once, until a payment
  *            is recorded, by the studio or online — after which the page
@@ -18,14 +20,14 @@
  * "Print or save as PDF" opens the add-on's own copy of the invoice.
  */
 import { useEffect, useState } from "react";
-import { Ban, CheckCheck, CircleAlert, CreditCard, Download, FileText, FlaskConical, Hash, House, LoaderCircle, Lock, Send, X } from "lucide-react";
+import { Ban, CalendarX, CheckCheck, CircleAlert, CreditCard, Download, FileText, FlaskConical, Hash, House, Landmark, LoaderCircle, Lock, Send, X } from "lucide-react";
 
 import { Button, LinesTable, StatusPill } from "../../components/ui.tsx";
 import type { Id } from "../../data/types.ts";
 import { useI18n } from "../../i18n/index.tsx";
 import { studioZone, today } from "../../lib/clock.ts";
 import { sentAPayment } from "../../state/clientActions.ts";
-import { loadPayOnline, payNow, useClientPay, useMayPayOnline, useRehearsing } from "../../state/clientPay.ts";
+import { loadPayOnline, noticeConfirming, payNow, useClientPay, useMayPayOnline, useRehearsing } from "../../state/clientPay.ts";
 import { loadClientInvoice, usePortal, usePortalRow, usePortalRows } from "../../state/portal.ts";
 import { openSheet } from "../../state/sheets.ts";
 import { go, toast, useUi } from "../../state/ui.ts";
@@ -94,8 +96,8 @@ export default function Invoice() {
   useEffect(() => {
     setClaim(null);
     setClaimError(null);
-    // Whether paying online is open now: asked as the invoice opens.
-    if (id !== null) void loadPayOnline();
+    // Whether paying online is open now, and whether a payment of it is still with the bank: asked as the invoice opens.
+    if (id !== null) void loadPayOnline().then(() => noticeConfirming(id));
   }, [id]);
 
   if (!signedIn) return null;
@@ -284,16 +286,25 @@ export default function Invoice() {
           </Button>
         </div>
 
-        {open && flow === "failed" && (
+        {open && (flow === "failed" || flow === "expired") && (
           <div className="cl-note cl-note--warn" role="alert">
-            <CircleAlert size={17} aria-hidden="true" />
+            {flow === "failed" ? <CircleAlert size={17} aria-hidden="true" /> : <CalendarX size={17} aria-hidden="true" />}
             <span className="cl-note-text">
-              <span>{t("client.invoice.failTitle")}</span>
+              <span>{flow === "failed" ? t("client.invoice.failTitle") : t("client.invoice.expiredTitle")}</span>
               <span className="cl-note-body">{t("client.invoice.failBody")}</span>
             </span>
           </div>
         )}
-        {open && mayPay && (flow === "idle" || flow === "failed") && (
+        {open && flow === "confirming" && (
+          <div className="cl-note cl-note--bank" role="status">
+            <Landmark size={17} aria-hidden="true" />
+            <span className="cl-note-text">
+              <span>{t("client.invoice.bankTitle")}</span>
+              <span className="cl-note-body">{t("client.invoice.bankBody")}</span>
+            </span>
+          </div>
+        )}
+        {open && mayPay && (flow === "idle" || flow === "failed" || flow === "expired") && (
           <div className="cl-pay">
             <Button kind="primary" size="wide" icon={Lock} className="cl-pay-now" onClick={pay}>
               <AmountIn text={t("client.invoice.payNow")} amount={money(inv.balance, inv.currency)} />
@@ -320,7 +331,8 @@ export default function Invoice() {
           {flow === "taking" ? t("client.invoice.taking") : flow === "checking" ? t("client.invoice.checking") : ""}
         </span>
 
-        {open && flow !== "checking" && (
+        {/* While the bank confirms a payment, nothing offers another way to pay it. */}
+        {open && flow !== "checking" && flow !== "confirming" && (
           <>
             <div className="cl-howto">
               <span className="cl-kicker">{t("client.invoice.howToPay")}</span>

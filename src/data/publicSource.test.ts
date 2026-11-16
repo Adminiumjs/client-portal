@@ -3,6 +3,7 @@
  * by what the endpoint does, and sends only what that endpoint may write —
  * Adminium stamps the rest.
  */
+import type { createPublicClient } from "@adminiumjs/public-client";
 import { describe, expect, it, vi } from "vitest";
 
 import { PortError } from "./ports.ts";
@@ -288,30 +289,52 @@ describe("the shared handover", () => {
 });
 
 describe("paying online", () => {
+  const none = async () => ({ state: "none" as const });
   it("reads as not online — never an error — from a client without the calls, or a refusal", async () => {
     expect(await (await publicPortalPort(fakeClient().client)).payOnline!()).toEqual({ online: false, test: false });
-    const refused = fakeClient({ payments: { available: async () => Promise.reject(new Error("503")), start: async () => ({ payUrl: "" }) } });
+    const refused = fakeClient({ payments: { available: async () => Promise.reject(new Error("503")), start: async () => ({ payUrl: "" }), state: none } });
     expect(await (await publicPortalPort(refused.client)).payOnline!()).toEqual({ online: false, test: false });
   });
 
   it("says online and a rehearsal as Adminium answers them", async () => {
-    const live = fakeClient({ payments: { available: async () => ({ online: true }), start: async () => ({ payUrl: "" }) } });
+    const live = fakeClient({ payments: { available: async () => ({ online: true }), start: async () => ({ payUrl: "" }), state: none } });
     expect(await (await publicPortalPort(live.client)).payOnline!()).toEqual({ online: true, test: false });
-    const rehearsal = fakeClient({ payments: { available: async () => ({ online: true, test: true as const }), start: async () => ({ payUrl: "" }) } });
+    const rehearsal = fakeClient({ payments: { available: async () => ({ online: true, test: true as const }), start: async () => ({ payUrl: "" }), state: none } });
     expect(await (await publicPortalPort(rehearsal.client)).payOnline!()).toEqual({ online: true, test: true });
   });
 
   it("starts a payment for the invoice through the door the client reads it by, and sends no amount", async () => {
     const start = vi.fn(async () => ({ payUrl: "https://studio.example/pay/AbC" }));
-    const { client } = fakeClient({ payments: { available: async () => ({ online: true }), start } });
+    const { client } = fakeClient({ payments: { available: async () => ({ online: true }), start, state: none } });
     expect(await (await publicPortalPort(client)).payInvoice!(12)).toEqual({ payUrl: "https://studio.example/pay/AbC" });
     expect(start).toHaveBeenCalledWith("clients_invoices", "12");
   });
 
   it("carries the server's refusal through, and refuses to pretend with a client that cannot start one", async () => {
     const refusal = Object.assign(new Error("no"), { code: "PUBLIC_PAY_REFUSED", status: 409, params: { reason: "nothing-due" } });
-    const { client } = fakeClient({ payments: { available: async () => ({ online: true }), start: async () => Promise.reject(refusal) } });
+    const { client } = fakeClient({ payments: { available: async () => ({ online: true }), start: async () => Promise.reject(refusal), state: none } });
     await expect((await publicPortalPort(client)).payInvoice!(12)).rejects.toMatchObject({ code: "PUBLIC_PAY_REFUSED", params: { reason: "nothing-due" } });
     await expect((await publicPortalPort(fakeClient().client)).payInvoice!(12)).rejects.toMatchObject({ code: "PUBLIC_CLIENT_TOO_OLD" });
+  });
+
+  it("asks how the invoice's payment stands through the door the client reads it by, and answers Adminium's word alone", async () => {
+    for (const said of ["none", "open", "confirming", "paid", "failed", "expired"] as const) {
+      const state = vi.fn(async () => ({ state: said, test: true as const }));
+      const { client } = fakeClient({ payments: { available: async () => ({ online: true }), start: async () => ({ payUrl: "" }), state } });
+      expect(await (await publicPortalPort(client)).payState!(12)).toBe(said);
+      expect(state).toHaveBeenCalledWith("clients_invoices", "12");
+    }
+    // A client that cannot ask: nothing was started, and the invoice says how it stands.
+    expect(await (await publicPortalPort(fakeClient().client)).payState!(12)).toBe("none");
+    // A refusal is the server's, carried through.
+    const refusal = Object.assign(new Error("no"), { code: "PUBLIC_REF_NOT_FOUND", status: 404 });
+    const { client } = fakeClient({ payments: { available: async () => ({ online: true }), start: async () => ({ payUrl: "" }), state: async () => Promise.reject(refusal) } });
+    await expect((await publicPortalPort(client)).payState!(12)).rejects.toMatchObject({ code: "PUBLIC_REF_NOT_FOUND" });
+  });
+
+  it("the public client this app ships with answers every call the page makes", () => {
+    // Fails to build, not at run time, when the client lacks one of them.
+    const shipped: NonNullable<PortalClient["payments"]> = null as unknown as NonNullable<ReturnType<typeof createPublicClient>>["payments"];
+    expect(shipped).toBeNull();
   });
 });

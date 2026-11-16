@@ -22,7 +22,7 @@ rather than lorem ipsum.
 
 ## What it needs
 
-- **Adminium 0.3.60 or later.** Update Adminium first, then the app: 0.2.8
+- **Adminium 0.3.61 or later.** Update Adminium first, then the app: 0.2.8
   updates an install of 0.2.0 or later in place. It moves the invoices onto
   the add-on's invoice shape's second version, which takes payments online:
   the payments gain the columns an online payment fills, and every row
@@ -173,8 +173,12 @@ rather than lorem ipsum.
     sent a payment", which stays for bank transfers. It opens Adminium's pay
     page in a tab of its own (the portal keeps the client signed in), for
     what the invoice still owes; back on the portal, the invoice is read
-    again and shows paid, "Paid online · receipt emailed". The client types
-    no card details anywhere in the app. A payment made online clears "I've
+    again and shows paid, "Paid online · receipt emailed", or says how the
+    payment stands: the bank still confirming it (some ways take days; the
+    invoice then offers no way to pay, also when opened again, until the
+    bank has answered), didn't finish, or the time on the pay page ran out
+    (nothing was taken, and every way to pay is back). The client types no
+    card details anywhere in the app. A payment made online clears "I've
     sent a payment", as one the studio records does.
   - **In the emails**, the invoice and its three reminders carry "Pay
     {amount} online" while the invoice can be paid online, and read as

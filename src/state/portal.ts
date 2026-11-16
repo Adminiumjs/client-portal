@@ -23,7 +23,7 @@ import type { ListCondition } from "../data/snapshotPort.ts";
 import type { Me, PortalPort, PublicStudio } from "../data/ports.ts";
 import { TABLE_REFS, type Id, type TableRef, type Tables } from "../data/types.ts";
 import type { ById, Held } from "./desk.ts";
-import { checkPayments, resetClientPay } from "./clientPay.ts";
+import { checkPayments, noticeConfirming, resetClientPay } from "./clientPay.ts";
 import { useUi } from "./ui.ts";
 
 export type PortalLoad = "idle" | "loading" | "ready" | "failed";
@@ -209,7 +209,13 @@ export async function refreshOpen(): Promise<void> {
  */
 export function attachPortalRefresh(target: Pick<Window, "addEventListener" | "removeEventListener"> = window): () => void {
   // Back from the pay page's own tab: the invoice being paid shows as it now stands.
-  const onFocus = () => void refreshOpen().then(() => checkPayments());
+  const onFocus = () =>
+    void refreshOpen().then(async () => {
+      await checkPayments();
+      // A payment the bank was confirming may have gone through, or not, while the page was away.
+      const { view, selected } = useUi.getState();
+      if (view === "invoice" && selected.invoice !== null) await noticeConfirming(selected.invoice);
+    });
   target.addEventListener("focus", onFocus);
   const stop = useUi.subscribe((s, before) => {
     if (s.view !== before.view || s.selected !== before.selected) void refreshOpen();

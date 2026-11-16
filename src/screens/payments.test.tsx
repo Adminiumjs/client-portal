@@ -26,7 +26,8 @@ import { I18nProvider } from "../i18n/index.tsx";
 import { fakeStudio, type FakeStudio } from "../testing/fakeStudio.ts";
 import { loadInvoice, useDesk } from "../state/desk.ts";
 import { setDeskPayments, useDeskPayments } from "../state/deskPayments.ts";
-import { checkPayments, loadPayOnline, payNow, useClientPay } from "../state/clientPay.ts";
+import { afterPaying, checkPayments, loadPayOnline, noticeConfirming, payNow, useClientPay } from "../state/clientPay.ts";
+import type { PayState } from "../data/ports.ts";
 import { loadClientInvoice, loadPortal, loadStudio, previewFromDesk, setPortalPort, usePortal } from "../state/portal.ts";
 import { useSheets } from "../state/sheets.ts";
 import { useUi } from "../state/ui.ts";
@@ -164,6 +165,122 @@ describe("the client's invoice", () => {
     expect(page).not.toMatch(/••|Visa|4242/);
     // The ledger names the way it was paid: online.
     expect(page).toContain("Online");
+  });
+
+  it("the bank confirming a payment: said, and nothing offers to pay again, by Stripe or by bank transfer", async () => {
+    useClientPay.setState({ online: { online: true, test: false } });
+    await clientPage(3, 5);
+    useClientPay.setState({ flow: { 5: "confirming" } });
+    const page = text(draw(<ClientInvoice />));
+    expect(page).toContain("Your bank is confirming the payment");
+    expect(page).toContain("Some ways to pay take a few days. Please don’t pay again. We’ll email you when it’s confirmed.");
+    expect(page).not.toMatch(/Pay \$[\d,.]+ now/);
+    expect(page).not.toContain("How to pay");
+    expect(page).not.toContain("I’ve sent a payment");
+  });
+
+  it("the time on the pay page ran out: said, and every way to pay is back", async () => {
+    useClientPay.setState({ online: { online: true, test: false } });
+    await clientPage(3, 5);
+    useClientPay.setState({ flow: { 5: "expired" } });
+    const page = text(draw(<ClientInvoice />));
+    expect(page).toContain("The time to pay on that page ran out. Nothing was taken.");
+    expect(page).toContain("You can try again, or pay by bank transfer below.");
+    expect(page).not.toContain("didn’t finish");
+    expect(page).toMatch(/Pay \$[\d,.]+ now/);
+    expect(page).toContain("How to pay");
+    expect(page).toContain("I’ve sent a payment");
+  });
+
+  it("a paid invoice reads paid whatever its last payment's state", async () => {
+    useClientPay.setState({ online: { online: true, test: false } });
+    await clientPage(2, 2);
+    for (const flow of ["confirming", "expired", "failed"] as const) {
+      useClientPay.setState({ flow: { 2: flow } });
+      const page = text(draw(<ClientInvoice />));
+      expect(page, flow).toContain("There is nothing to pay.");
+      expect(page, flow).not.toContain("Your bank is confirming");
+      expect(page, flow).not.toContain("Nothing was taken");
+    }
+  });
+
+  it("what the page does with Adminium's word on coming back", () => {
+    // Owed: said, looked for again, or the page as it reads.
+    expect(afterPaying("confirming", true)).toBe("confirming");
+    expect(afterPaying("failed", true)).toBe("failed");
+    expect(afterPaying("expired", true)).toBe("expired");
+    expect(afterPaying("none", true)).toBe("idle");
+    expect(afterPaying("open", true)).toBe("look");
+    expect(afterPaying("paid", true)).toBe("look");
+    expect(afterPaying("unknown", true)).toBe("look");
+    // Nothing owed: the invoice says it is paid, whatever the word.
+    for (const said of ["none", "open", "confirming", "paid", "failed", "expired", "unknown"] as const) expect(afterPaying(said, false), said).toBe("idle");
+  });
+
+  it("back from the pay page: Adminium's word, looked for again while the service has not said", async () => {
+    await signIn(3);
+    select(5);
+    useClientPay.setState({ online: { online: true, test: false } });
+    const port = studio.world.portal(3);
+    const answers = (said: PayState[]) => {
+      const asked: number[] = [];
+      setPortalPort({ ...port, payState: async (id) => (asked.push(id), said.length > 1 ? said.shift()! : said[0]!) });
+      return asked;
+    };
+    const pauses: number[] = [];
+    const pause = async (ms: number) => void pauses.push(ms);
+    for (const [said, flow] of [["confirming", "confirming"], ["failed", "failed"], ["expired", "expired"], ["none", "idle"]] as const) {
+      const asked = answers([said]);
+      useClientPay.setState({ flow: { 5: "checking" } });
+      await checkPayments(pause);
+      expect(useClientPay.getState().flow[5], said).toBe(flow);
+      expect(asked).toEqual([5]);
+    }
+    // Still open at the service: asked again, and the answer when it comes.
+    pauses.length = 0;
+    answers(["open", "open", "failed"]);
+    useClientPay.setState({ flow: { 5: "checking" } });
+    await checkPayments(pause);
+    expect(useClientPay.getState().flow[5]).toBe("failed");
+    expect(pauses).toEqual([2000, 2000]);
+    // Open all along (the pay page left open in its tab): a few looks, then Pay now again (it opens the same checkout).
+    pauses.length = 0;
+    answers(["open"]);
+    useClientPay.setState({ flow: { 5: "checking" } });
+    await checkPayments(pause);
+    expect(useClientPay.getState().flow[5]).toBe("idle");
+    expect(pauses).toHaveLength(5);
+    // The money arrived and is not recorded yet: looked for longer, never offered again meanwhile.
+    pauses.length = 0;
+    answers(["paid"]);
+    useClientPay.setState({ flow: { 5: "checking" } });
+    await checkPayments(pause);
+    expect(pauses).toHaveLength(29);
+  });
+
+  it("opened again while the bank confirms a payment: said, until the bank has answered", async () => {
+    await signIn(3);
+    select(5);
+    await loadClientInvoice(5);
+    const port = studio.world.portal(3);
+    let said: PayState = "confirming";
+    setPortalPort({ ...port, payState: async () => said });
+    // Not offered online: nothing asked, nothing said.
+    useClientPay.setState({ online: { online: false, test: false }, flow: {} });
+    await noticeConfirming(5);
+    expect(useClientPay.getState().flow[5]).toBeUndefined();
+    useClientPay.setState({ online: { online: true, test: false } });
+    await noticeConfirming(5);
+    expect(useClientPay.getState().flow[5]).toBe("confirming");
+    // The bank turned it down: the page as the invoice reads, Pay now with it.
+    said = "failed";
+    await noticeConfirming(5);
+    expect(useClientPay.getState().flow[5]).toBe("idle");
+    // A flow the page is following is its own.
+    said = "confirming";
+    useClientPay.setState({ flow: { 5: "taking" } });
+    await noticeConfirming(5);
+    expect(useClientPay.getState().flow[5]).toBe("taking");
   });
 
   it("the studio's preview never offers Pay now", async () => {

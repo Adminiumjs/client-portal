@@ -44,6 +44,7 @@ import {
   type Me,
   type PortalPort,
   type PrivateFile,
+  type PayState,
   type PublicStudio,
   type SentPayment,
   type StatementPeriod,
@@ -91,13 +92,15 @@ export interface PortalClient {
   /** An add-on's settings marked for a browser, for a VERIFIED session. */
   addOnSettings?(key: string): Promise<Record<string, unknown>>;
   /**
-   * Paying online from the app's own page (Adminium 0.3.60): whether the app
-   * takes payments online now, and the pay link of a row this session reads.
-   * A client without it reads as "not online", and the page as it always has.
+   * Paying online from the app's own page: whether the app takes payments
+   * online now, the pay link of a row this session reads, and how that row's
+   * newest online payment stands (Adminium 0.3.61). A client without it reads
+   * as "not online", and the page as it always has.
    */
   payments?: {
     available(signal?: AbortSignal): Promise<{ online: boolean; test?: true }>;
     start(ref: string, id: string): Promise<{ payUrl: string }>;
+    state(ref: string, id: string): Promise<{ state: PayState; test?: true }>;
   };
 }
 
@@ -372,6 +375,13 @@ export async function publicPortalPort(client: PortalClient, opts: PublicPortalO
         // The invoice is named by the door the client reads it through; the amount is Adminium's, never the page's.
         const { payUrl } = await client.payments.start(refs.invoices, String(id));
         return { payUrl };
+      }),
+    payState: (id) =>
+      guard(async () => {
+        // A client that cannot ask says nothing was started: the invoice alone says how it stands.
+        if (client.payments === undefined) return "none";
+        // Read through the door the client reads the invoice by, as a start is.
+        return (await client.payments.state(refs.invoices, String(id))).state;
       }),
 
     accept: (id, signedName) => guard(async () => one("proposals", await client.update(refs.accept, String(id), { status: "accepted", signed_name: signedName.trim() }))),
