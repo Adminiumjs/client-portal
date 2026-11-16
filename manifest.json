@@ -18974,10 +18974,12 @@
         "zh-TW": "發票已送出"
       },
       "vars": [
+        "invoice.balance",
         "invoice.due_on",
         "invoice.number",
         "invoice.title",
         "invoice.total",
+        "pay_url",
         "practice.name",
         "practice.phone",
         "practice.reply_to"
@@ -19012,6 +19014,25 @@
                 "items": [
                   "{{invoice.number}} · due {{invoice.due_on}} · {{invoice.total}}"
                 ]
+              }
+            },
+            {
+              "block": "email.button",
+              "id": "pay",
+              "data": {
+                "label": "Pay {{invoice.balance}} online",
+                "url": "{{pay_url}}",
+                "onlyWith": "pay_url"
+              }
+            },
+            {
+              "block": "email.text",
+              "id": "pay-note",
+              "data": {
+                "paras": [
+                  "You’ll pay on the Stripe or PayPal page."
+                ],
+                "onlyWith": "pay_url"
               }
             },
             {
@@ -19083,6 +19104,25 @@
               }
             },
             {
+              "block": "email.button",
+              "id": "pay",
+              "data": {
+                "label": "{{invoice.balance}} online bezahlen",
+                "url": "{{pay_url}}",
+                "onlyWith": "pay_url"
+              }
+            },
+            {
+              "block": "email.text",
+              "id": "pay-note",
+              "data": {
+                "paras": [
+                  "Sie bezahlen auf der Seite von Stripe oder PayPal."
+                ],
+                "onlyWith": "pay_url"
+              }
+            },
+            {
               "block": "email.box",
               "id": "how-to-pay",
               "data": {
@@ -19148,6 +19188,25 @@
                 "items": [
                   "{{invoice.number}} · échéance le {{invoice.due_on}} · {{invoice.total}}"
                 ]
+              }
+            },
+            {
+              "block": "email.button",
+              "id": "pay",
+              "data": {
+                "label": "Payer {{invoice.balance}} en ligne",
+                "url": "{{pay_url}}",
+                "onlyWith": "pay_url"
+              }
+            },
+            {
+              "block": "email.text",
+              "id": "pay-note",
+              "data": {
+                "paras": [
+                  "Vous paierez sur la page Stripe ou PayPal."
+                ],
+                "onlyWith": "pay_url"
               }
             },
             {
@@ -19219,6 +19278,25 @@
               }
             },
             {
+              "block": "email.button",
+              "id": "pay",
+              "data": {
+                "label": "Betal {{invoice.balance}} online",
+                "url": "{{pay_url}}",
+                "onlyWith": "pay_url"
+              }
+            },
+            {
+              "block": "email.text",
+              "id": "pay-note",
+              "data": {
+                "paras": [
+                  "Du betaler på Stripe- eller PayPal-siden."
+                ],
+                "onlyWith": "pay_url"
+              }
+            },
+            {
               "block": "email.box",
               "id": "how-to-pay",
               "data": {
@@ -19284,6 +19362,25 @@
                 "items": [
                   "{{invoice.number}} · splatná {{invoice.due_on}} · {{invoice.total}}"
                 ]
+              }
+            },
+            {
+              "block": "email.button",
+              "id": "pay",
+              "data": {
+                "label": "Zaplatit {{invoice.balance}} online",
+                "url": "{{pay_url}}",
+                "onlyWith": "pay_url"
+              }
+            },
+            {
+              "block": "email.text",
+              "id": "pay-note",
+              "data": {
+                "paras": [
+                  "Zaplatíte na stránce Stripe nebo PayPal."
+                ],
+                "onlyWith": "pay_url"
               }
             },
             {
@@ -19355,6 +19452,25 @@
               }
             },
             {
+              "block": "email.button",
+              "id": "pay",
+              "data": {
+                "label": "ادفع {{invoice.balance}} عبر الإنترنت",
+                "url": "{{pay_url}}",
+                "onlyWith": "pay_url"
+              }
+            },
+            {
+              "block": "email.text",
+              "id": "pay-note",
+              "data": {
+                "paras": [
+                  "ستدفع على صفحة Stripe أو PayPal."
+                ],
+                "onlyWith": "pay_url"
+              }
+            },
+            {
               "block": "email.box",
               "id": "how-to-pay",
               "data": {
@@ -19420,6 +19536,25 @@
                 "items": [
                   "{{invoice.number}} · {{invoice.due_on}} 到期 · {{invoice.total}}"
                 ]
+              }
+            },
+            {
+              "block": "email.button",
+              "id": "pay",
+              "data": {
+                "label": "在线支付 {{invoice.balance}}",
+                "url": "{{pay_url}}",
+                "onlyWith": "pay_url"
+              }
+            },
+            {
+              "block": "email.text",
+              "id": "pay-note",
+              "data": {
+                "paras": [
+                  "您将在 Stripe 或 PayPal 页面上付款。"
+                ],
+                "onlyWith": "pay_url"
               }
             },
             {
@@ -19491,6 +19626,25 @@
               }
             },
             {
+              "block": "email.button",
+              "id": "pay",
+              "data": {
+                "label": "線上支付 {{invoice.balance}}",
+                "url": "{{pay_url}}",
+                "onlyWith": "pay_url"
+              }
+            },
+            {
+              "block": "email.text",
+              "id": "pay-note",
+              "data": {
+                "paras": [
+                  "您將在 Stripe 或 PayPal 頁面上付款。"
+                ],
+                "onlyWith": "pay_url"
+              }
+            },
+            {
               "block": "email.box",
               "id": "how-to-pay",
               "data": {
@@ -19546,6 +19700,7 @@
         "invoice.due_on",
         "invoice.number",
         "invoice.title",
+        "pay_url",
         "practice.name",
         "practice.phone",
         "practice.reply_to"
@@ -19571,6 +19726,25 @@
                   "No alarm at all — {{invoice.number}} came due on {{invoice.due_on}} and I do not think it has landed yet. If it is already in your payment run, ignore me entirely.",
                   "{{invoice.balance}} on {{invoice.title}}."
                 ]
+              }
+            },
+            {
+              "block": "email.button",
+              "id": "pay",
+              "data": {
+                "label": "Pay {{invoice.balance}} online",
+                "url": "{{pay_url}}",
+                "onlyWith": "pay_url"
+              }
+            },
+            {
+              "block": "email.text",
+              "id": "pay-note",
+              "data": {
+                "paras": [
+                  "You’ll pay on the Stripe or PayPal page."
+                ],
+                "onlyWith": "pay_url"
               }
             },
             {
@@ -19617,6 +19791,25 @@
             },
             {
               "block": "email.button",
+              "id": "pay",
+              "data": {
+                "label": "{{invoice.balance}} online bezahlen",
+                "url": "{{pay_url}}",
+                "onlyWith": "pay_url"
+              }
+            },
+            {
+              "block": "email.text",
+              "id": "pay-note",
+              "data": {
+                "paras": [
+                  "Sie bezahlen auf der Seite von Stripe oder PayPal."
+                ],
+                "onlyWith": "pay_url"
+              }
+            },
+            {
+              "block": "email.button",
               "id": "open",
               "data": {
                 "label": "{{invoice.number}} ansehen",
@@ -19655,6 +19848,25 @@
                   "Rien d’alarmant — {{invoice.number}} était due le {{invoice.due_on}} et je ne crois pas que le paiement soit arrivé. S’il est déjà dans votre prochain virement, ignorez simplement ce message.",
                   "{{invoice.balance}} pour {{invoice.title}}."
                 ]
+              }
+            },
+            {
+              "block": "email.button",
+              "id": "pay",
+              "data": {
+                "label": "Payer {{invoice.balance}} en ligne",
+                "url": "{{pay_url}}",
+                "onlyWith": "pay_url"
+              }
+            },
+            {
+              "block": "email.text",
+              "id": "pay-note",
+              "data": {
+                "paras": [
+                  "Vous paierez sur la page Stripe ou PayPal."
+                ],
+                "onlyWith": "pay_url"
               }
             },
             {
@@ -19701,6 +19913,25 @@
             },
             {
               "block": "email.button",
+              "id": "pay",
+              "data": {
+                "label": "Betal {{invoice.balance}} online",
+                "url": "{{pay_url}}",
+                "onlyWith": "pay_url"
+              }
+            },
+            {
+              "block": "email.text",
+              "id": "pay-note",
+              "data": {
+                "paras": [
+                  "Du betaler på Stripe- eller PayPal-siden."
+                ],
+                "onlyWith": "pay_url"
+              }
+            },
+            {
+              "block": "email.button",
               "id": "open",
               "data": {
                 "label": "Se {{invoice.number}}",
@@ -19739,6 +19970,25 @@
                   "Nic vážného — {{invoice.number}} byla splatná {{invoice.due_on}} a myslím, že platba ještě nedorazila. Pokud už je v příštím platebním běhu, tuto zprávu klidně ignorujte.",
                   "{{invoice.balance}} za {{invoice.title}}."
                 ]
+              }
+            },
+            {
+              "block": "email.button",
+              "id": "pay",
+              "data": {
+                "label": "Zaplatit {{invoice.balance}} online",
+                "url": "{{pay_url}}",
+                "onlyWith": "pay_url"
+              }
+            },
+            {
+              "block": "email.text",
+              "id": "pay-note",
+              "data": {
+                "paras": [
+                  "Zaplatíte na stránce Stripe nebo PayPal."
+                ],
+                "onlyWith": "pay_url"
               }
             },
             {
@@ -19785,6 +20035,25 @@
             },
             {
               "block": "email.button",
+              "id": "pay",
+              "data": {
+                "label": "ادفع {{invoice.balance}} عبر الإنترنت",
+                "url": "{{pay_url}}",
+                "onlyWith": "pay_url"
+              }
+            },
+            {
+              "block": "email.text",
+              "id": "pay-note",
+              "data": {
+                "paras": [
+                  "ستدفع على صفحة Stripe أو PayPal."
+                ],
+                "onlyWith": "pay_url"
+              }
+            },
+            {
+              "block": "email.button",
               "id": "open",
               "data": {
                 "label": "اعرض {{invoice.number}}",
@@ -19823,6 +20092,25 @@
                   "不必紧张 — {{invoice.number}} 已于 {{invoice.due_on}} 到期，我想款项还没有到账。如果已经在您的付款计划中，请忽略这封邮件。",
                   "{{invoice.title}} 尚欠 {{invoice.balance}}。"
                 ]
+              }
+            },
+            {
+              "block": "email.button",
+              "id": "pay",
+              "data": {
+                "label": "在线支付 {{invoice.balance}}",
+                "url": "{{pay_url}}",
+                "onlyWith": "pay_url"
+              }
+            },
+            {
+              "block": "email.text",
+              "id": "pay-note",
+              "data": {
+                "paras": [
+                  "您将在 Stripe 或 PayPal 页面上付款。"
+                ],
+                "onlyWith": "pay_url"
               }
             },
             {
@@ -19869,6 +20157,25 @@
             },
             {
               "block": "email.button",
+              "id": "pay",
+              "data": {
+                "label": "線上支付 {{invoice.balance}}",
+                "url": "{{pay_url}}",
+                "onlyWith": "pay_url"
+              }
+            },
+            {
+              "block": "email.text",
+              "id": "pay-note",
+              "data": {
+                "paras": [
+                  "您將在 Stripe 或 PayPal 頁面上付款。"
+                ],
+                "onlyWith": "pay_url"
+              }
+            },
+            {
+              "block": "email.button",
               "id": "open",
               "data": {
                 "label": "查看 {{invoice.number}}",
@@ -19905,6 +20212,7 @@
         "invoice.balance",
         "invoice.due_on.days_since",
         "invoice.number",
+        "pay_url",
         "practice.name",
         "practice.phone",
         "practice.reply_to"
@@ -19930,6 +20238,25 @@
                   "{{invoice.number}} is {{invoice.due_on.days_since}} days past due — {{invoice.balance}} outstanding. Can you tell me when it will be paid, or whether it needs splitting in two?",
                   "Part payments are fine and easy to set up. Silence is the only thing that makes this awkward."
                 ]
+              }
+            },
+            {
+              "block": "email.button",
+              "id": "pay",
+              "data": {
+                "label": "Pay {{invoice.balance}} online",
+                "url": "{{pay_url}}",
+                "onlyWith": "pay_url"
+              }
+            },
+            {
+              "block": "email.text",
+              "id": "pay-note",
+              "data": {
+                "paras": [
+                  "You’ll pay on the Stripe or PayPal page."
+                ],
+                "onlyWith": "pay_url"
               }
             },
             {
@@ -19976,6 +20303,25 @@
             },
             {
               "block": "email.button",
+              "id": "pay",
+              "data": {
+                "label": "{{invoice.balance}} online bezahlen",
+                "url": "{{pay_url}}",
+                "onlyWith": "pay_url"
+              }
+            },
+            {
+              "block": "email.text",
+              "id": "pay-note",
+              "data": {
+                "paras": [
+                  "Sie bezahlen auf der Seite von Stripe oder PayPal."
+                ],
+                "onlyWith": "pay_url"
+              }
+            },
+            {
+              "block": "email.button",
               "id": "open",
               "data": {
                 "label": "{{invoice.number}} ansehen",
@@ -20014,6 +20360,25 @@
                   "{{invoice.number}} est en retard de {{invoice.due_on.days_since}} jours — {{invoice.balance}} restent dus. Pouvez-vous me dire quand elle sera réglée, ou s’il faut l’étaler en deux ?",
                   "Les paiements partiels sont possibles et simples à mettre en place. Seul le silence rend la chose gênante."
                 ]
+              }
+            },
+            {
+              "block": "email.button",
+              "id": "pay",
+              "data": {
+                "label": "Payer {{invoice.balance}} en ligne",
+                "url": "{{pay_url}}",
+                "onlyWith": "pay_url"
+              }
+            },
+            {
+              "block": "email.text",
+              "id": "pay-note",
+              "data": {
+                "paras": [
+                  "Vous paierez sur la page Stripe ou PayPal."
+                ],
+                "onlyWith": "pay_url"
               }
             },
             {
@@ -20060,6 +20425,25 @@
             },
             {
               "block": "email.button",
+              "id": "pay",
+              "data": {
+                "label": "Betal {{invoice.balance}} online",
+                "url": "{{pay_url}}",
+                "onlyWith": "pay_url"
+              }
+            },
+            {
+              "block": "email.text",
+              "id": "pay-note",
+              "data": {
+                "paras": [
+                  "Du betaler på Stripe- eller PayPal-siden."
+                ],
+                "onlyWith": "pay_url"
+              }
+            },
+            {
+              "block": "email.button",
               "id": "open",
               "data": {
                 "label": "Se {{invoice.number}}",
@@ -20098,6 +20482,25 @@
                   "{{invoice.number}} je {{invoice.due_on.days_since}} dní po splatnosti — zbývá uhradit {{invoice.balance}}. Můžete mi napsat, kdy bude zaplacena, nebo jestli ji rozdělit na dvě části?",
                   "Platba po částech není problém a snadno ji nastavíme. Nepříjemné je jen mlčení."
                 ]
+              }
+            },
+            {
+              "block": "email.button",
+              "id": "pay",
+              "data": {
+                "label": "Zaplatit {{invoice.balance}} online",
+                "url": "{{pay_url}}",
+                "onlyWith": "pay_url"
+              }
+            },
+            {
+              "block": "email.text",
+              "id": "pay-note",
+              "data": {
+                "paras": [
+                  "Zaplatíte na stránce Stripe nebo PayPal."
+                ],
+                "onlyWith": "pay_url"
               }
             },
             {
@@ -20144,6 +20547,25 @@
             },
             {
               "block": "email.button",
+              "id": "pay",
+              "data": {
+                "label": "ادفع {{invoice.balance}} عبر الإنترنت",
+                "url": "{{pay_url}}",
+                "onlyWith": "pay_url"
+              }
+            },
+            {
+              "block": "email.text",
+              "id": "pay-note",
+              "data": {
+                "paras": [
+                  "ستدفع على صفحة Stripe أو PayPal."
+                ],
+                "onlyWith": "pay_url"
+              }
+            },
+            {
+              "block": "email.button",
               "id": "open",
               "data": {
                 "label": "اعرض {{invoice.number}}",
@@ -20182,6 +20604,25 @@
                   "{{invoice.number}} 已逾期 {{invoice.due_on.days_since}} 天，尚欠 {{invoice.balance}}。能否告诉我何时付款，或者是否需要分两次付？",
                   "分期付款没问题，也很容易安排。只有沉默才会让事情尴尬。"
                 ]
+              }
+            },
+            {
+              "block": "email.button",
+              "id": "pay",
+              "data": {
+                "label": "在线支付 {{invoice.balance}}",
+                "url": "{{pay_url}}",
+                "onlyWith": "pay_url"
+              }
+            },
+            {
+              "block": "email.text",
+              "id": "pay-note",
+              "data": {
+                "paras": [
+                  "您将在 Stripe 或 PayPal 页面上付款。"
+                ],
+                "onlyWith": "pay_url"
               }
             },
             {
@@ -20228,6 +20669,25 @@
             },
             {
               "block": "email.button",
+              "id": "pay",
+              "data": {
+                "label": "線上支付 {{invoice.balance}}",
+                "url": "{{pay_url}}",
+                "onlyWith": "pay_url"
+              }
+            },
+            {
+              "block": "email.text",
+              "id": "pay-note",
+              "data": {
+                "paras": [
+                  "您將在 Stripe 或 PayPal 頁面上付款。"
+                ],
+                "onlyWith": "pay_url"
+              }
+            },
+            {
+              "block": "email.button",
               "id": "open",
               "data": {
                 "label": "查看 {{invoice.number}}",
@@ -20264,6 +20724,7 @@
         "invoice.balance",
         "invoice.due_on.days_since",
         "invoice.number",
+        "pay_url",
         "practice.name",
         "practice.phone",
         "practice.reply_to"
@@ -20289,6 +20750,25 @@
                   "{{invoice.number}} is {{invoice.due_on.days_since}} days past due — {{invoice.balance}} outstanding. Under clause 6 of the terms you agreed, any work we have under way for you pauses from today rather than running up against an unpaid invoice. It is not personal.",
                   "Nothing is lost. The day it clears we pick up where we stopped."
                 ]
+              }
+            },
+            {
+              "block": "email.button",
+              "id": "pay",
+              "data": {
+                "label": "Pay {{invoice.balance}} online",
+                "url": "{{pay_url}}",
+                "onlyWith": "pay_url"
+              }
+            },
+            {
+              "block": "email.text",
+              "id": "pay-note",
+              "data": {
+                "paras": [
+                  "You’ll pay on the Stripe or PayPal page."
+                ],
+                "onlyWith": "pay_url"
               }
             },
             {
@@ -20335,6 +20815,25 @@
             },
             {
               "block": "email.button",
+              "id": "pay",
+              "data": {
+                "label": "{{invoice.balance}} online bezahlen",
+                "url": "{{pay_url}}",
+                "onlyWith": "pay_url"
+              }
+            },
+            {
+              "block": "email.text",
+              "id": "pay-note",
+              "data": {
+                "paras": [
+                  "Sie bezahlen auf der Seite von Stripe oder PayPal."
+                ],
+                "onlyWith": "pay_url"
+              }
+            },
+            {
+              "block": "email.button",
               "id": "open",
               "data": {
                 "label": "{{invoice.number}} ansehen",
@@ -20373,6 +20872,25 @@
                   "{{invoice.number}} est en retard de {{invoice.due_on.days_since}} jours — {{invoice.balance}} restent dus. Selon la clause 6 des conditions que vous avez acceptées, tout travail en cours pour vous est mis en pause dès aujourd’hui plutôt que de s’accumuler face à une facture impayée. Ce n’est rien de personnel.",
                   "Rien n’est perdu. Le jour où elle sera réglée, nous reprendrons là où nous nous sommes arrêtés."
                 ]
+              }
+            },
+            {
+              "block": "email.button",
+              "id": "pay",
+              "data": {
+                "label": "Payer {{invoice.balance}} en ligne",
+                "url": "{{pay_url}}",
+                "onlyWith": "pay_url"
+              }
+            },
+            {
+              "block": "email.text",
+              "id": "pay-note",
+              "data": {
+                "paras": [
+                  "Vous paierez sur la page Stripe ou PayPal."
+                ],
+                "onlyWith": "pay_url"
               }
             },
             {
@@ -20419,6 +20937,25 @@
             },
             {
               "block": "email.button",
+              "id": "pay",
+              "data": {
+                "label": "Betal {{invoice.balance}} online",
+                "url": "{{pay_url}}",
+                "onlyWith": "pay_url"
+              }
+            },
+            {
+              "block": "email.text",
+              "id": "pay-note",
+              "data": {
+                "paras": [
+                  "Du betaler på Stripe- eller PayPal-siden."
+                ],
+                "onlyWith": "pay_url"
+              }
+            },
+            {
+              "block": "email.button",
               "id": "open",
               "data": {
                 "label": "Se {{invoice.number}}",
@@ -20457,6 +20994,25 @@
                   "{{invoice.number}} je {{invoice.due_on.days_since}} dní po splatnosti — zbývá uhradit {{invoice.balance}}. Podle bodu 6 podmínek, které jste přijali, od dnešního dne pozastavujeme veškerou práci, kterou máme rozběhnutou, místo abychom ji hromadili proti nezaplacené faktuře. Není to nic osobního.",
                   "Nic se neztratí. Jakmile bude uhrazena, navážeme tam, kde jsme skončili."
                 ]
+              }
+            },
+            {
+              "block": "email.button",
+              "id": "pay",
+              "data": {
+                "label": "Zaplatit {{invoice.balance}} online",
+                "url": "{{pay_url}}",
+                "onlyWith": "pay_url"
+              }
+            },
+            {
+              "block": "email.text",
+              "id": "pay-note",
+              "data": {
+                "paras": [
+                  "Zaplatíte na stránce Stripe nebo PayPal."
+                ],
+                "onlyWith": "pay_url"
               }
             },
             {
@@ -20503,6 +21059,25 @@
             },
             {
               "block": "email.button",
+              "id": "pay",
+              "data": {
+                "label": "ادفع {{invoice.balance}} عبر الإنترنت",
+                "url": "{{pay_url}}",
+                "onlyWith": "pay_url"
+              }
+            },
+            {
+              "block": "email.text",
+              "id": "pay-note",
+              "data": {
+                "paras": [
+                  "ستدفع على صفحة Stripe أو PayPal."
+                ],
+                "onlyWith": "pay_url"
+              }
+            },
+            {
+              "block": "email.button",
               "id": "open",
               "data": {
                 "label": "اعرض {{invoice.number}}",
@@ -20545,6 +21120,25 @@
             },
             {
               "block": "email.button",
+              "id": "pay",
+              "data": {
+                "label": "在线支付 {{invoice.balance}}",
+                "url": "{{pay_url}}",
+                "onlyWith": "pay_url"
+              }
+            },
+            {
+              "block": "email.text",
+              "id": "pay-note",
+              "data": {
+                "paras": [
+                  "您将在 Stripe 或 PayPal 页面上付款。"
+                ],
+                "onlyWith": "pay_url"
+              }
+            },
+            {
+              "block": "email.button",
               "id": "open",
               "data": {
                 "label": "查看 {{invoice.number}}",
@@ -20583,6 +21177,25 @@
                   "{{invoice.number}} 已逾期 {{invoice.due_on.days_since}} 天，尚欠 {{invoice.balance}}。根據您同意的條款第 6 條，從今天起我們為您進行中的工作將暫停，而不是繼續累積在一張未付的發票上。這並非針對個人。",
                   "什麼都不會遺失。款項結清的那天，我們就從停下的地方繼續。"
                 ]
+              }
+            },
+            {
+              "block": "email.button",
+              "id": "pay",
+              "data": {
+                "label": "線上支付 {{invoice.balance}}",
+                "url": "{{pay_url}}",
+                "onlyWith": "pay_url"
+              }
+            },
+            {
+              "block": "email.text",
+              "id": "pay-note",
+              "data": {
+                "paras": [
+                  "您將在 Stripe 或 PayPal 頁面上付款。"
+                ],
+                "onlyWith": "pay_url"
               }
             },
             {
