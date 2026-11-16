@@ -49,8 +49,8 @@ describe("the studio's clients", () => {
         ],
       },
     ]);
-    // 0.3.38 first read who the clients are; the floor has since moved on (0.3.60, invoices paid online).
-    expect([MIN_ADMINIUM, manifest.compatibility.minAdminiumVersion]).toEqual(["0.3.60", "0.3.60"]);
+    // 0.3.38 first read who the clients are; the floor has since moved on (0.3.61, invoices paid online and how a payment stands).
+    expect([MIN_ADMINIUM, manifest.compatibility.minAdminiumVersion]).toEqual(["0.3.61", "0.3.61"]);
   });
 
   it("are not the studio's own team, whose table is called people", () => {

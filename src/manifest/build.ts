@@ -36,7 +36,7 @@ import { TABLES } from "./tables.ts";
  * 0.2.8 moves the invoices onto the invoice shape's second version: the
  * payments gain the columns an online payment fills (the rows already there
  * keep every value), and a client may pay an invoice online once the studio's
- * Adminium takes payments. It asks for Adminium 0.3.60 and Invoices &
+ * Adminium takes payments. It asks for Adminium 0.3.61 and Invoices &
  * Receipts 1.0.13.
  */
 export const VERSION = "0.2.8";
@@ -62,8 +62,11 @@ export const VERSION = "0.2.8";
  * (`payments.payables`, arriving switched off), gives an app's role the
  * refund of its own payments (`payments:@:refund`), and answers a client's
  * page whether it may pay online now, and where.
+ * 0.3.61 is the first that tells a client's page how an invoice's payment
+ * stands (the bank confirming it, didn't finish, the time on the pay page ran
+ * out), and keeps the clients' access through an update.
  */
-export const MIN_ADMINIUM = "0.3.60";
+export const MIN_ADMINIUM = "0.3.61";
 
 const ENV = {
   VITE_ADMINIUM_API_BASE_URL: { required: false, example: "https://admin.example.com" },

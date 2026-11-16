@@ -40,7 +40,7 @@ describe("the invoices take payments online", () => {
     // The add-on that has that version, and the Adminium that reads the payable.
     expect(manifest.addOns.requires.find((r) => r.key === "invoices")?.range).toBe(">=1.0.13");
     expect(manifest.compatibility.minAdminiumVersion).toBe(MIN_ADMINIUM);
-    expect(MIN_ADMINIUM).toBe("0.3.60");
+    expect(MIN_ADMINIUM).toBe("0.3.61");
   });
 
   it("name the invoices once, as the shape maps them: where a client comes back, and that the receipt is the app's own", () => {
