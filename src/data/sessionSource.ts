@@ -7,8 +7,11 @@
  * A standalone build talks to `/api/v1/public/*` with an `adm_pub_` key. That
  * key is a NON-PRINCIPAL: it consults no roles, and what it may reach is fixed
  * by a scope an operator wrote. Correct for a customer storefront, wrong for a
- * staff console: these apps read every customer's records, and the guard in
- * `adminiumSource.ts` says so out loud by refusing a customer-side scope.
+ * staff console: the desk reads every client's records, which no customer-side
+ * scope should ever reach. So the desk never holds a key at all: its reads
+ * (`adminiumSource.ts`) and writes go only through this transport, and the
+ * clients' bundle, which does hold one, carries no desk screen
+ * (`src/testing/bundles.test.ts` builds it and checks).
  *
  * Hosted at Adminium's own origin under `/apps/<key>/staff/`, none of that is
  * needed. The browser already holds the operator's session cookie, so this
