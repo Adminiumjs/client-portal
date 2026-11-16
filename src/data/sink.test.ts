@@ -223,6 +223,7 @@ describe("a step list", () => {
 });
 
 describe("an invoice's pay link", () => {
+  // The fake transport answers a table's id as its name.
   const payable = { kind: "shape", connectionId: "conn-1", tableName: TABLE_OF_REF.invoices, rowKey: "12" };
 
   it("copies the link a client already holds while it works, and makes none", async () => {

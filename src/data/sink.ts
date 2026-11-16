@@ -329,7 +329,8 @@ export function sessionSink(transport: SessionTransport, tableOf: Readonly<Recor
      * grant; the invoices are an invoice shape's, so the record is a `shape`.
      */
     async payLink(invoiceId) {
-      const payable = { kind: "shape", connectionId: await transport.connection(), tableName: tableOf.invoices, rowKey: String(invoiceId) };
+      // The record as Adminium's payments name it: the connection, the invoices table's id there, the row's key.
+      const payable = { kind: "shape", connectionId: await transport.connection(), tableName: await transport.tableId(tableOf.invoices), rowKey: String(invoiceId) };
       const current = await send<{ data?: { url?: string; expiresAt?: number } | null }>("/api/v1/payments/links/current", "POST", payable);
       if (typeof current.data?.url === "string" && typeof current.data.expiresAt === "number") return { url: current.data.url, expiresAt: current.data.expiresAt };
       const made = await send<{ data?: { link?: { url?: string; expiresAt?: number } } }>("/api/v1/payments/links", "POST", payable);
