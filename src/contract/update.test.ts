@@ -111,8 +111,24 @@ const FERN = { email: "fern@studio-update.net", company: "Dalby Print", name: "F
 
 /** What 0.2.1 adds to 0.2.0's tables, from the manifest: the update's plan must be exactly this. */
 const NEW_TABLES = ["events", "expenses", "running_costs", "suppliers", "time_entries"];
-const NEW_COLUMNS: Record<string, string[]> = { invoice_lines: ["expense_id", "time_entry_id"] };
-const NEW_ENUM_VALUES: Record<string, Record<string, string[]>> = { messages: { kind: ["new-enquiry"] } };
+/**
+ * What the update adds to tables that were there: the hours and purchases a
+ * line bills, and — the invoices on the invoice shape's second version — what
+ * an online payment fills (written by Adminium alone) and the way it is paid.
+ */
+const NEW_COLUMNS: Record<string, string[]> = {
+  invoice_lines: ["expense_id", "time_entry_id"],
+  payments: ["approval_code", "card_last4", "net_amount", "payment_ref", "provider", "refunded_amount"],
+};
+const NEW_ENUM_VALUES: Record<string, Record<string, string[]>> = { messages: { kind: ["new-enquiry"] }, payments: { method: ["online"] } };
+/**
+ * A payment that was there was refunded nothing and keeps all it paid: the
+ * two columns of the new ones that are worked out for it, and what each holds.
+ */
+const FILLED_ON_PAYMENTS: Record<string, (row: Record<string, string | null>) => number> = {
+  refunded_amount: () => 0,
+  net_amount: (row) => Number(row["amount"]),
+};
 const NEW_PAGES = ["clients-expenses", "clients-running-costs", "clients-studio-dates", "clients-suppliers", "clients-time"];
 
 /** The yes/no columns of a table, as the manifest being installed declares them. */
@@ -450,8 +466,10 @@ describe.skipIf(why !== null)(`the update of a live ${FROM} install to ${TO}${wh
       };
 
       it(`updates in place to ${TO}, as planned, allowing the public access it adds`, async () => {
-        // The operator ticks "Allow this public access": through the API, what a version adds is given only when asked.
-        updated = ok(await staff.post<typeof updated>("/api/v1/apps/clients/update", { planChecksum: plan.checksum, publicAccess: true }));
+        // The operator ticks "Allow this public access", the clients' wider read of a payment and the refund right a
+        // studio manager gains: through the API,
+        // what a version adds is given only when asked.
+        updated = ok(await staff.post<typeof updated>("/api/v1/apps/clients/update", { planChecksum: plan.checksum, publicAccess: true, publicWider: true, roleGrants: true }));
         const reply = updated.app;
         console.info(
           `[update reply, ${engine}] ` +
@@ -490,8 +508,12 @@ describe.skipIf(why !== null)(`the update of a live ${FROM} install to ${TO}${wh
           expect([name, now!.rows.length]).toEqual([name, was.rows.length]);
           const kept = now!.rows.map((row) => Object.fromEntries(Object.keys(was.columns).map((c) => [c, row[c]])));
           expect(kept, `the rows of ${name}`).toEqual(was.rows);
-          // A column the update adds holds nothing on a row that was there.
-          for (const column of added[name]!) expect([name, column, now!.rows.filter((row) => row[column] !== null).length]).toEqual([name, column, 0]);
+          // A column the update adds holds nothing on a row that was there — but what a payment kept and was refunded, worked out for it.
+          for (const column of added[name]!) {
+            const filled = name === `${prefix}payments` ? FILLED_ON_PAYMENTS[column] : undefined;
+            if (filled === undefined) expect([name, column, now!.rows.filter((row) => row[column] !== null).length]).toEqual([name, column, 0]);
+            else for (const row of now!.rows) expect([name, column, row["id"], Number(row[column])]).toEqual([name, column, row["id"], filled(row)]);
+          }
         }
         console.info(`[redeclared, ${engine}] ${JSON.stringify(redeclared)}`);
         // Indexes, foreign keys and checks: every one there is still there, but an enum's check, which takes the new value.
@@ -504,12 +526,19 @@ describe.skipIf(why !== null)(`the update of a live ${FROM} install to ${TO}${wh
           // Nothing goes but a check the rebuild spells again (SQLite writes its keywords in capitals), or an
           // enum's check, replaced by one naming every old value, in order, and then the new one.
           const valuesOf = (c: string) => [...c.matchAll(/'([a-z0-9-]+)\\?'/g)].map((m) => m[1]!);
+          const widenedBy = name === `${prefix}messages` ? NEW_ENUM_VALUES["messages"]!["kind"]! : name === `${prefix}payments` ? NEW_ENUM_VALUES["payments"]!["method"]! : null;
           for (const c of gone) {
             const same = came.some((d) => d.toLowerCase() === c.toLowerCase());
-            const widened = came.some((d) => JSON.stringify(valuesOf(d)) === JSON.stringify([...valuesOf(c), ...(NEW_ENUM_VALUES["messages"]!["kind"] ?? [])]));
-            expect([name, c, same || (name === `${prefix}messages` && widened)]).toEqual([name, c, true]);
+            const widened = widenedBy !== null && came.some((d) => JSON.stringify(valuesOf(d)) === JSON.stringify([...valuesOf(c), ...widenedBy]));
+            expect([name, c, same || widened]).toEqual([name, c, true]);
           }
-          expect([name, came.length - gone.length]).toEqual([name, name === `${prefix}invoice_lines` ? came.length : 0]);
+          // New: the line's two links (each unique), and the online payment's reference (unique, so a payment is never written twice).
+          if (name === `${prefix}payments`) {
+            // Every one it gains beyond the widened check is the reference's uniqueness (Postgres says it twice: the index and the constraint).
+            const beyond = came.filter((c) => !gone.some((g) => JSON.stringify([...valuesOf(g), ...widenedBy!]) === JSON.stringify(valuesOf(c))));
+            expect([name, beyond.length > 0, beyond.every((c) => c.includes("payment_ref"))]).toEqual([name, true, true]);
+          }
+          else expect([name, came.length - gone.length]).toEqual([name, name === `${prefix}invoice_lines` ? came.length : 0]);
         }
         // Only the columns the plan said.
         expect(Object.fromEntries(Object.entries(added).filter(([, list]) => list.length > 0))).toEqual(Object.fromEntries(Object.entries(NEW_COLUMNS).map(([ref, list]) => [`${prefix}${ref}`, list])));

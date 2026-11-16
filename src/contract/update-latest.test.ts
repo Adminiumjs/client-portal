@@ -1,31 +1,42 @@
 /**
- * THE CLIENT PORTAL'S UPDATE FROM THE RELEASE BEFORE THIS ONE: THE RELEASED
- * 0.2.5, UPDATED IN PLACE.
+ * THE CLIENT PORTAL'S UPDATE FROM THE RELEASE BEFORE THIS ONE, RELEASED,
+ * UPDATED IN PLACE.
  *
  * `update.test.ts` proves the longest way a studio comes (0.2.0, the first
  * release an install can be updated from). This proves the way most come:
  * from the release just before this one, on SQLite, Postgres and MySQL:
  *
- *   1. install the RELEASED 0.2.5 — the published tarball's own bytes
+ *   1. install the RELEASED version — the published tarball's own bytes
  *      (`CONTRACT_LATEST_TARBALL`), refused unless they hash to what
  *      RELEASES.json recorded — on the Adminium it asks for
- *      (`CONTRACT_LATEST_ADMINIUM`, 0.3.28), with Invoices & Receipts, and
- *      its own sample;
- *   2. a client at work in 0.2.5: an enquiry the desk took from them and made
+ *      (`CONTRACT_LATEST_ADMINIUM`), with Invoices & Receipts, and its own
+ *      sample;
+ *   2. a client at work in it: an enquiry the desk took from them and made
  *      a proposal of, the proposal signed on the clients' side, their work
- *      approved there and a note left on it, an invoice sent to them;
+ *      approved there and a note left on it, an invoice sent to them, and
+ *      "I've sent a payment" said on it;
  *   3. ADMINIUM UPGRADED IN PLACE to the one this build needs (`ADMINIUM_REPO`)
  *      on the same data directory, secret and database: nothing in the app's
  *      tables moved by it;
  *   4. ENGINE FIRST: the client's address put on the do-not-email list, and
  *      the invoice the desk sends them still reaches them (an app that says
  *      no class sends service mail);
- *   5. THIS build uploaded: the plan is no new table, no new column and no new
- *      enum value — nothing dropped, renamed or rewritten — and it applies;
- *   6. every row that was there is unchanged, byte for byte, and every column
- *      and constraint as it was;
- *   7. THE APP NEXT: an invoice and a payment's receipt still reach the client
- *      on the do-not-email list (every kind is service mail);
+ *   5. THIS build uploaded: the invoices move to the invoice shape's second
+ *      version, so the plan adds to the payments only what an online payment
+ *      fills (its reference, the service, what was refunded and what is left,
+ *      a terminal's code and the card's last four) and gives its way to pay
+ *      the value `online` — no new table, nothing dropped, renamed or
+ *      rewritten — and it applies;
+ *   6. every row that was there is unchanged, byte for byte, in every column
+ *      it had; the payments already there were refunded nothing and keep all
+ *      of what they paid (their invoices' paid and balance as they were), and
+ *      hold nothing in the other new columns;
+ *   7. THE APP NEXT: paying online arrives switched off, so a client is
+ *      offered nothing new: no pay link, and the invoice email reads as it
+ *      did; a payment recorded through Adminium's own payment panel clears the
+ *      client's "I've sent a payment" as one the studio records does; an
+ *      invoice and a payment's receipt still reach the client on the
+ *      do-not-email list (every kind is service mail);
  *   8. THE CLIENT ERASED by their address: their own row and the copies of
  *      them on the enquiry, the approved work and the note are blanked, and so
  *      is the address their mail went to; the proposal they signed, their
@@ -80,13 +91,20 @@ const LATEST: ReleasedFrom = {
 const REQUIRED = ["1", "true"].includes(process.env["ADMINIUM_REQUIRE_CONTRACT"] ?? "");
 const why = missing() ?? releasedMissing(LATEST);
 if (why !== null && REQUIRED) throw new Error(`the update contract from the latest release must run here, and cannot: ${why}`);
+/**
+ * What the update adds to the payments: the columns an online payment fills,
+ * written by Adminium alone, and the way to pay it lands as.
+ */
+const ONLINE_COLUMNS = ["approval_code", "card_last4", "net_amount", "payment_ref", "provider", "refunded_amount"];
+const ONLINE_METHOD = { method: ["online"] };
+
 /** After the plain, update, roles and acceptance contracts' engines (or `CONTRACT_LATEST_PORT_BASE`). */
 const PORT_BASE = Number(process.env["CONTRACT_LATEST_PORT_BASE"] ?? Number(process.env["CONTRACT_PORT_BASE"] ?? 4870) + 12 * PORTS_PER_ENGINE);
 const database = (engine: Engine) => `cp_latest_${engine}${process.env["CONTRACT_DB_SUFFIX"] ?? ""}`;
 const ADMIN = { email: process.env["E2E_ADMIN_EMAIL"] ?? "e2e@adminium.local", password: process.env["E2E_ADMIN_PASSWORD"] ?? "adminium-e2e-password" };
 
 const released = why === null ? releasedBundle(LATEST) : null;
-const FROM = released?.version ?? "0.2.5";
+const FROM = released?.version ?? "0.2.7";
 const TO = why === null ? appBundle().version : "0.2.6";
 
 describe.skipIf(why !== null)(`the update of a live ${FROM} install to ${TO}${why === null ? "" : ` — skipped: ${why}`}`, () => {
@@ -104,8 +122,8 @@ describe.skipIf(why !== null)(`the update of a live ${FROM} install to ${TO}${wh
 
       /** A client of the studio, on an address the outbox writes to (it skips the sample's reserved `.example`). */
       const INES = { company: "Calloway Ceramics", contact_name: "Ines Calloway", email: `ines.${engine}@studio-latest.net` };
-      /** What she and the studio made in 0.2.5. */
-      const made = { client: 0 as Id, enquiry: 0 as Id, loose: 0 as Id, proposal: 0 as Id, project: 0 as Id, deliverable: 0 as Id, note: 0 as Id, invoices: [] as Id[] };
+      /** What she and the studio made in the release before. */
+      const made = { client: 0 as Id, enquiry: 0 as Id, loose: 0 as Id, proposal: 0 as Id, project: 0 as Id, deliverable: 0 as Id, note: 0 as Id, invoices: [] as Id[], claimed: 0 as Id };
 
       const studio = mkdtempSync(join(tmpdir(), `cp-latest-${engine}-`));
       const ran = { from: "", to: "" };
@@ -175,7 +193,7 @@ describe.skipIf(why !== null)(`the update of a live ${FROM} install to ${TO}${wh
         return { id: invoice.id, number, message, mail };
       };
 
-      // ── 0.2.5, released, at work ────────────────────────────────────────────
+      // ── the release before, at work ─────────────────────────────────────────
 
       it(`installs the RELEASED ${FROM} — the published tarball, byte for byte — with Invoices & Receipts, and its sample`, async () => {
         const addOn = addOnBundle();
@@ -195,7 +213,7 @@ describe.skipIf(why !== null)(`the update of a live ${FROM} install to ${TO}${wh
         const created = installed.schema.created;
         prefix = created.find((name) => name.endsWith("deliverable_versions"))!.slice(0, -"deliverable_versions".length);
         real = Object.fromEntries(created.map((name) => [name.slice(prefix.length), name]));
-        // 0.2.5 has every table this build has: the update adds none.
+        // The release before has every table this build has: the update adds none.
         expect(Object.keys(real).sort()).toEqual(TABLES.map((t) => t.ref).sort());
         await learnTables();
         ok(await staff.patch(`/api/v1/connections/${connectionId}`, { timezone: DEMO_ZONE, currency: DEMO_CURRENCY }));
@@ -251,6 +269,11 @@ describe.skipIf(why !== null)(`the update of a live ${FROM} install to ${TO}${wh
 
         const first = await invoiceInes("Café mugs, deposit");
         expect([first.message.status, first.message.to]).toEqual(["sent", INES.email]);
+        // She says she paid it, on her side: the desk sees her word until a payment is recorded.
+        const said = door("invoices", (r) => r.writable.includes("client_paid"));
+        ok(await guest.patch(`/api/v1/public/records/${said}/${String(first.id)}`, { values: { client_paid: true, client_paid_on: "2026-07-28", client_paid_amount: "100", client_paid_note: "Sent part by bank transfer." } }, ines));
+        expect((await row("invoices", first.id))["client_paid"]).toBeTruthy();
+        made.claimed = first.id;
       }, 400_000);
 
       it("upgrades Adminium in place to the one this build needs, on the same data, the app still at its release", async () => {
@@ -304,11 +327,11 @@ describe.skipIf(why !== null)(`the update of a live ${FROM} install to ${TO}${wh
         installable: boolean;
         checksum: string;
         problems: unknown[];
-        tables: { ref: string; table: string; class: string; action: string; edits: unknown[]; blocked: unknown[]; renameExistingTo?: string }[];
+        tables: { ref: string; table: string; class: string; action: string; edits: { kind: string; column: string; values?: string[] }[]; blocked: unknown[]; renameExistingTo?: string }[];
         addOns?: { key: string; action: string | null }[];
       };
 
-      it(`plans the update to ${TO}: no new table, column or value, nothing dropped, renamed or rewritten`, async () => {
+      it(`plans the update to ${TO}: to the payments only what an online payment fills, nothing dropped, renamed or rewritten`, async () => {
         const app = appBundle();
         const staged = await staff.post(`/api/v1/apps/upload?expectedSha512=${encodeURIComponent(app.integrity)}`, app.buffer);
         expect([200, 201], JSON.stringify(staged.body).slice(0, 800)).toContain(staged.status);
@@ -317,23 +340,26 @@ describe.skipIf(why !== null)(`the update of a live ${FROM} install to ${TO}${wh
         expect([plan.installable, plan.problems]).toEqual([true, []]);
         expect(plan.tables.map((t) => t.ref).sort()).toEqual(TABLES.map((t) => t.ref).sort());
         for (const planned of plan.tables) {
-          expect([planned.ref, planned.action, planned.class, planned.table, planned.renameExistingTo, planned.edits, planned.blocked]).toEqual([
-            planned.ref,
-            "reuse",
-            "own-leftover",
-            real[planned.ref],
-            undefined,
-            [],
-            [],
-          ]);
+          expect([planned.ref, planned.action, planned.class, planned.table, planned.renameExistingTo, planned.blocked]).toEqual([planned.ref, "reuse", "own-leftover", real[planned.ref], undefined, []]);
+          // Only additions, and only to the payments: a column added, the way to pay given a value.
+          const adds = planned.edits.filter((e) => e.kind === "add-column").map((e) => e.column).sort();
+          expect([planned.ref, adds]).toEqual([planned.ref, planned.ref === "payments" ? ONLINE_COLUMNS : []]);
+          const values = Object.fromEntries(planned.edits.filter((e) => e.kind === "enum-values").map((e) => [e.column, e.values]));
+          expect([planned.ref, values]).toEqual([planned.ref, planned.ref === "payments" ? ONLINE_METHOD : {}]);
+          expect([planned.ref, planned.edits.filter((e) => !["add-column", "enum-values"].includes(e.kind))]).toEqual([planned.ref, []]);
         }
         expect(plan.addOns?.find((a) => a.key === "invoices")?.action ?? null).toBeNull();
       }, 120_000);
 
-      it(`updates in place to ${TO}, as planned`, async () => {
+      it(`updates in place to ${TO}, as planned, allowing the refund right and the public read it adds`, async () => {
         const updated = ok(
           await staff.post<{ app: { version: string; schema?: { created: string[]; reused: string[] }; rules?: { skipped: unknown[] } }; from: string; to: string; pruned: string[] }>("/api/v1/apps/clients/update", {
             planChecksum: plan.checksum,
+            // The operator allows what the update gives more of: a studio manager's refund of the app's online payments,
+            // and the clients' read of whether a payment was made online and what was refunded of it.
+            roleGrants: true,
+            publicWider: true,
+            publicAccess: true,
           }),
         );
         expect([updated.from, updated.to, updated.app.version]).toEqual([FROM, TO, TO]);
@@ -344,23 +370,97 @@ describe.skipIf(why !== null)(`the update of a live ${FROM} install to ${TO}${wh
         expect(apps.apps.find((a) => a.key === "clients")?.version).toBe(TO);
       }, 180_000);
 
-      it("keeps every row that was there, byte for byte, and every column and constraint as it was", async () => {
+      it("keeps every row that was there, byte for byte, in every column it had; the payments keep all they paid and were refunded nothing", async () => {
         const after = await raw();
+        const payments = `${prefix}payments`;
         expect(Object.keys(after).sort()).toEqual(Object.keys(before).sort());
         for (const [name, was] of Object.entries(before)) {
           const now = after[name]!;
-          expect([name, now.key, now.columns, now.constraints]).toEqual([name, was.key, was.columns, was.constraints]);
-          expect(now.rows, `the rows of ${name}`).toEqual(was.rows);
+          expect([name, now.key]).toEqual([name, was.key]);
+          // Only the payments gain columns; every column there was keeps its declaration, but the way to pay, which takes `online`.
+          const added = Object.keys(now.columns).filter((c) => !(c in was.columns)).sort();
+          expect([name, added]).toEqual([name, name === payments ? ONLINE_COLUMNS : []]);
+          for (const [column, declared] of Object.entries(was.columns)) {
+            if (name === payments && column === "method") continue;
+            expect([name, column, now.columns[column]]).toEqual([name, column, declared]);
+          }
+          // Every row: the same key, the same values as the engine spells them, in the same order.
+          const kept = now.rows.map((r) => Object.fromEntries(Object.keys(was.columns).map((c) => [c, r[c]])));
+          expect(kept, `the rows of ${name}`).toEqual(was.rows);
+          if (name !== payments) {
+            expect([name, now.constraints]).toEqual([name, was.constraints]);
+            continue;
+          }
+          // The payments already there: nothing refunded, all they paid kept, and nothing in what only an online payment fills.
+          for (const r of now.rows) {
+            expect([r["id"], Number(r["refunded_amount"]), Number(r["net_amount"])]).toEqual([r["id"], 0, Number(r["amount"])]);
+            for (const column of ["payment_ref", "provider", "approval_code", "card_last4"]) expect([r["id"], column, r[column]]).toEqual([r["id"], column, null]);
+          }
+          // Every index, key and check stays (an enum's check may be spelled again to take the new value); the reference is unique.
+          const gone = was.constraints.filter((c) => !now.constraints.includes(c));
+          const came = now.constraints.filter((c) => !was.constraints.includes(c));
+          console.info(`[constraints, ${engine}, payments] gone ${JSON.stringify(gone)} came ${JSON.stringify(came)}`);
+          for (const c of gone) expect([c, came.some((d) => d.includes("method") || d.toLowerCase() === c.toLowerCase())]).toEqual([c, true]);
+          expect(came.some((c) => c.includes("payment_ref")), JSON.stringify(came)).toBe(true);
         }
+        // And over HTTP: every row Adminium hands out is the one it handed out before, but for the new columns.
         const nowHttp = await all();
-        for (const [ref, list] of Object.entries(beforeHttp)) expect(nowHttp[ref], `${ref} over HTTP`).toEqual(list);
+        for (const [ref, list] of Object.entries(beforeHttp)) {
+          const trimmed = nowHttp[ref]!.map((r) => Object.fromEntries(Object.entries(r).filter(([column]) => ref !== "payments" || !ONLINE_COLUMNS.includes(column))));
+          expect(trimmed, `${ref} over HTTP`).toEqual(list);
+        }
       }, 120_000);
+
+      // ── paying online, as it arrives ────────────────────────────────────────
+
+      it("arrives with paying online switched off: no pay link for a client, and the invoices' money as it was", async () => {
+        const apps = ok(await staff.get<{ data: { apps: { appKey: string; connectionId: string; enabled: boolean; tables: { tableName: string; shape: boolean; valid: boolean }[] }[] } }>("/api/v1/payments/apps")).data.apps;
+        expect(apps.filter((a) => a.appKey === "clients")).toEqual([{ connectionId, appKey: "clients", name: expect.any(String), enabled: false, tables: [{ tableName: tableIds["invoices"], shape: true, valid: true }] }]);
+        const guest = await guestOf();
+        expect(ok(await guest.get<{ data: { online: boolean } }>("/api/v1/public/payments/available")).data.online).toBe(false);
+        // Every invoice's paid and balance, worked out again from what is left of each payment, as before the update.
+        const invoices = await rows("invoices");
+        for (const invoice of invoices) {
+          const was = beforeHttp["invoices"]!.find((i) => i.id === invoice.id)!;
+          expect([invoice["number"], invoice["paid"], invoice["balance"]]).toEqual([was["number"], was["paid"], was["balance"]]);
+        }
+      }, 120_000);
+
+      it("clears the client's word when a payment is recorded through Adminium's own payment panel, as one the studio records does", async () => {
+        const before = await row("invoices", made.claimed);
+        expect(before["client_paid"]).toBeTruthy();
+        const recorded = ok(
+          await staff.post<{ data: { key: string; already: boolean; due: string } }>("/api/v1/payments/record-payment", {
+            connectionId,
+            table: tableIds["invoices"],
+            recordId: String(made.claimed),
+            amount: "100",
+            way: "bank-transfer",
+            paidOn: "2026-07-28",
+            note: null,
+            approvalCode: null,
+            last4: null,
+            key: `contract_${engine}_claimed_0001`,
+          }),
+        ).data;
+        expect(recorded.already).toBe(false);
+        const after = await row("invoices", made.claimed);
+        for (const column of ["client_paid", "client_paid_on", "client_paid_amount", "client_paid_note", "client_paid_at"]) expect([column, after[column] ?? null]).toEqual([column, null]);
+        expect(Number(after["paid"])).toBe(Number(before["paid"]) + 100);
+        expect(Number(after["balance"])).toBe(Number(before["balance"]) - 100);
+        const payment = (await rows("payments")).filter((p) => p["document_id"] === made.claimed).at(-1)!;
+        // Recorded by hand: no service took it, and it keeps all it paid.
+        expect([payment["method"], payment["provider"] ?? null, Number(payment["net_amount"]), Number(payment["refunded_amount"])]).toEqual(["bank-transfer", null, 100, 0]);
+        expect(await settled("payment-receipt", "payment_id", payment.id)).toMatchObject({ status: "sent", to: INES.email });
+      }, 300_000);
 
       // ── the app next ────────────────────────────────────────────────────────
 
       it(`still sends the invoice and the payment's receipt to the client on the do-not-email list, now that ${TO} says every email is service mail`, async () => {
         const sent = await invoiceInes("Café mugs, final stage");
         expect([sent.message.status, sent.message.to, sent.mail !== undefined]).toEqual(["sent", INES.email, true]);
+        // Paying online is off: the invoice email carries no pay button, as before.
+        expect(sent.mail!.text).not.toMatch(/online|\/pay\//i);
         const payment = ok(await staff.post<{ data: Row }>(data("payments"), { values: { document_id: sent.id, amount: "100", method: "bank-transfer", paid_on: "2026-07-28" } }), 201).data;
         expect(await settled("payment-receipt", "payment_id", payment.id)).toMatchObject({ status: "sent", to: INES.email });
         await until(async () => (await sink()).find((m) => m.to.includes(INES.email) && m.text.includes(String(payment["number"]))), "the receipt in the sink");
