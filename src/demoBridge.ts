@@ -22,7 +22,8 @@ import { DEMO_PROTOCOL_VERSION, isDemoMessage, type DemoMessage } from "./demo-t
 import { DEMO_CLIENT_ID } from "./data/demo.ts";
 import type { Id, TableRef } from "./data/types.ts";
 import { venueDay } from "./data/venueTime.ts";
-import { DEMO_LINK_TOKEN, demoWorld, type DemoWorld } from "./demo/world.ts";
+import { DEMO_LINK_TOKEN, DEMO_PAY_PROVIDER, demoWorld, type DemoWorld } from "./demo/world.ts";
+import type { LiveFrame } from "./data/live.ts";
 import { demoText } from "./demo/strings.ts";
 import { setHostLocale } from "./i18n/index.tsx";
 import { locale as currentLocale, onLocaleApplied } from "./i18n/ambient.ts";
@@ -250,6 +251,16 @@ function shortcuts(): Record<DemoShortcutId, () => Promise<void> | void> {
   };
 }
 
+/** A payment the stand-in took online ("Pay now" in the demo): said to be the demo's, with no money moved. */
+function sayStandInPaid(frame: LiveFrame): void {
+  if (frame.table !== "payments" || frame.kind !== "record.create" || frame.id === null) return;
+  const w = demoWorld();
+  const payment = w?.rows.payments.find((p) => String(p.id) === String(frame.id));
+  if (w === null || payment === undefined || payment["provider"] !== DEMO_PAY_PROVIDER) return;
+  const invoice = w.rows.invoices.find((i) => String(i.id) === String(payment["document_id"]));
+  toast(say("demo.toast.paidOnline", { number: String(invoice?.["number"] ?? ""), amount: formatMoney(String(payment["amount"]), String(invoice?.["currency"] ?? "USD"), currentLocale()) }), { icon: "lock" });
+}
+
 /** Run one of the card's shortcuts; a refusal the world gives is shown as the app shows any. */
 export async function runShortcut(id: string): Promise<void> {
   const run = (shortcuts() as Record<string, (() => Promise<void> | void) | undefined>)[id];
@@ -336,7 +347,12 @@ export function applyDemoMessage(message: DemoMessage): void {
 
 export function startDemoBridge(): () => void {
   // Whatever moves the whole world (the clock, a reset, the language) is read again by every screen.
-  const offReload = demoWorld()?.onReload(() => void readAgain()) ?? (() => {});
+  const offWorld = demoWorld()?.onReload(() => void readAgain()) ?? (() => {});
+  const offPaid = demoWorld()?.subscribe(sayStandInPaid) ?? (() => {});
+  const offReload = () => {
+    offWorld();
+    offPaid();
+  };
   if (typeof window === "undefined" || window.parent === window) return offReload;
   const origin = window.location.origin;
   const parent = window.parent;
