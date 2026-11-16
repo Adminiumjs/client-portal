@@ -154,7 +154,8 @@ export function modulesLeftOut(document: unknown, has: (addOn: string) => boolea
  * a kept total over one (the column stays, empty), a page bound to one, a
  * role's grants and limits on one, a rule or a public entry on one, an
  * outbox link and producer on one (and the class of a kind that went), a
- * starting row for one, a people table and a copy of a person kept on one. A role left with
+ * starting row for one, a people table and a copy of a person kept on one, a
+ * payable that names one ({@link paymentsWithout}). A role left with
  * no module is gone too. The modules themselves stay declared: one that is
  * left out is simply off.
  */
@@ -250,6 +251,8 @@ export function withoutModules<T>(manifest: T, gone: readonly string[]): T {
     });
     out['automations'] = kept;
   }
+
+  paymentsWithout(out, goneTables, lostColumns);
 
   if (Array.isArray(out['documents'])) {
     const kept = list(out['documents']).filter((entry) => !(inGone(entry) || (isDoc(entry) && onGoneTable(entry['table']))));
@@ -365,6 +368,99 @@ export function withoutModules<T>(manifest: T, gone: readonly string[]): T {
     for (const role of list(out['roles'])) if (isDoc(role) && typeof role['cloneFrom'] === 'string' && !kept.has(role['cloneFrom'])) delete role['cloneFrom'];
   }
   return out as T;
+}
+
+/**
+ * The tables and the columns of the payable's own, payments and refund tables
+ * one payable names, as `[table, column]` pairs (a column of `undefined` names
+ * the table alone): everything it cannot be paid without.
+ */
+function payableNeeds(entry: Doc): [string, string | undefined][] {
+  const table = text(entry['table']) ?? '';
+  const out: [string, string | undefined][] = [[table, undefined]];
+  if (entry['shape'] === true) return out;
+  const on = (name: string, ref: unknown): void => {
+    if (typeof ref === 'string') out.push([name, ref]);
+  };
+  const conditions = (name: string, value: unknown): void => {
+    for (const condition of list(value)) if (isDoc(condition)) on(name, condition['column']);
+  };
+  on(table, entry['label']);
+  for (const key of ['amount', 'currency', 'due', 'status'] as const) if (isDoc(entry[key])) on(table, entry[key]['column']);
+  on(table, entry['customerEmail']);
+  on(table, entry['customerCountry']);
+  conditions(table, entry['payableWhen']);
+  if (isDoc(entry['instantOnly'])) conditions(table, entry['instantOnly']['where']);
+  const setting = (ref: unknown): void => {
+    if (isDoc(ref) && typeof ref['table'] === 'string') out.push([ref['table'], text(ref['column'])]);
+  };
+  if (isDoc(entry['currency'])) setting(entry['currency']['setting']);
+  const payments = isDoc(entry['payments']) && entry['payments']['kind'] === 'table' ? entry['payments'] : undefined;
+  if (payments !== undefined && typeof payments['table'] === 'string') {
+    const kept = payments['table'];
+    out.push([kept, undefined]);
+    for (const [key, ref] of Object.entries(payments)) if (!['kind', 'table', 'method', 'amountUnit'].includes(key)) on(kept, ref);
+    if (isDoc(payments['method'])) on(kept, payments['method']['column']);
+  }
+  const refunds = isDoc(entry['refunds']) && entry['refunds']['model'] === 'rows' ? entry['refunds'] : undefined;
+  if (refunds !== undefined && typeof refunds['table'] === 'string') {
+    const rows = refunds['table'];
+    out.push([rows, undefined]);
+    for (const key of ['payment', 'amount', 'providerRef', 'state'] as const) on(rows, refunds[key]);
+    conditions(rows, refunds['when']);
+    if (isDoc(refunds['auto']) && isDoc(refunds['auto']['values'])) for (const column of Object.keys(refunds['auto']['values'])) on(rows, column);
+  }
+  const refundOn = isDoc(entry['refundOn']) ? entry['refundOn'] : undefined;
+  if (refundOn !== undefined) {
+    setting(refundOn['switch']);
+    if (isDoc(refundOn['before'])) {
+      on(table, refundOn['before']['column']);
+      setting(refundOn['before']['hours']);
+    }
+  }
+  return out;
+}
+
+/**
+ * The payments block with some tables not made: a payable goes whole when a
+ * table it names is not made (its own, its payments table, its refund table,
+ * the settings row it reads its currency, its refund switch or its hours
+ * from), or when a column it names is a link that went with one. A payable is
+ * never kept with half its bookkeeping: an app installed without the part
+ * takes no payment for it. A pay-page field that went is only dropped from the
+ * page. Then a public entry may no longer answer with a pay link on a table
+ * that is not payable, and with no payable left, no role of the app is given
+ * the refund right.
+ */
+function paymentsWithout(out: Doc, goneTables: ReadonlySet<string>, lostColumns: ReadonlyMap<string, ReadonlySet<string>>): void {
+  const payments = isDoc(out['payments']) ? out['payments'] : undefined;
+  if (payments === undefined || !Array.isArray(payments['payables'])) return;
+  const before = list(payments['payables']).length;
+  const kept = list(payments['payables']).filter((entry) => {
+    if (!isDoc(entry)) return true;
+    return !payableNeeds(entry).some(([table, column]) => goneTables.has(table) || (column !== undefined && (lostColumns.get(table)?.has(column) ?? false)));
+  });
+  for (const entry of kept) {
+    if (!isDoc(entry) || !Array.isArray(entry['pageFields'])) continue;
+    const lost = lostColumns.get(text(entry['table']) ?? '');
+    if (lost === undefined) continue;
+    const fields = list(entry['pageFields']).filter((field) => !(typeof field === 'string' && lost.has(field)));
+    if (fields.length === 0) delete entry['pageFields'];
+    else entry['pageFields'] = fields;
+  }
+  if (kept.length === before) return;
+  if (kept.length === 0) delete payments['payables'];
+  else payments['payables'] = kept;
+  if (Object.keys(payments).length === 0) delete out['payments'];
+
+  const payable = new Set(kept.flatMap((entry) => (isDoc(entry) && typeof entry['table'] === 'string' ? [entry['table']] : [])));
+  for (const entry of list(out['publicAccess'])) {
+    if (isDoc(entry) && entry['pay'] === true && !(typeof entry['table'] === 'string' && payable.has(entry['table']))) delete entry['pay'];
+  }
+  if (payable.size > 0) return;
+  for (const role of list(out['roles'])) {
+    if (isDoc(role) && Array.isArray(role['permissions'])) role['permissions'] = list(role['permissions']).filter((grant) => grant !== 'payments:@:refund');
+  }
 }
 
 /**
