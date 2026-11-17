@@ -18,6 +18,7 @@
 import { describe, expect, it } from "vitest";
 
 import { HOMOGRAPH_TOKENS, IDEA_IN_LANGUAGE, OTHER_LANGUAGES, PRO_PHRASES, SUBSTRING_BANNED, type OtherLanguage } from "../testing/lexicon.ts";
+import { BRACKETED_ID } from "../testing/sweep.ts";
 import { AREAS } from "./messages/index.ts";
 
 /** Plural forms per language, in the order the runtime reads `|` variants. */
@@ -45,7 +46,7 @@ const NEVER = [
 ];
 
 /** A private reference: planning ids and section marks never reach a screen. */
-const PRIVATE = [/§/, /\bplan 5\d\b/i, /\b(?:DP|OF|N|F|K|D|U|W|E)-?\d{1,3}\b/, /O-fix/i, /\bOCP\b/, /57-T\d+/];
+const PRIVATE = [/§/, /\bplan 5\d\b/i, /\b(?:DP|OF|N|F|K|D|U|W|E)-?\d{1,3}\b/, /O-fix/i, /\bOCP\b/, /57-T\d+/, BRACKETED_ID];
 
 describe("every area's keys", () => {
   it("are namespaced by the area, and no key is in two areas", () => {
@@ -133,6 +134,7 @@ describe("the checks see what they guard", () => {
     expect(SUBSTRING_BANNED.some((w) => "Upgrade your plan".toLowerCase().includes(w))).toBe(true);
     expect(NEVER.some((p) => p.test("The link never expires."))).toBe(true);
     expect(PRIVATE.some((p) => p.test("See DP-110"))).toBe(true);
+    expect(PRIVATE.some((p) => p.test(["Refunded in its app (", "CR4)"].join("")))).toBe(true);
     expect(ALL.length).toBeGreaterThan(8 * 120);
   });
 });

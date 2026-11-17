@@ -28,8 +28,19 @@ import { HOMOGRAPH_TOKENS, PRO_PHRASES, SUBSTRING_BANNED, TIERING_PATTERNS } fro
 /** Chunks that are other people's code, named by the build's `manualChunks` and pdf.js's own files. */
 export const VENDOR = /^(?:react|icons)-[\w-]+\.js$|^pdf(?:\.worker)?[\w.-]*\.m?js$/;
 
+/**
+ * A bare id in brackets, the way a planning document tagged a decision,
+ * question, ruling or task onto the end of a sentence: one capital (or one of a
+ * few two-letter prefixes) and up to three digits, an optional letter or dashed
+ * number after it, several joined by a comma, a slash, a dash, "and" or a space.
+ * The bracket must hold ONLY ids, so an id followed by a colon and a reason, or
+ * a hex byte such as 0xC4, is not read; and it must not follow a word character,
+ * a `$`, a dot or a closing bracket, so a call such as `split(M1)` is not read.
+ */
+export const BRACKETED_ID = /(?<![\w$.\])])\((?:CR|BN|AC|DP|YR|[A-Z])\d{1,3}[a-z]?(?:-\d{1,3})?(?:\s*(?:,|\/|\u2013|-|\+|&|and|\s)\s*(?:CR|BN|AC|DP|YR|[A-Z])\d{1,3}[a-z]?(?:-\d{1,3})?)*\)/;
+
 /** A private reference: a planning document's ids and section marks. */
-export const PRIVATE: readonly RegExp[] = [/§/, /\bplan 5\d\b/i, /\b57-T\d*/, /\bDP-\d/, /\bF-\d/, /\bN-\d/, /\bO-fix\b/i, /\bOCP\b/];
+export const PRIVATE: readonly RegExp[] = [/§/, /\bplan 5\d\b/i, /\b57-T\d*/, /\bDP-\d/, /\bF-\d/, /\bN-\d/, /\bO-fix\b/i, /\bOCP\b/, BRACKETED_ID];
 
 /** A path from the machine that built it. */
 export const LOCAL_PATH: readonly RegExp[] = [/\/Users\//, /\/private\/tmp/, /scratchpad/i];
