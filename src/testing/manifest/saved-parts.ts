@@ -39,7 +39,7 @@
  */
 import { z } from 'zod';
 
-import { refSchema, settingRefSchema, type ReferenceIssue, type TableIndex } from './refs.ts';
+import { refSchema, scalarSchema, settingRefSchema, valueFits, type ColumnShape, type ReferenceIssue, type TableIndex } from './refs.ts';
 import { conditionIssues, moveTarget, stateConditionSchema, type StateMove } from './states.ts';
 
 /** The publisher of a file made on an Adminium. */
@@ -244,6 +244,16 @@ export const savedPayableSchema = z
         from: z.array(z.string().min(1).max(64)).min(1).max(16).optional(),
         /** The states a row is moved to `refunded` from. */
         refundedFrom: z.array(z.string().min(1).max(64)).min(1).max(16).optional(),
+        /**
+         * Further columns of the record written, with fixed values, in the same
+         * write as the move to `paid` an online payment makes (a ticket order's
+         * `paid_method` set to `online`). A payment recorded by hand writes none
+         * of them: the screen that records it says how it was paid. Only
+         * columns of the payable's own table that hold a plain value — never
+         * the state column, a money column, the amount, the balance, the
+         * currency, a link or a key.
+         */
+        set: z.record(refSchema, scalarSchema).optional(),
       })
       .strict()
       .optional(),
@@ -333,8 +343,11 @@ export interface SavedPartsManifest {
         defaults?: Readonly<Record<string, unknown>> | undefined;
         humanCheck?: true | undefined;
         pay?: true | undefined;
+        requirePayments?: 'on' | 'off' | undefined;
       }[]
     | undefined;
+  /** The app's tables: a move that waits for no payment on its way is a move of a payable one. */
+  requiredSchema?: { tables: readonly { ref: string; states?: { moves?: Readonly<Record<string, readonly StateMove[]>> | undefined } | undefined }[] } | undefined;
   reports?: readonly SavedReport[] | undefined;
   invoiceLayouts?: readonly SavedInvoiceLayout[] | undefined;
   scheduledReports?: readonly SavedScheduledReport[] | undefined;
@@ -403,7 +416,7 @@ function refundIssues(
       }
     });
   }
-  // The rows model writes the app's own refund row for an automatic refund (Q10): it says what goes in it.
+  // The rows model writes the app's own refund row for an automatic refund: it says what goes in it.
   if (rows !== null && rows.auto === undefined) out.push({ path: at('refundOn'), message: 'a refund that starts by itself writes the app\'s refund row: say its values (`refunds.auto`)' });
   const setting = (ref: { table: string; column: string }, type: 'bool' | 'number', name: (string | number)[]): void => {
     const found = index.column(ref.table, ref.column) as { type?: string } | undefined;
@@ -548,6 +561,19 @@ export function savedPartsIssues(m: SavedPartsManifest, index: TableIndex): Refe
           if (values !== null && !values.includes(state)) out.push({ path: at('status', name, i), message: `"${state}" is not a value of "${payable.table}.${payable.status!.column}"` });
         });
       }
+      // What the move to paid writes beside the state: plain columns of the record, never its money, keys or links.
+      const sets = Object.entries(payable.status.set ?? {});
+      if (sets.length > 4) out.push({ path: at('status', 'set'), message: 'a move to paid writes at most 4 more columns' });
+      const moneyColumns = new Set([payable.amount.column, payable.due?.column, 'column' in payable.currency ? payable.currency.column : undefined].filter((c): c is string => c !== undefined));
+      for (const [name, value] of sets) {
+        const column = index.column(payable.table, name) as ColumnShape | undefined;
+        const here = at('status', 'set', name);
+        if (column === undefined) out.push({ path: here, message: `"${payable.table}" has no column "${name}"` });
+        else if (name === payable.status.column) out.push({ path: here, message: 'the state column is moved by `paid`, not set' });
+        else if (moneyColumns.has(name) || ['money', 'decimal'].includes(column.type)) out.push({ path: here, message: `"${payable.table}.${name}" holds money: a payment never writes a figure into its record` });
+        else if (['id', 'fk', 'uuid', 'json', 'blob'].includes(column.type) || column.role === 'pk' || column.references !== undefined) out.push({ path: here, message: `"${payable.table}.${name}" is a key, a link or a document: a payment writes only a plain value` });
+        else if (!valueFits(column, value)) out.push({ path: here, message: `${JSON.stringify(value)} does not fit "${payable.table}.${name}"` });
+      }
       // On a table whose states list its moves, the paid (and refunded) move is one of them: a move not listed is refused
       // when the money lands, so the payment would stand with its record left where it was.
       const moves = found.states?.column === payable.status.column ? found.states.moves : undefined;
@@ -585,6 +611,23 @@ export function savedPartsIssues(m: SavedPartsManifest, index: TableIndex): Refe
     if (!(entry.methods ?? []).includes('POST')) out.push({ path: at, message: 'a pay link is answered by a create, and this entry makes none' });
     if (!payableTables.has(entry.table)) out.push({ path: at, message: `"${entry.table}" is not one of this app's payable tables (payments.payables)` });
     if (entry.humanCheck !== true) out.push({ path: at, message: 'a create that answers a pay link asks the human check' });
+  });
+  // A move refused while a payment is on its way: of a payable table, where payments can be on their way.
+  (m.requiredSchema?.tables ?? []).forEach((table, t) => {
+    for (const [from, moves] of Object.entries(table.states?.moves ?? {})) {
+      moves.forEach((move, i) => {
+        if (typeof move === 'object' && move.requires?.noPaymentInFlight === true && !payableTables.has(table.ref)) {
+          out.push({ path: ['requiredSchema', 'tables', t, 'states', 'moves', from, i, 'requires', 'noPaymentInFlight'], message: `"${table.ref}" is not one of this app's payable tables (payments.payables), so no payment is ever on its way for its rows` });
+        }
+      });
+    }
+  });
+  // An entry open only while payments are on (or off): a create of one of the app's payable tables.
+  (m.publicAccess ?? []).forEach((entry, e) => {
+    if (entry.requirePayments === undefined) return;
+    const at = ['publicAccess', e, 'requirePayments'];
+    if (!(entry.methods ?? []).includes('POST')) out.push({ path: at, message: 'payments being on or off opens a create, and this entry makes none' });
+    if (!payableTables.has(entry.table)) out.push({ path: at, message: `"${entry.table}" is not one of this app's payable tables (payments.payables)` });
   });
   const ways = new Set<string>();
   (m.payments?.ways ?? []).forEach((way, w) => {

@@ -454,8 +454,41 @@ function paymentsWithout(out: Doc, goneTables: ReadonlySet<string>, lostColumns:
   if (Object.keys(payments).length === 0) delete out['payments'];
 
   const payable = new Set(kept.flatMap((entry) => (isDoc(entry) && typeof entry['table'] === 'string' ? [entry['table']] : [])));
+  const unpayable = (entry: unknown): boolean => isDoc(entry) && !(typeof entry['table'] === 'string' && payable.has(entry['table']));
   for (const entry of list(out['publicAccess'])) {
-    if (isDoc(entry) && entry['pay'] === true && !(typeof entry['table'] === 'string' && payable.has(entry['table']))) delete entry['pay'];
+    if (isDoc(entry) && entry['pay'] === true && unpayable(entry)) delete entry['pay'];
+    // Payments are never on for a table that is no longer payable: an entry open only while they are off is simply open.
+    if (isDoc(entry) && entry['requirePayments'] === 'off' && unpayable(entry)) delete entry['requirePayments'];
+  }
+  // No payment is ever on its way for a table that is no longer payable: a move waiting for none waits for nothing.
+  const schema = out['requiredSchema'];
+  for (const table of isDoc(schema) ? list(schema['tables']) : []) {
+    if (!isDoc(table) || (typeof table['ref'] === 'string' && payable.has(table['ref'])) || !isDoc(table['states']) || !isDoc(table['states']['moves'])) continue;
+    for (const moves of Object.values(table['states']['moves'])) {
+      for (const move of list(moves)) {
+        if (!isDoc(move) || !isDoc(move['requires']) || move['requires']['noPaymentInFlight'] === undefined) continue;
+        delete move['requires']['noPaymentInFlight'];
+        if (Object.keys(move['requires']).length === 0) delete move['requires'];
+      }
+    }
+  }
+  // An app with no payable left never takes payments: a mail queued only while they are off is queued always, one only while they are on never.
+  const box = out['outbox'];
+  const unpaid = (producer: unknown): boolean => {
+    if (!isDoc(producer) || producer['payments'] === undefined) return false;
+    if (payable.size === 0) return true;
+    const source = [producer['onCreate'], producer['onChange'], producer['before'], producer['onDelete']].find(isDoc);
+    return source !== undefined && source['via'] === undefined && !(typeof source['table'] === 'string' && payable.has(source['table']));
+  };
+  if (isDoc(box) && Array.isArray(box['producers'])) {
+    for (const producer of list(box['producers'])) if (unpaid(producer) && isDoc(producer) && producer['payments'] === 'off') delete producer['payments'];
+    box['producers'] = list(box['producers']).filter((producer) => !(unpaid(producer) && isDoc(producer) && producer['payments'] === 'on'));
+  }
+  // …and one open only while they are on never opens: it goes with the payable.
+  if (Array.isArray(out['publicAccess'])) {
+    const open = list(out['publicAccess']).filter((entry) => !(isDoc(entry) && entry['requirePayments'] === 'on' && unpayable(entry)));
+    if (open.length === 0) delete out['publicAccess'];
+    else out['publicAccess'] = open;
   }
   if (payable.size > 0) return;
   for (const role of list(out['roles'])) {

@@ -675,6 +675,21 @@ export const publicAccessSchema = z
      * create of one of the app's payable tables, behind the human check.
      */
     pay: z.literal(true).optional(),
+    /**
+     * Open only while the app takes payments online for this entry's table
+     * (`on`: a create that must be paid for), or only while it does not
+     * (`off`: the way a create is made when payments are off). "Takes
+     * payments" is what `GET /public/payments/available` answers, for this
+     * table: the app's payable switched on, a live service, reachable, not
+     * paused. Closed, a write here is refused as a switched-off setting is
+     * (`PUBLIC_SWITCHED_OFF`). With `requireSetting`, both must hold: a hotel
+     * that asks guests to pay at booking opens its paying entry with
+     * `requireSetting` "required" and `requirePayments: "on"`, and its unpaid
+     * one for "required" only with `requirePayments: "off"` — so no caller
+     * books unpaid while paying is required and possible, and none is held to
+     * pay while it is not. Only on a create of one of the app's payable tables.
+     */
+    requirePayments: z.enum(['on', 'off']).optional(),
     /** The rows a create carries with it, by child table (see `childEntrySchema`). */
     children: childTablesSchema(childEntrySchema).optional(),
     /** Checks the created row's own values must pass (guests no more than a room sleeps). */

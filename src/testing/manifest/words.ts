@@ -26,6 +26,7 @@
  * It reads the plain document, not the typed manifest, so the schema file may
  * import it without the two files importing each other.
  */
+import { OUTBOX_PRODUCERS_BEFORE } from './outbox.ts';
 import { placeholdersIn } from './placeholders.ts';
 
 export interface ManifestWord {
@@ -347,6 +348,16 @@ export const INSTALL_FLOOR_WORD_NAMES = [
   'states.waitsForPayment',
   // A public create that answers the new row's pay link.
   'publicAccess.pay',
+  // A move refused while a payment for the row is on its way.
+  'states.noPaymentInFlight',
+  // A public entry open only while the app takes payments online for its table (or only while it does not).
+  'publicAccess.requirePayments',
+  // An outbox producer queued only while payments are on (or off) for the row its message is about.
+  'outbox.producerPayments',
+  // More than 24 outbox producers (up to 32).
+  'outbox.manyProducers',
+  // Further plain columns an online payment's move to paid writes (a ticket order's paid_method).
+  'payments.statusSet',
 ] as const;
 export type ManifestWordName = (typeof INSTALL_FLOOR_WORD_NAMES)[number];
 
@@ -641,7 +652,12 @@ export const WORD_FLOORS: Readonly<Partial<Record<ManifestWordName, string>>> = 
   'payments.appPayables': '0.3.60',
   'payments.payableExtras': '0.3.60',
   'states.waitsForPayment': '0.3.60',
+  'states.noPaymentInFlight': '0.3.62',
   'publicAccess.pay': '0.3.60',
+  'publicAccess.requirePayments': '0.3.62',
+  'outbox.producerPayments': '0.3.62',
+  'outbox.manyProducers': '0.3.62',
+  'payments.statusSet': '0.3.62',
 };
 
 /** The kinds of file a column takes from the release that cleans SVG and reads models and fonts whole (`ASSET_FILE_KINDS`). */
@@ -765,6 +781,7 @@ export function installFloorWords(document: unknown): ManifestWord[] {
         (status !== null && (status['from'] !== undefined || status['refundedFrom'] !== undefined)) ||
         (payments !== null && payments['kind'] === 'table' && (payments['date'] === undefined || PAYMENT_EXTRAS.some((key) => payments[key] !== undefined)));
       if (extra) out.push({ word: 'payments.payableExtras', path: `payments.payables.${String(p)}` });
+      if (status !== null && status['set'] !== undefined) out.push({ word: 'payments.statusSet', path: `payments.payables.${String(p)}.status.set` });
     });
     // A row removed through a public entry of an app (an add-on's own link says `publicAccess.ownDelete`).
     list(document['publicAccess']).forEach((entry, e) => {
@@ -784,6 +801,7 @@ export function installFloorWords(document: unknown): ManifestWord[] {
   // An agreement on a text's length, on an entry or on its child rows (two levels).
   list(document['publicAccess']).forEach((entry, e) => {
     if (isDoc(entry) && entry['pay'] !== undefined) out.push({ word: 'publicAccess.pay', path: `publicAccess.${String(e)}.pay` });
+    if (isDoc(entry) && entry['requirePayments'] !== undefined) out.push({ word: 'publicAccess.requirePayments', path: `publicAccess.${String(e)}.requirePayments` });
     // A choice in the settings row that must hold one of some values.
     list(isDoc(entry) ? entry['requireSetting'] : undefined).forEach((setting, r) => {
       if (isDoc(setting) && setting['in'] !== undefined) out.push({ word: 'publicAccess.requireSettingIn', path: `publicAccess.${String(e)}.requireSetting.${String(r)}.in` });
@@ -839,6 +857,7 @@ export function installFloorWords(document: unknown): ManifestWord[] {
         list(moves).forEach((move, m) => {
           if (isDoc(move) && move['planned'] === true) out.push({ word: 'states.planned', path: `${at}.states.moves.${from}.${String(m)}.planned` });
           if (isDoc(move) && isDoc(move['requires']) && move['requires']['notPast'] !== undefined) out.push({ word: 'states.notPast', path: `${at}.states.moves.${from}.${String(m)}.requires.notPast` });
+          if (isDoc(move) && isDoc(move['requires']) && move['requires']['noPaymentInFlight'] !== undefined) out.push({ word: 'states.noPaymentInFlight', path: `${at}.states.moves.${from}.${String(m)}.requires.noPaymentInFlight` });
         });
       }
       for (const [child, rule] of Object.entries(isDoc(table['states']['children']) ? table['states']['children'] : {})) {
@@ -1017,7 +1036,9 @@ export function installFloorWords(document: unknown): ManifestWord[] {
   if (outbox['classes'] !== undefined) out.push({ word: 'outbox.classes', path: 'outbox.classes' });
   if (outbox['purposes'] !== undefined) out.push({ word: 'outbox.purposes', path: 'outbox.purposes' });
   if (outbox['surveyLinks'] !== undefined) out.push({ word: 'outbox.surveyLinks', path: 'outbox.surveyLinks' });
+  if (list(outbox['producers']).length > OUTBOX_PRODUCERS_BEFORE) out.push({ word: 'outbox.manyProducers', path: 'outbox.producers' });
   list(outbox['producers']).forEach((producer, p) => {
+    if (isDoc(producer) && producer['payments'] !== undefined) out.push({ word: 'outbox.producerPayments', path: `outbox.producers.${String(p)}.payments` });
     if (isDoc(producer) && producer['replyTo'] !== undefined) out.push({ word: 'outbox.replyTo', path: `outbox.producers.${String(p)}.replyTo` });
     // A message about a row that was removed.
     if (isDoc(producer) && producer['onDelete'] !== undefined) out.push({ word: 'outbox.onDelete', path: `outbox.producers.${String(p)}.onDelete` });

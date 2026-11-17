@@ -69,6 +69,8 @@
  *   (`requires.linked`), for a window on the clock (`requires.time`, read from
  *   moments — see `refs.ts`) and for a value of the settings row
  *   (`requires.setting`).
+ * - A move of a payable row may be refused while a payment for it is on its
+ *   way (`requires.noPaymentInFlight`).
  * - A move may be refused once a date of the row has passed
  *   (`requires.notPast`): today on the business's calendar against the date
  *   the row holds, for every writer; an empty date refuses nothing.
@@ -178,6 +180,16 @@ export const stateMoveSchema = z.union([
            * none.
            */
           notPast: refSchema.optional(),
+          /**
+           * Refused while a payment for the row is on its way
+           * (`PAYMENT_IN_FLIGHT`): the payment service is processing it, or it
+           * succeeded and Adminium is writing it down — a diner who picks "pay
+           * when you pick up instead" while their card is landing. Every
+           * writer is held to it, the public and staff alike; only the
+           * payment's own move to paid is not. Only on a payable table of the
+           * app (`payments.payables`).
+           */
+          noPaymentInFlight: z.literal(true).optional(),
         })
         .strict()
         .optional(),
