@@ -93,7 +93,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: MoSofi/Adminium
-          ref: v0.3.61
+          ref: v0.3.62
           path: .adminium-product
 
       # Adminium 0.3.4 refuses to install 0.2.0 (its emails ask a date for a time's
