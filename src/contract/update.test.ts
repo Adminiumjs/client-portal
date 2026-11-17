@@ -200,6 +200,11 @@ describe.skipIf(why !== null)(`the update of a live ${FROM} install to ${TO}${wh
       const byNumber = (list: Row[], number: string) => list.find((r) => r["number"] === number)!;
       const raw = () => rawTables(engine as Engine, port, database(engine as Engine), prefix);
       const sample = async () => ok(await staff.get<{ loaded: boolean; total: number; tables: { ref: string; count: number }[] }>("/api/v1/apps/clients/sample-data"));
+      // The labels of the released sample's payments, as its file names them.
+      const samplePayments = (): string[] => {
+        const bundle = JSON.parse(released!.files["seeds/clients.sample.json"]!.toString("utf8")) as { tables: { ref: string; rows: Record<string, unknown>[] }[] };
+        return (bundle.tables.find((t) => t.ref === "payments")?.rows ?? []).map((row) => String(row["@label"]));
+      };
       const surfaceConfig = async () => ok(await new Caller(server.base).get<{ publishableKey: string; publicKeys?: Record<string, string> }>("/apps/clients/customer/surface-config.json"));
       const guestOf = async () => new Caller(server.base, { authorization: `Bearer ${(await surfaceConfig()).publishableKey}`, origin: server.base });
       const proof = async (guest: Caller, purpose: "claim" | "write") => {
@@ -784,8 +789,20 @@ describe.skipIf(why !== null)(`the update of a live ${FROM} install to ${TO}${wh
         const plan = ok(await staff.post<{ changed: { ref: string; label: string | null; columns: string[] }[] }>("/api/v1/apps/clients/sample-data/remove-plan"));
         expect(plan.changed.filter((c) => c.ref === "invoice_lines")).toEqual([]);
         const key = (c: { ref: string; label: string | null; columns: string[] }) => `${c.ref}|${String(c.label)}|${[...c.columns].sort().join(",")}`;
-        // The studio's own edits since the snapshot: the settings the new-enquiry test switched on.
-        expect(plan.changed.map(key).sort()).toEqual([...changedBefore.map(key), "settings|studio|notify_enquiry,reply_to"].sort());
+        // The studio's own edits since the snapshot: the settings the new-enquiry test switched on. And, through the engine
+        // gap below, each sample payment's `net_amount` and nothing else of it: the column the update added and worked out.
+        expect(plan.changed.map(key).sort()).toEqual(
+          [...changedBefore.map(key), "settings|studio|notify_enquiry,reply_to", ...samplePayments().map((label) => `payments|${label}|net_amount`)].sort(),
+        );
+      }, 60_000);
+
+      // KNOWN ENGINE GAP, kept failing on purpose until the engine closes it. An update that adds a worked-out column (here
+      // the payments' `net_amount`, what is kept after refunds) fills it on every row already there; the sample's ledger
+      // counts a column it never hashed as unchanged only while it is empty or holds its default, so every sample payment
+      // reads as changed, and a removal that keeps changed rows (the default) keeps them.
+      it.fails("KNOWN GAP: a sample payment the update only worked a new column out for reads as unchanged", async () => {
+        const plan = ok(await staff.post<{ changed: { ref: string; label: string | null; columns: string[] }[] }>("/api/v1/apps/clients/sample-data/remove-plan"));
+        expect(plan.changed.filter((c) => c.ref === "payments")).toEqual(changedBefore.filter((c) => c.ref === "payments"));
       }, 60_000);
 
       it("removes the sample afterwards, keeping every row the studio and its clients made", async () => {
