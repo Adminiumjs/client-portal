@@ -21,7 +21,7 @@ function invoice(over: Partial<Invoice>): Invoice {
 }
 function payment(document_id: Id, over: Partial<Payment>): Payment {
   seq += 1;
-  return { id: seq, document_id, number_seq: seq, number: `REC-${String(seq)}`, amount: "50.00", currency: "USD", method: "bank-transfer", method_note: null, paid_on: "2026-07-10", recorded_by: null, recorded_at: null, voided: false, void_reason: null, voided_by: null, voided_at: null, client_id: 1, client_key: null, ...over };
+  return { id: seq, document_id, number_seq: seq, number: `REC-${String(seq)}`, amount: "50.00", refunded_amount: "0", net_amount: null, currency: "USD", method: "bank-transfer", method_note: null, payment_ref: null, provider: null, approval_code: null, card_last4: null, paid_on: "2026-07-10", recorded_by: null, recorded_at: null, voided: false, void_reason: null, voided_by: null, voided_at: null, client_id: 1, client_key: null, ...over };
 }
 const cost = (monthly_amount: string): RunningCost => ({ id: ++seq, label: "Rent", monthly_amount, position: 0, client_key: null });
 

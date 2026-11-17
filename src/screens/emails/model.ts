@@ -150,13 +150,27 @@ function fillData(data: unknown, values: Readonly<Record<string, string>>): unkn
   return data;
 }
 
+/**
+ * Whether a block goes in this email, as Adminium's outbox decides it: a block
+ * sent only with a value (`onlyWith`) goes when that value is filled, one sent
+ * only without it (`onlyWithout`) when it is not. The pay button goes only
+ * while the invoice has a live pay link (`pay_url`), which no sample has.
+ */
+function sent(data: Record<string, unknown>, values: Readonly<Record<string, string>>): boolean {
+  const has = (name: unknown): boolean => typeof name === "string" && (values[name] ?? "").trim() !== "";
+  if (typeof data["onlyWith"] === "string" && !has(data["onlyWith"])) return false;
+  return !(typeof data["onlyWithout"] === "string" && has(data["onlyWithout"]));
+}
+
 /** The email with a sample's values in every place. */
 export function filled(doc: EmailDoc, values: Readonly<Record<string, string>>): EmailDoc {
   return {
     name: doc.name,
     subject: fill(doc.subject, values),
     preheader: fill(doc.preheader, values),
-    blocks: doc.blocks.map((b) => ({ id: b.id, block: b.block, data: fillData(b.data, values) as Record<string, unknown> })),
+    blocks: doc.blocks
+      .filter((b) => sent(b.data, values))
+      .map((b) => ({ id: b.id, block: b.block, data: fillData(b.data, values) as Record<string, unknown> })),
     footer: fill(doc.footer, values),
   };
 }

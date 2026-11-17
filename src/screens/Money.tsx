@@ -35,6 +35,7 @@ const METHOD_KEYS: Readonly<Record<Payment["method"], MessageKey>> = {
   cheque: "money.method.cheque",
   cash: "money.method.cash",
   other: "money.method.other",
+  online: "money.method.online",
 };
 
 /** A calendar month's name in the page's language ("Jul", or with its year "July 2026"). */

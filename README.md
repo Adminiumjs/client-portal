@@ -22,12 +22,15 @@ rather than lorem ipsum.
 
 ## What it needs
 
-- **Adminium 0.3.49 or later.** Update Adminium first, then the app: 0.2.7
-  changes no table and updates an install of 0.2.0 or later in place. From
-  0.2.7 a studio may install the app once per database: each install's
-  screens open at their own address and say which install they are on every
-  call, so a second database's desk reads and writes its own studio.
-- **Invoices & Receipts 1.0.5 or later**, which installs with the app.
+- **Adminium 0.3.61 or later.** Update Adminium first, then the app: 0.2.8
+  updates an install of 0.2.0 or later in place. It moves the invoices onto
+  the add-on's invoice shape's second version, which takes payments online:
+  the payments gain the columns an online payment fills, and every row
+  already there keeps every value. From 0.2.7 a studio may install the app
+  once per database: each install's screens open at their own address and
+  say which install they are on every call, so a second database's desk
+  reads and writes its own studio.
+- **Invoices & Receipts 1.0.13 or later**, which installs with the app.
 - A database on **SQLite, Postgres or MySQL**. The app creates its own tables
   there, under names Adminium gives them.
 - **Email delivery** and **file storage** set up in Adminium. The app sends its
@@ -73,7 +76,10 @@ rather than lorem ipsum.
     every document, and their side of the portal to preview read-only.
   - **Invoices**: six filters (All, Open, Overdue, Draft, Paid, Void). Record
     a payment, including a part payment. A studio manager may void an unpaid
-    invoice or a recorded payment.
+    invoice or a recorded payment. Once the studio takes payments online
+    (below), "Copy pay link" sits beside "Record payment", a payment a client
+    made online says so ("Online · Stripe"), and a studio manager may refund
+    it.
   - **Chasing**, with held reminders. Every sent invoice gets three
     reminders, each due on its day of the invoice's ladder, and **none goes
     out until someone approves it**. Each one can be edited while it waits,
@@ -118,7 +124,8 @@ rather than lorem ipsum.
   - **Their projects and the review**: milestones, and the work shared with
     them. They can open a file, write back, approve it, or ask for changes.
   - **Their invoices**: the lines, the payments so far, the balance, how to
-    pay, and "I've sent a payment" to tell the studio.
+    pay, and "I've sent a payment" to tell the studio. Once the studio takes
+    payments online, "Pay now" too.
   - **Statement & receipts**: everything invoiced and paid over a period,
     with a receipt for each payment.
   - **The brief**: the studio's questions, answered on the client's own
@@ -156,6 +163,37 @@ rather than lorem ipsum.
   service mail: each email to a client is about their own proposal, work or
   invoice, so Adminium's do-not-email list never stops it, and the studio
   sends no newsletter.
+
+- **Paying online, when the studio wants it.** The invoices can be paid
+  online through Adminium's own payments: the studio connects Stripe or
+  PayPal in Adminium (Studio → Payments) and switches this app on there
+  (Apps). The app arrives switched off, and until it is on, every screen and
+  email reads exactly as before.
+  - **On the client's invoice**, "Pay now" sits above How to pay and "I've
+    sent a payment", which stays for bank transfers. It opens Adminium's pay
+    page in a tab of its own (the portal keeps the client signed in), for
+    what the invoice still owes; back on the portal, the invoice is read
+    again and shows paid, "Paid online · receipt emailed", or says how the
+    payment stands: the bank still confirming it (some ways take days; the
+    invoice then offers no way to pay, also when opened again, until the
+    bank has answered), didn't finish, or the time on the pay page ran out
+    (nothing was taken, and every way to pay is back). The client types no
+    card details anywhere in the app. A payment made online clears "I've
+    sent a payment", as one the studio records does.
+  - **In the emails**, the invoice and its three reminders carry "Pay
+    {amount} online" while the invoice can be paid online, and read as
+    before when it cannot. The receipt is the app's own email, so a client
+    never gets two. The printed invoice carries the pay link and its code to
+    scan, drawn by the add-on, while something is owed.
+  - **On the desk**, "Copy pay link" copies the link a client already holds
+    while it works (copying never retires it), else makes one, and says until
+    when it works. A payment made online is never voided: a studio manager
+    refunds it, in Adminium's own two steps, and the balance opens again by
+    what was refunded. Installing or updating the app lists the studio
+    manager's refund right on Adminium's check, ticked, to untick.
+  - **Rehearsing**: while someone who manages payments rehearses in
+    Adminium, a sample invoice can be paid in test mode, under a band only
+    they see.
 
 - **Clients, as Adminium knows them.** The clients are the studio's people:
   the contact's address, name and language, and the copies of them on an
@@ -223,7 +261,9 @@ from the old tables.
 ## The demo
 
 The [website demo](https://adminium.dev/demo/client-portal) runs with no
-server. It loads the app's real sample in memory at 10:00 on Tuesday 28 July
+server, and plays the pay step without one: "Pay now" on a client's invoice
+records what is owed as a payment made online, and nothing leaves the page,
+no money included. It loads the app's real sample in memory at 10:00 on Tuesday 28 July
 2026, and a stand-in plays Adminium's part: the same rules for every write,
 the same outbox, the same fingerprints. The demo's card offers:
 
@@ -299,16 +339,18 @@ npx vitest run src/contract
 ```
 
 Two more prove an update in place on the same three engines: the released
-0.2.0 (`src/contract/update.test.ts`) and the released 0.2.5
+0.2.0 (`src/contract/update.test.ts`) and the released 0.2.7
 (`src/contract/update-latest.test.ts`), each the published file, refused
 unless it matches `RELEASES.json`, installed on the Adminium it was released
 for, that Adminium upgraded in place to `ADMINIUM_REPO`, and the app updated
-to this build with every row kept byte for byte.
+to this build with every row kept byte for byte (the payments gain the
+columns an online payment fills; the payments already there keep all they
+paid, and paying online arrives switched off).
 
 | Variable | What it points at |
 | --- | --- |
 | `CONTRACT_FROM_TARBALL`, `CONTRACT_FROM_ADMINIUM` | `clients-0.2.0.tgz` from `downloads.adminium.dev/apps/clients/`, and an Adminium `v0.3.3` checkout, built. |
-| `CONTRACT_LATEST_TARBALL`, `CONTRACT_LATEST_ADMINIUM` | `clients-0.2.5.tgz`, and an Adminium `v0.3.28` checkout, built. |
+| `CONTRACT_LATEST_TARBALL`, `CONTRACT_LATEST_ADMINIUM` | `clients-0.2.7.tgz`, and an Adminium `v0.3.49` checkout, built. |
 
 `ADMINIUM_REQUIRE_CONTRACT=1` turns a skip into a failure. CI's `contract`
 workflow sets it and runs all three engines, alongside the drift checks for

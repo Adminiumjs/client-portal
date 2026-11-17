@@ -6,7 +6,7 @@
  * keeps is a rule another browser can skip:
  *
  *   - proposals and invoices are built on the Invoices & Receipts add-on's
- *     shapes (`quote@1`, `invoice@1`): their numbers run without gaps, their
+ *     shapes (`quote@1`, `invoice@2`): their numbers run without gaps, their
  *     lines, tax, totals, what is paid and what is still owed are worked out by
  *     the server, and a sent document is locked and voided, never deleted;
  *   - a client's details, a proposal's signature and fingerprint, who posted a
@@ -240,11 +240,21 @@ function partStates(
   return states as unknown as Record<string, unknown>;
 }
 
-/** Which table of this app is built on each part: `invoice@1/document` → `invoices`. */
+/**
+ * Which table of this app is built on each part: `invoice@2/document` → `invoices`.
+ *
+ * Invoices are on the shape's second version, which takes payments online:
+ * each payment keeps what was refunded of it (`refunded_amount`, and
+ * `net_amount` what is left), the service's own reference (`payment_ref`,
+ * unique, so a payment is never written twice) and which service took it
+ * (`provider`), all written by Adminium alone; an invoice's `paid` sums what
+ * is left of each payment. A payment the studio records by hand leaves them
+ * empty, as before.
+ */
 const BUILT: Record<string, string> = {
-  "invoice@1/document": "invoices",
-  "invoice@1/lines": "invoice_lines",
-  "invoice@1/payments": "payments",
+  "invoice@2/document": "invoices",
+  "invoice@2/lines": "invoice_lines",
+  "invoice@2/payments": "payments",
   "quote@1/document": "proposals",
   "quote@1/lines": "proposal_lines",
 };
@@ -311,6 +321,12 @@ const PAYMENT_WORDS: Record<string, string> = {
   void_reason: "Why it was voided",
   voided_by: "Voided by",
   voided_at: "Voided on",
+  refunded_amount: "Refunded",
+  net_amount: "Kept after refunds",
+  payment_ref: "Online payment reference",
+  provider: "Paid through",
+  approval_code: "Card approval code",
+  card_last4: "Card's last four digits",
 };
 
 /** The shape's enum columns, given the studio's words for their values. */
@@ -333,7 +349,7 @@ const QUOTE_STATUS = { draft: "Draft", sent: "Sent", accepted: "Accepted", decli
 const TERMS = { net7: "7 days", net14: "14 days", net30: "30 days", "on-receipt": "On receipt" };
 const LADDER = { gentle: "Gentle", standard: "Standard", firm: "Firm" };
 const DISCOUNT_KIND = { amount: "Amount off", percent: "Percent off" };
-const METHOD = { "bank-transfer": "Bank transfer", card: "Card", cheque: "Cheque", cash: "Cash", other: "Other" };
+const METHOD = { "bank-transfer": "Bank transfer", card: "Card", cheque: "Cheque", cash: "Cash", other: "Other", online: "Online" };
 
 // ── the tables ──────────────────────────────────────────────────────────────
 
@@ -849,10 +865,10 @@ export const TABLES: Table[] = [
     label: l("Invoice"),
     labelPlural: l("Invoices"),
     keyField: "number",
-    ...builtOn("invoice@1", "document"),
+    ...builtOn("invoice@2", "document"),
     columns: [
       ...withWords(
-        partColumns("invoice@1", "document", BUILT, INVOICE_WORDS).map((column) =>
+        partColumns("invoice@2", "document", BUILT, INVOICE_WORDS).map((column) =>
           // A client's own tax rate comes first; the add-on's default when they have none.
           column.ref === "tax_rate" ? { ...column, rules: { ...column.rules, copy: { via: "client_id", from: "tax_rate" } } } : column,
         ),
@@ -871,7 +887,7 @@ export const TABLES: Table[] = [
       at("client_paid_at", "Client said so", { ...opt, rules: stamp("now", when("client_paid", true)) }),
       clientKey,
     ],
-    states: partStates("invoice@1", "document", BUILT, {
+    states: partStates("invoice@2", "document", BUILT, {
       except: ["client_paid_note", "client_paid_amount", "client_paid_on", "client_paid", "client_paid_at"],
       // A recorded payment answers the client's "I've sent it": the flag goes.
       clearOnCreate: { payments: ["client_paid_note", "client_paid_amount", "client_paid_on", "client_paid", "client_paid_at"] },
@@ -895,9 +911,9 @@ export const TABLES: Table[] = [
     keep: KEPT_FOR_TAX,
     label: l("Invoice line"),
     labelPlural: l("Invoice lines"),
-    ...builtOn("invoice@1", "lines"),
+    ...builtOn("invoice@2", "lines"),
     columns: [
-      ...withWords(partColumns("invoice@1", "lines", BUILT, LINE_WORDS), { discount_kind: DISCOUNT_KIND }),
+      ...withWords(partColumns("invoice@2", "lines", BUILT, LINE_WORDS), { discount_kind: DISCOUNT_KIND }),
       clientOf("document_id"),
       // The hours or the purchase a line puts on the invoice. The line is the one record of it: an
       // entry is invoiced while a line points at it, and free again once a draft's line is removed
@@ -915,8 +931,8 @@ export const TABLES: Table[] = [
     label: l("Payment"),
     labelPlural: l("Payments"),
     keyField: "number",
-    ...builtOn("invoice@1", "payments"),
-    columns: [...withWords(partColumns("invoice@1", "payments", BUILT, PAYMENT_WORDS), { method: METHOD }), clientOf("document_id"), clientKey],
+    ...builtOn("invoice@2", "payments"),
+    columns: [...withWords(partColumns("invoice@2", "payments", BUILT, PAYMENT_WORDS), { method: METHOD }), clientOf("document_id"), clientKey],
   },
   {
     ref: "messages",

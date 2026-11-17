@@ -80,6 +80,9 @@ const HAND_SETTINGS: Readonly<Record<string, unknown>> = {
 /** The desk person's roles in the demo: the studio's manager. */
 const MANAGER: ReadonlySet<string> = new Set(["studio-manager"]);
 
+/** The service the demo's stand-in names on a payment it takes: no real one, and no money moves. */
+export const DEMO_PAY_PROVIDER = "Demo";
+
 /** The token the demo's emailed sign-in link carries, and the code the same email shows. */
 export const DEMO_LINK_TOKEN = "demo";
 export const DEMO_CODE = "000000";
@@ -431,6 +434,40 @@ export function createWorld(source: Seed | SampleSource, base: () => number, zon
         guard();
         const text = settings["invoices.payment_instructions"];
         return typeof text === "string" && text.trim() !== "" ? text : null;
+      },
+      /*
+       * Paying online, played by the stand-in: no pay page and no money. "Pay
+       * now" records what the invoice still owes as a payment taken online, as
+       * Adminium records one the service confirmed — written as Adminium itself,
+       * with the service's name and its own reference — so the invoice turns
+       * paid, the client's claim clears and the receipt goes, as they would.
+       */
+      payOnline: async () => ({ online: signedIn, test: false, standIn: true }),
+      payInvoice: async (id) => {
+        guard();
+        const invoice = find("invoices", id);
+        if (invoice === undefined || !own("invoices")(invoice)) throw new PortError("PUBLIC_REF_NOT_FOUND", "not found", 404);
+        const due = Number(invoice["balance"] ?? 0);
+        if (invoice["status"] !== "sent" || !(due > 0)) throw new PortError("PUBLIC_PAY_REFUSED", "nothing to pay", 409, { reason: due > 0 ? "not-now" : "nothing-due" });
+        try {
+          written(
+            engine.insert(
+              "payments",
+              {
+                document_id: invoice.id,
+                amount: String(invoice["balance"]),
+                method: "online",
+                provider: DEMO_PAY_PROVIDER,
+                payment_ref: `demo_${drawCode(16)}`,
+                paid_on: today(),
+              },
+              { origin: "system", name: `Online payment (${DEMO_PAY_PROVIDER})`, roles: "any" },
+            ),
+          );
+        } catch (error) {
+          return asPort(error);
+        }
+        return { payUrl: null };
       },
       accept: async (id, name) => write("proposals", id, { status: "accepted", signed_name: name.trim() }, (r) => r["status"] === "sent" && inDate(r)),
       sign: async (id, name) => write("proposals", id, { signed_name: name.trim() }, (r) => r["status"] === "accepted" && (r["signed_name"] === null || r["signed_name"] === "")),

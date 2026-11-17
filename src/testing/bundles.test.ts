@@ -185,10 +185,14 @@ describe("the release sweep finds nothing in what ships", () => {
     expect(planted("<p>Go premium</p>", "index.html")).toEqual(["banned word"]);
     expect(planted('const a = "See §4.3";')).toEqual(["private citation"]);
     expect(planted('const a = "the fix from DP-12";')).toEqual(["private citation"]);
+    // A bracketed id is built, not written, so this file carries none itself.
+    const tag = (...ids: string[]) => `(${ids.join(" ")})`;
+    expect(planted(`const a = "kept on the phone ${tag("F17")}";`)).toEqual(["private citation"]);
+    expect(planted(`const a = "a rule ${tag("D6", "Q6")} and a task ${tag("T01-48")}";`)).toEqual(["private citation"]);
     expect(planted('const a = "/Users/someone/app/src/x.ts";')).toEqual(["local path"]);
     expect(planted('{"version":3,"sources":["../src/a.ts"],"sourcesContent":["// see plan 58"]}', "assets/a.js.map")).toEqual(["private citation"]);
     // …and leaves a name, a key, a document's number and a legitimate word alone.
-    expect(planted('const explanation = "freeze"; const k = "nav.plans"; const n = "PRO-1142"; const f = "Liste des tarifs"; const c = "Nabídka pro kterou";')).toEqual([]);
+    expect(planted('const explanation = "freeze"; const k = "nav.plans"; const n = "PRO-1142"; const f = "Liste des tarifs"; const c = "Nabídka pro kterou"; const s = "split(M1)"; const h = "DHT (0xC4)"; const t = "MP3 (ID3)";')).toEqual([]);
   });
 
   it("no build and no manifest carries a banned word, a private citation or a local path", () => {

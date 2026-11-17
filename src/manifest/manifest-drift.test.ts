@@ -43,9 +43,9 @@ describe("the tables built on Invoices & Receipts are what its shapes say", () =
   it("requires the add-on the five tables are built on", () => {
     const needs = manifest["addOns"] as { requires: { key: string }[] };
     expect(needs.requires.map((need) => need.key)).toEqual(["invoices"]);
-    for (const ref of ["proposals", "proposal_lines", "invoices", "invoice_lines", "payments"]) {
-      expect(table(ref)["builtOn"], ref).toMatch(/^invoices\/(invoice|quote)@1$/);
-    }
+    for (const ref of ["proposals", "proposal_lines"]) expect(table(ref)["builtOn"], ref).toBe("invoices/quote@1");
+    // The invoices are on the shape's second version: it takes payments online.
+    for (const ref of ["invoices", "invoice_lines", "payments"]) expect(table(ref)["builtOn"], ref).toBe("invoices/invoice@2");
   });
 });
 

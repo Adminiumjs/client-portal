@@ -137,6 +137,20 @@ export const CONTRACT_REGISTRY = [
       'One payment service, online only: start a checkout on its hosted page, read how it ended, end one, refund, verify its webhooks, list missed events, and say which ways to pay are switched on. Answers are data; a refusal is never thrown.',
     implementations: 2,
   },
+  {
+    /**
+     * A card reader on the shop's counter, driven by a cloud API: the till
+     * asks the engine, the engine asks the reader, outbound only. Its two
+     * implementers are Card payments (Stripe Terminal) and the Card readers
+     * add-on (Square), proven against the packed package before the release
+     * that admits it.
+     */
+    id: 'card-terminal',
+    version: 1,
+    summary:
+      'A card reader at the counter: pair it in two steps, put an amount on it, read where the charge stands (the tip apart), take it off, refund, and read disputes by polling. Answers are data; a charge is never given up blind.',
+    implementations: 2,
+  },
 ] as const satisfies readonly ContractDefinition[];
 
 export type ContractId = (typeof CONTRACT_REGISTRY)[number]['id'];

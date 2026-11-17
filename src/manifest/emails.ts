@@ -42,12 +42,21 @@ export interface Words {
   button?: string;
 }
 
-export type EmailWords = Record<Kind, Words> & { clientFoot: string; studioFoot: string; greeting: string };
+export type EmailWords = Record<Kind, Words> & {
+  clientFoot: string;
+  studioFoot: string;
+  greeting: string;
+  /** The button to pay what is still owed online, and the line under it. */
+  payButton: string;
+  payNote: string;
+};
 
 export const EMAIL_EN: EmailWords = {
   greeting: "Hello {{recipient.first_name}},",
   clientFoot: "{{practice.name}} · {{practice.reply_to}} · {{practice.phone}}. Reply to this email and one of us reads it.",
   studioFoot: "Sent by {{practice.name}} to {{practice.reply_to}}. Change what we tell you in Settings.",
+  payButton: "Pay {{invoice.balance}} online",
+  payNote: "You’ll pay on the Stripe or PayPal page.",
   "proposal-sent": {
     name: "Proposal sent",
     subject: "Proposal for {{client.company}} — {{proposal.number}}",
@@ -250,6 +259,15 @@ const STUDIO: ReadonlySet<Kind> = new Set([
   "new-enquiry",
 ]);
 
+/**
+ * The emails about an invoice that is still owed: the invoice itself and its
+ * three reminders. Each carries a button to pay it online and a line under it,
+ * sent only while Adminium has a live pay link for the invoice (`pay_url`, empty
+ * when the studio takes no payments online, or nothing is owed): without one,
+ * the email reads exactly as it always has.
+ */
+const PAYABLE: ReadonlySet<Kind> = new Set(["invoice-sent", "invoice-rung-1", "invoice-rung-2", "invoice-rung-3"]);
+
 /** A notice's second sentence is the client's own words, quoted. */
 const QUOTED: ReadonlySet<Kind> = new Set(["declined", "changes-requested", "client-says-paid", "new-enquiry"]);
 
@@ -265,6 +283,10 @@ function layout(kind: Kind, all: EmailWords) {
     blocks.push(para("greeting", all.greeting));
     blocks.push(para("body", ...w.paras));
     if (w.list !== undefined) blocks.push({ block: "email.list", id: "details", data: { items: w.list } });
+    if (PAYABLE.has(kind)) {
+      blocks.push({ block: "email.button", id: "pay", data: { label: all.payButton, url: "{{pay_url}}", onlyWith: "pay_url" } });
+      blocks.push({ block: "email.text", id: "pay-note", data: { paras: [all.payNote], onlyWith: "pay_url" } });
+    }
     if (w.box !== undefined) {
       blocks.push({ block: "email.box", id: "how-to-pay", data: { label: w.box.label, value: w.box.value } });
       if (w.reference !== undefined) blocks.push(para("reference", w.reference));
@@ -288,9 +310,9 @@ export function emailWords(): Record<Tag, EmailWords> {
 }
 
 /** The variables each template reads, for the template editor's list. */
-function varsOf(words: Words): string[] {
-  const text = JSON.stringify(words);
-  const found = new Set<string>(["practice.name", "practice.reply_to", "practice.phone"]);
+function varsOf(words: Words, kind: Kind): string[] {
+  const text = JSON.stringify(words) + (PAYABLE.has(kind) ? JSON.stringify(EMAIL_EN.payButton) : "");
+  const found = new Set<string>(["practice.name", "practice.reply_to", "practice.phone", ...(PAYABLE.has(kind) ? ["pay_url"] : [])]);
   for (const [, name] of text.matchAll(/\{\{([A-Za-z_.]+)\}\}/g)) found.add(name!);
   // The editor lists what reads a row; `signInLink` and the add-on's settings are filled, not listed.
   return [...found].filter((name) => /^[a-z_]+(\.[a-z_]+)*$/.test(name)).sort();
@@ -302,7 +324,7 @@ export function emailTemplates(kinds: readonly Kind[]): unknown[] {
   return kinds.map((kind) => ({
     key: `clients-${kind}`,
     name: Object.fromEntries(Object.entries(words).map(([tag, w]) => [tag, w[kind].name])),
-    vars: varsOf(EMAIL_EN[kind]),
+    vars: varsOf(EMAIL_EN[kind], kind),
     locales: Object.fromEntries(Object.entries(words).map(([tag, w]) => [tag, layout(kind, w)])),
   }));
 }

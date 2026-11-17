@@ -136,7 +136,9 @@ async function bootClients(): Promise<void> {
   }
   const { createPublicClient } = await import("@adminiumjs/public-client");
   // Signing in by link asks for the human check first rather than being refused once.
-  const client = createPublicClient({ baseUrl: config.baseUrl, publishableKey: config.publishableKey, humanCheck: true } as never);
+  // A rehearsal's writes (someone who manages payments, trying the pay step) carry their staff session's token.
+  const rehearsal = config.rehearsalCsrfToken;
+  const client = createPublicClient({ baseUrl: config.baseUrl, publishableKey: config.publishableKey, humanCheck: true, ...(rehearsal === undefined ? {} : { csrfToken: rehearsal }) } as never);
   if (client === null) {
     showStartupFailure({ key: "startup.noServer" }, "NO_BACKEND");
     return;
@@ -238,7 +240,9 @@ async function bootDesk(): Promise<void> {
   setClockSource(() => Date.now());
   setStaffToken(() => csrf);
 
-  const [desk, { onSignedOut }] = await Promise.all([import("./state/desk.ts"), import("./state/outcome.ts")]);
+  const [desk, { onSignedOut }, { setDeskPayments }] = await Promise.all([import("./state/desk.ts"), import("./state/outcome.ts"), import("./state/deskPayments.ts")]);
+  // Whether the studio's Adminium takes the invoices online, and what this person may do with payments.
+  setDeskPayments(staff.payments, staff.kit);
   desk.useDesk.setState({
     me: desk.meOf(staff.user, staff.access),
     // The attached add-ons' public settings (Holiday calendars' days …), as the staff config carries them.

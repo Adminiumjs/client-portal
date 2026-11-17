@@ -58,6 +58,11 @@ import {
   type TableIndex,
 } from './refs.ts';
 
+/** The most producers an outbox declares: as many as an app may have templates. */
+export const OUTBOX_PRODUCERS_MAX = 32;
+/** The most an Adminium before 0.3.62 reads (`outbox.manyProducers`). */
+export const OUTBOX_PRODUCERS_BEFORE = 24;
+
 /** The statuses an outbox table's status column must offer. */
 export const OUTBOX_STATUSES = ['queued', 'sent', 'failed', 'skipped'] as const;
 
@@ -131,6 +136,20 @@ const producerBase = {
       z.object({ feature: z.string().regex(/^[a-z][a-z0-9-]{0,39}$/, 'a feature id'), setting: settingRefSchema }).strict(),
     ])
     .optional(),
+  /**
+   * Queued only while the app takes payments online for the row the message
+   * is about (`on`) — its payable switched on, a live service, customers able
+   * to reach the pay page — or only while it does not (`off`). Judged when
+   * the message is queued, beside `gate`: a print shop's "Delivery quote
+   * accepted, pay online" goes only with payments on; a shop's "We'll send an
+   * invoice" order mail only with them off, and its "not paid yet, pay here"
+   * mail only with them on. Two producers of one event, one `on` and one
+   * `off`, each with its own template, send one mail whichever way the shop
+   * is set — each with its own subject and preheader. A message already
+   * waiting is not judged again: its pay blocks follow `{{pay_url}}` when it
+   * goes. A row someone who manages payments is rehearsing counts as on.
+   */
+  payments: z.enum(['on', 'off']).optional(),
   /** The part of the app the email belongs to: nothing is queued while it is off (see `modules.ts`). */
   module: z.string().regex(/^[a-z][a-z0-9-]{0,39}$/, 'a module id is kebab-case').optional(),
   /** Skipped for a recipient whose `recipient.optIn` column is false. */
@@ -426,7 +445,13 @@ export const outboxSchema = z
      * which reads the invitations table. From Adminium 0.3.40.
      */
     surveyLinks: z.array(z.string().min(1).max(40)).min(1).max(8).optional(),
-    producers: z.array(outboxProducerSchema).max(24).optional(),
+    /**
+     * At most {@link OUTBOX_PRODUCERS_MAX}, as many as an app has templates:
+     * a sanity bound, not a cost — each producer is one more check on a
+     * write of its table and, for a reminder, one bounded query a minute.
+     * More than {@link OUTBOX_PRODUCERS_BEFORE} needs Adminium 0.3.62.
+     */
+    producers: z.array(outboxProducerSchema).max(OUTBOX_PRODUCERS_MAX).optional(),
   })
   .strict();
 export type Outbox = z.infer<typeof outboxSchema>;
@@ -623,6 +648,8 @@ export function outboxIssues(
     addOns?: AddOnNeeds | undefined;
     /** `add-on` when the outbox is an add-on's own: it links into its apps' pages, and has no guest side of its own. */
     kind?: string | undefined;
+    /** The app's payable tables: a producer judged by payments being on reads one. */
+    payments?: { payables?: readonly { table: string }[] | undefined } | undefined;
   } & Parameters<typeof unlistedColumn>[0],
   index: TableIndex,
 ): ReferenceIssue[] {
@@ -885,6 +912,14 @@ export function outboxIssues(
       out.push({ path: here('optIn'), message: 'the recipient names no opt-in column' });
     }
     const source = 'onCreate' in producer ? producer.onCreate : 'onChange' in producer ? producer.onChange : 'onDelete' in producer ? producer.onDelete : producer.before;
+    // Payments on or off, for the row the message is about: one of the app's payable tables (a child row's, through `via`).
+    if (producer.payments !== undefined) {
+      const payable = new Set((m.payments?.payables ?? []).map((entry) => entry.table));
+      const via = 'via' in source ? source.via : undefined;
+      if (payable.size === 0) out.push({ path: here('payments'), message: 'the app takes no payments (payments.payables), so they are never on' });
+      else if (via === undefined && !payable.has(source.table)) out.push({ path: here('payments'), message: `"${source.table}" is not one of this app's payable tables (payments.payables)` });
+      if ('onDelete' in producer) out.push({ path: here('payments'), message: 'a removed row is paid for no longer: payments are judged for a row that is still there' });
+    }
     if (index.table(source.table) === undefined) {
       out.push({ path: here(), message: `"${source.table}" is not a table of this app` });
       return;

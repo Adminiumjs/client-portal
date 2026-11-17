@@ -3,27 +3,36 @@
  * due, what it covers (the stored lines and totals), the payments so far, and
  * the balance — then what the client can do about it.
  *
- *   open     How to pay (the studio's payment instructions, when Adminium
- *            serves them to the signed-in client) with the invoice number to
- *            quote; "I've sent a payment" — once, until the studio records a
- *            payment — after which the page says when they told the studio
- *   paid     settled on the day of its last payment; see the receipt
+ *   open     "Pay now", while the studio's Adminium takes the invoices
+ *            online (`state/clientPay.ts`: the pay page opens in a tab of
+ *            its own, and the invoice is read again when the client comes
+ *            back, with how the payment stands: didn't finish or ran out
+ *            say so beside Pay now; the bank confirming it says so instead
+ *            of every way to pay); How to pay (the studio's payment instructions, when
+ *            Adminium serves them to the signed-in client) with the invoice
+ *            number to quote; "I've sent a payment" — once, until a payment
+ *            is recorded, by the studio or online — after which the page
+ *            says when they told the studio
+ *   paid     settled on the day of its last payment, "Paid online · receipt
+ *            emailed" when that payment was made online; see the receipt
  *   void     voided on its day; nothing to pay (the reason is the studio's own)
  *
  * "Print or save as PDF" opens the add-on's own copy of the invoice.
  */
 import { useEffect, useState } from "react";
-import { Ban, CheckCheck, CircleAlert, Download, FileText, Hash, House, Send, X } from "lucide-react";
+import { Ban, CalendarX, CheckCheck, CircleAlert, CreditCard, Download, FileText, FlaskConical, Hash, House, Landmark, LoaderCircle, Lock, Send, X } from "lucide-react";
 
 import { Button, LinesTable, StatusPill } from "../../components/ui.tsx";
 import type { Id } from "../../data/types.ts";
 import { useI18n } from "../../i18n/index.tsx";
 import { studioZone, today } from "../../lib/clock.ts";
 import { sentAPayment } from "../../state/clientActions.ts";
+import { loadPayOnline, noticeConfirming, payNow, useClientPay, useMayPayOnline, useRehearsing } from "../../state/clientPay.ts";
 import { loadClientInvoice, usePortal, usePortalRow, usePortalRows } from "../../state/portal.ts";
 import { openSheet } from "../../state/sheets.ts";
 import { go, toast, useUi } from "../../state/ui.ts";
 import NotFound from "./NotFound.tsx";
+import { madeOnline } from "../../lib/money.ts";
 import { checkClaim, ledger } from "./invoice/model.ts";
 import { AlsoWith, useDay, useSelected } from "./shared/bits.tsx";
 import { byPosition, dayOf, daysPastDue, hasClaimed, invoiceState, isOpen, paymentsOf, settledOn } from "./shared/model.ts";
@@ -62,7 +71,7 @@ export function usePaymentInstructions(invoiceId: Id | null): string | null {
   return text;
 }
 
-const METHOD_KEYS = { "bank-transfer": "client.method.bank", card: "client.method.card", cheque: "client.method.cheque", cash: "client.method.cash", other: "client.method.other" } as const;
+const METHOD_KEYS = { "bank-transfer": "client.method.bank", card: "client.method.card", cheque: "client.method.cheque", cash: "client.method.cash", other: "client.method.other", online: "client.method.online" } as const;
 
 export default function Invoice() {
   const { t, money, locale, number } = useI18n();
@@ -78,10 +87,17 @@ export default function Invoice() {
   const [claim, setClaim] = useState<{ amount: string; on: string } | null>(null);
   const [claimError, setClaimError] = useState<{ field: "amount" | "on" | null; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  const mayPay = useMayPayOnline();
+  const rehearsing = useRehearsing();
+  // The demo's stand-in takes the payment itself: there is no Stripe or PayPal page to name.
+  const standIn = useClientPay((s) => s.online?.standIn === true);
+  const flow = useClientPay((s) => (id === null ? "idle" : (s.flow[id] ?? "idle")));
 
   useEffect(() => {
     setClaim(null);
     setClaimError(null);
+    // Whether paying online is open now, and whether a payment of it is still with the bank: asked as the invoice opens.
+    if (id !== null) void loadPayOnline().then(() => noticeConfirming(id));
   }, [id]);
 
   if (!signedIn) return null;
@@ -97,6 +113,9 @@ export default function Invoice() {
   const payments = paymentsOf(allPayments, inv.id);
   const rows = ledger(inv, allPayments);
   const settled = settledOn(inv, allPayments);
+  // The payment that settled it was made online (a service took it): the client is told so, never with card details.
+  const lastPayment = payments.length === 0 ? null : payments[payments.length - 1]!;
+  const paidOnline = lastPayment !== null && madeOnline(lastPayment);
   const claimed = hasClaimed(inv);
   const claimedOn = dayOf(inv.client_paid_at, zone) ?? inv.client_paid_on;
   const termsWord = inv.terms === null ? "" : t(`client.terms.${inv.terms}`);
@@ -108,6 +127,14 @@ export default function Invoice() {
       return;
     }
     void openInNewTab(() => port.documentUrl("invoice", "invoices", inv.id, locale), t("client.blocked"));
+  };
+
+  const pay = () => {
+    if (useUi.getState().preview !== null) {
+      toast(t("portal.previewBlocked"), { icon: "info" });
+      return;
+    }
+    void payNow(inv.id, { openTab: (link) => openInNewTab(link, t("client.blocked")) });
   };
 
   const sendClaim = async () => {
@@ -133,6 +160,12 @@ export default function Invoice() {
 
   return (
     <section className="screen ol-screen cl-page" data-screen="client-invoice" aria-labelledby="cl-invoice-title">
+      {rehearsing && (
+        <div className="cl-test-band" role="note">
+          <FlaskConical size={16} aria-hidden="true" />
+          <span>{t("client.invoice.testBand")}</span>
+        </div>
+      )}
       <article className="cl-card cl-doc-card">
         <div className="cl-doc-head">
           <div className="cl-doc-line">
@@ -201,9 +234,9 @@ export default function Invoice() {
                       {date(row.day)}
                     </span>
                     <span role="cell" className="cl-ledger-entry">
-                      <span className="cl-ledger-label">{row.kind === "total" ? t("client.invoice.total") : t("client.invoice.received")}</span>
+                      <span className="cl-ledger-label">{row.kind === "total" ? t("client.invoice.total") : row.kind === "refund" ? t("client.invoice.refundRow") : t("client.invoice.received")}</span>
                       <span className="cl-mono-small">
-                        {row.kind === "total" ? [inv.number, termsWord].filter((x) => x !== null && x !== "").join(" · ") : t(METHOD_KEYS[row.method ?? "other"])}
+                        {row.kind === "total" ? [inv.number, termsWord].filter((x) => x !== null && x !== "").join(" · ") : row.online ? t("client.method.online") : t(METHOD_KEYS[row.method ?? "other"])}
                         {/* On a phone the date and amount columns fold away: the entry says them. */}
                         {row.kind === "payment" && (
                           <span className="cl-ledger-narrow">
@@ -214,7 +247,7 @@ export default function Invoice() {
                       </span>
                     </span>
                     <span role="cell" className={`cl-num money${row.kind === "payment" ? " cl-tone-pos" : " cl-tone-muted"}`}>
-                      {row.kind === "payment" ? `−${money(row.amount, inv.currency)}` : money(row.amount, inv.currency)}
+                      {row.kind === "payment" ? `−${money(row.amount, inv.currency)}` : row.kind === "refund" ? `+${money(row.amount, inv.currency)}` : money(row.amount, inv.currency)}
                     </span>
                     <span role="cell" className="cl-num money">
                       {money(row.after, inv.currency)}
@@ -253,7 +286,53 @@ export default function Invoice() {
           </Button>
         </div>
 
-        {open && (
+        {open && (flow === "failed" || flow === "expired") && (
+          <div className="cl-note cl-note--warn" role="alert">
+            {flow === "failed" ? <CircleAlert size={17} aria-hidden="true" /> : <CalendarX size={17} aria-hidden="true" />}
+            <span className="cl-note-text">
+              <span>{flow === "failed" ? t("client.invoice.failTitle") : t("client.invoice.expiredTitle")}</span>
+              <span className="cl-note-body">{t("client.invoice.failBody")}</span>
+            </span>
+          </div>
+        )}
+        {open && flow === "confirming" && (
+          <div className="cl-note cl-note--bank" role="status">
+            <Landmark size={17} aria-hidden="true" />
+            <span className="cl-note-text">
+              <span>{t("client.invoice.bankTitle")}</span>
+              <span className="cl-note-body">{t("client.invoice.bankBody")}</span>
+            </span>
+          </div>
+        )}
+        {open && mayPay && (flow === "idle" || flow === "failed" || flow === "expired") && (
+          <div className="cl-pay">
+            <Button kind="primary" size="wide" icon={Lock} className="cl-pay-now" onClick={pay}>
+              <AmountIn text={t("client.invoice.payNow")} amount={money(inv.balance, inv.currency)} />
+            </Button>
+            {!standIn && <span className="cl-fine">{t("client.invoice.payNote")}</span>}
+          </div>
+        )}
+        {open && flow === "taking" && (
+          <div className="cl-pay">
+            <div className="cl-pay-taking">
+              <LoaderCircle size={16} className="btn-spin" aria-hidden="true" />
+              <span>{t("client.invoice.taking")}</span>
+            </div>
+            {!standIn && <span className="cl-fine">{t("client.invoice.payNoteShort")}</span>}
+          </div>
+        )}
+        {flow === "checking" && (
+          <div className="cl-pay-checking">
+            <LoaderCircle size={16} className="btn-spin" aria-hidden="true" />
+            <span>{t("client.invoice.checking")}</span>
+          </div>
+        )}
+        <span className="ol-sr-only" role="status" aria-live="polite">
+          {flow === "taking" ? t("client.invoice.taking") : flow === "checking" ? t("client.invoice.checking") : ""}
+        </span>
+
+        {/* While the bank confirms a payment, nothing offers another way to pay it. */}
+        {open && flow !== "checking" && flow !== "confirming" && (
           <>
             <div className="cl-howto">
               <span className="cl-kicker">{t("client.invoice.howToPay")}</span>
@@ -347,6 +426,12 @@ export default function Invoice() {
               <CheckCheck size={18} aria-hidden="true" />
               {t("client.invoice.settledTitle", { id: inv.number ?? "", date: date(settled ?? inv.due_on, "long") })}
             </span>
+            {paidOnline && (
+              <span className="cl-settled-online">
+                <CreditCard size={15} aria-hidden="true" />
+                {t("client.invoice.paidOnline")}
+              </span>
+            )}
             <span className="cl-muted cl-small">{t("client.invoice.disagree")}</span>
             <div className="cl-row-wrap">
               {payments.length > 0 && (
@@ -371,5 +456,22 @@ export default function Invoice() {
 
       <AlsoWith current={{ kind: "invoice", id: inv.id }} />
     </section>
+  );
+}
+
+/**
+ * A sentence with an amount in it ("Pay {amount} now"), the amount drawn in
+ * the money face: one translated sentence, so each language puts the amount
+ * where it belongs.
+ */
+function AmountIn({ text, amount }: { text: string; amount: string }) {
+  const at = text.indexOf("{amount}");
+  if (at === -1) return <span>{text}</span>;
+  return (
+    <span>
+      {text.slice(0, at)}
+      <span className="money">{amount}</span>
+      {text.slice(at + "{amount}".length)}
+    </span>
   );
 }

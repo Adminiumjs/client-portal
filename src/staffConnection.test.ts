@@ -105,6 +105,8 @@ describe("loadStaffConfig", () => {
       publicKeys: { kiosk: "adm_pub_k", broken: 3 },
       access: { tables: { tickets: ["read", "update", "fly"], odd: "all" }, roles: [{ slug: "pos-cashier", name: "POS cashier" }, { name: "no slug" }] },
       addOns: { invoices: { version: "1.0.3", settings: { business_name: "Harbour Café" } }, odd: 3 },
+      payments: { on: true, online: true, test: "yes", refund: false },
+      kit: { contract: 1, entry: "/assets/kit/kit-AbC123.js", styles: ["/assets/kit/kit-AbC123.css"] },
     });
     expect(await loadStaffConfig({ hostedStaff: true, base: "/apps/pos/staff/", fetchImpl })).toEqual({
       connectionId: "con_42",
@@ -122,7 +124,18 @@ describe("loadStaffConfig", () => {
       publicKeys: { kiosk: "adm_pub_k" },
       access: { tables: { tickets: ["read", "update"] }, roles: [{ slug: "pos-cashier", name: "POS cashier" }] },
       addOns: { invoices: { version: "1.0.3", settings: { business_name: "Harbour Café" } } },
+      payments: { on: true, online: true, test: false, refund: false },
+      kit: { contract: 1, entry: "/assets/kit/kit-AbC123.js" },
     });
+  });
+
+  it("takes the kit only from this same server, and says nothing of payments when the server said nothing", async () => {
+    for (const entry of ["https://elsewhere.example/kit.js", "//elsewhere.example/kit.js", "/assets/kit/kit.css", "javascript:alert(1)"]) {
+      const config = await loadStaffConfig({ hostedStaff: true, base: "/apps/pos/staff/", fetchImpl: ok({ connectionId: "con_42", tables: {}, kit: { contract: 1, entry } }) });
+      expect(config?.kit, entry).toBeNull();
+    }
+    const config = await loadStaffConfig({ hostedStaff: true, base: "/apps/pos/staff/", fetchImpl: ok({ connectionId: "con_42", tables: {} }) });
+    expect(config?.payments).toBeNull();
   });
 
   it("says nothing of access when the server said nothing, so no button is hidden on a guess", async () => {

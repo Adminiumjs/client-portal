@@ -13,7 +13,15 @@
  *                   draft's can go);
  *   studio-manager  everything, the set-up and the Invoices & Receipts
  *                   add-on's own settings included; voids an invoice or a
- *                   payment, discards a draft, and reopens a finished project.
+ *                   payment recorded by hand, discards a draft, reopens a
+ *                   finished project, and gives back money a client paid
+ *                   online (Adminium's refund, for this app's invoices only:
+ *                   the install's check lists it, ticked, to untick).
+ *
+ * A payment taken online is Adminium's to write: its reference, the service
+ * that took it and what was refunded of it are written by nobody else (the
+ * studio's limits leave them out, and Adminium refuses them to every role).
+ * It is never voided; a manager refunds it.
  *
  * A freelancer working alone is simply the workspace's admin.
  *
@@ -61,9 +69,23 @@ export const ROLES = [
         writable: columnsBut("invoices", "number_seq", "number", "issued_on", "sent_at", "subtotal", "tax", "total", "paid", "balance", "void_reason", "voided_at", "voided_by"),
         writableValues: { status: ["sent"] },
       },
-      // Records a payment, never voids one.
+      // Records a payment, never voids one, and never writes what only an online payment carries.
       payments: {
-        writable: columnsBut("payments", "number_seq", "number", "recorded_by", "recorded_at", "voided", "void_reason", "voided_by", "voided_at"),
+        writable: columnsBut(
+          "payments",
+          "number_seq",
+          "number",
+          "recorded_by",
+          "recorded_at",
+          "voided",
+          "void_reason",
+          "voided_by",
+          "voided_at",
+          "refunded_amount",
+          "net_amount",
+          "payment_ref",
+          "provider",
+        ),
       },
     },
   },
@@ -80,6 +102,8 @@ export const ROLES = [
       ...EVERY_TABLE.map(pii),
       // The add-on's letterhead, tax, payment instructions and reminder ladders.
       "addOn:invoices:settings",
+      // Gives back money a client paid online for one of this app's invoices.
+      "payments:@:refund",
     ],
   },
 ];

@@ -80,6 +80,19 @@ describe("a preview", () => {
     expect(plainLines(ps, "Foot").at(-1)).toEqual({ text: "--\nFoot", tone: "foot" });
   });
 
+  it("sends the pay button and its line only with a live pay link, as Adminium's outbox does", () => {
+    const rows = useDesk.getState().rows;
+    const picked = pick("invoice-sent", rows, "2026-07-28");
+    const values = valuesFor(picked, { tag: "en-US", today: "2026-07-28", settings: Object.values(rows.settings)[0]!, payHow: "Bank transfer", places: PLACES, code: "481926" });
+    const without = pieces(filled(shippedDoc("invoice-sent", "en-US"), values));
+    expect(without.filter((p) => p.kind === "button")).toHaveLength(1);
+    expect(JSON.stringify(without)).not.toContain("Stripe");
+    const withLink = pieces(filled(shippedDoc("invoice-sent", "en-US"), { ...values, pay_url: "https://studio.example/pay/AbC" }));
+    expect(withLink.map((p) => p.kind)).toEqual(["lead", "para", "rows", "button", "para", "box", "button", "sign"]);
+    expect(withLink.find((p) => p.kind === "button")).toMatchObject({ label: `Pay ${values["invoice.balance"]!} online`, url: "https://studio.example/pay/AbC" });
+    expect(withLink).toContainEqual({ kind: "para", text: "You’ll pay on the Stripe or PayPal page." });
+  });
+
   it("never shows a share code or a sign-in token, only the address with the token left out", () => {
     const rows = useDesk.getState().rows;
     const picked = pick("handover", rows, "2026-07-28");

@@ -1,6 +1,6 @@
 {
   "package": "@adminium/add-on-invoices",
-  "version": "1.0.5",
-  "commit": "2a2cd5bbbcbd8baf141fcd63b5687a2ceafd9e4c",
-  "serverSha256": "1eda210c4fe8cb3efa9d427f8c9331f0ed2709a272272bcd1783d77135ddfcfc"
+  "version": "1.0.27",
+  "commit": "87f706ff80f3e34d253cc77d1a279d44879ee78d",
+  "serverSha256": "0ff9d71f8c442bf635d0489d3c6e0f08753d23d173ec066b2145784396b7f489"
 }

@@ -99,6 +99,8 @@ describe.skipIf(why !== null)(`the contract with a built Adminium${why === null 
       let staff: Caller;
       let connectionId = "";
       let real: Record<string, string> = {};
+      // Cleo, signed in on the clients' side by her emailed link: who later asks how her invoice's payment stands.
+      let cleo: { guest: Caller; session: string } | null = null;
       let tableIds: Record<string, string> = {};
 
       beforeAll(async () => {
@@ -237,6 +239,7 @@ describe.skipIf(why !== null)(`the contract with a built Adminium${why === null 
         const token = /\/c#([A-Za-z0-9_-]{43})/.exec(mail.text)![1]!;
         const session = ok(await guest.post<{ data: { session: string; level: string } }>("/api/v1/public/claim/link/verify", { token })).data;
         expect(session.level).toBe("verified");
+        cleo = { guest, session: session.session };
         const as = { "x-adminium-public-session": session.session };
         // The accept door, found as the portal finds it: the proposals entry that writes a status and a signature.
         const refs = ok(await guest.get<{ data: { refs: Record<string, { actions: string[]; writable: string[] }> } }>("/api/v1/public/config", as)).data.refs;
@@ -259,6 +262,36 @@ describe.skipIf(why !== null)(`the contract with a built Adminium${why === null 
         const twice = await guest.patch(`/api/v1/public/records/${accept}/${String(proposal.id)}`, { values: { status: "accepted", signed_name: "Someone Else" } }, as);
         expect(twice.status).toBe(404);
       }, 240_000);
+
+      it("installs paying online switched off: the invoices are the app's one payable, and a client is offered no pay link", async () => {
+        const apps = ok(await staff.get<{ data: { apps: { appKey: string; connectionId: string; enabled: boolean; tables: { tableName: string; shape: boolean; valid: boolean }[] }[] } }>("/api/v1/payments/apps")).data.apps;
+        expect(apps.filter((a) => a.appKey === "clients")).toEqual([{ connectionId, appKey: "clients", name: expect.any(String), enabled: false, tables: [{ tableName: tableIds["invoices"], shape: true, valid: true }] }]);
+        const config = ok(await new Caller(server.base).get<{ publishableKey: string }>("/apps/clients/customer/surface-config.json"));
+        const guest = new Caller(server.base, { authorization: `Bearer ${config.publishableKey}`, origin: server.base });
+        expect(ok(await guest.get<{ data: { online: boolean } }>("/api/v1/public/payments/available")).data.online).toBe(false);
+        // The desk's payment panel reads an open invoice as the shape's: what the desk's Copy pay link and Refund name.
+        const open = (await rows("invoices")).find((i) => i["status"] === "sent" && Number(i["balance"]) > 0)!;
+        const panel = ok(await staff.post<{ data: { payable: { kind: string; tableName: string; rowKey: string }; due: string } | null }>("/api/v1/payments/panel", { connectionId, table: tableIds["invoices"], recordId: String(open.id) })).data;
+        expect(panel?.payable).toMatchObject({ kind: "shape", tableName: tableIds["invoices"], rowKey: String(open.id) });
+        expect(Number(panel?.due)).toBe(Number(open["balance"]));
+        // The desk's Copy pay link asks for the invoice's current link by that same name: none yet.
+        expect(ok(await staff.post<{ data: unknown }>("/api/v1/payments/links/current", { kind: "shape", connectionId, tableName: tableIds["invoices"], rowKey: String(open.id) })).data).toBeNull();
+      }, 120_000);
+
+      it("tells a signed-in client how their own invoice's payment stands, in one word, and nothing of another client's", async () => {
+        expect(cleo).not.toBeNull();
+        const { guest, session } = cleo!;
+        const as = { "x-adminium-public-session": session };
+        const refs = ok(await guest.get<{ data: { refs: Record<string, { actions: string[] }> } }>("/api/v1/public/config", as)).data.refs;
+        const ref = Object.keys(refs).find((name) => name.startsWith(real["invoices"]!) && refs[name]!.actions.includes("read"))!;
+        const own = ok(await guest.get<{ data: Row[] }>(`/api/v1/public/records/${ref}?limit=200`, as)).data;
+        expect(own.length).toBeGreaterThan(0);
+        // Nothing was started online: one word, and nothing else of it.
+        for (const invoice of own) expect(ok(await guest.get<{ data: unknown }>(`/api/v1/public/payments/state?ref=${ref}&id=${String(invoice.id)}`, as)).data).toEqual({ state: "none" });
+        // Another client's invoice is not hers to ask about, as it is not hers to read.
+        const other = (await rows("invoices")).find((invoice) => !own.some((mine) => mine.id === invoice.id))!;
+        expect((await guest.get(`/api/v1/public/payments/state?ref=${ref}&id=${String(other.id)}`, as)).status).toBe(404);
+      }, 120_000);
 
       // ── the back office ─────────────────────────────────────────────────────
 

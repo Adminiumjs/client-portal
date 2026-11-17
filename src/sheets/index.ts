@@ -18,6 +18,7 @@ import Version from "./Version.tsx";
 import MarkApproved from "./MarkApproved.tsx";
 import RecordPayment from "./RecordPayment.tsx";
 import VoidPayment from "./VoidPayment.tsx";
+import RefundPayment from "./RefundPayment.tsx";
 import VoidInvoice from "./VoidInvoice.tsx";
 import Extend from "./Extend.tsx";
 import Withdraw from "./Withdraw.tsx";
@@ -37,6 +38,7 @@ export const DESK_SHEETS: { [K in DeskSheet["kind"]]: SheetComponent<K> } = {
   markApproved: MarkApproved,
   recordPayment: RecordPayment,
   voidPayment: VoidPayment,
+  refundPayment: RefundPayment,
   voidInvoice: VoidInvoice,
   extend: Extend,
   withdraw: Withdraw,
@@ -56,6 +58,7 @@ export const SHEET_TITLES: Readonly<Record<DeskSheet["kind"], MessageKey>> = {
   markApproved: "sheetName.markApproved",
   recordPayment: "sheetName.recordPayment",
   voidPayment: "sheetName.voidPayment",
+  refundPayment: "sheetName.refundPayment",
   voidInvoice: "sheetName.voidInvoice",
   extend: "sheetName.extend",
   withdraw: "sheetName.withdraw",

@@ -30,6 +30,7 @@ export type DeskSheet =
   | { kind: "markApproved"; deliverableId: Id }
   | { kind: "recordPayment"; invoiceId: Id; prefill?: { amount?: string; on?: Day } }
   | { kind: "voidPayment"; paymentId: Id }
+  | { kind: "refundPayment"; paymentId: Id }
   | { kind: "voidInvoice"; invoiceId: Id }
   | { kind: "extend"; proposalId: Id }
   | { kind: "withdraw"; proposalId: Id }

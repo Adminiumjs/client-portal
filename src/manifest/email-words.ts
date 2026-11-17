@@ -12,6 +12,8 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
     greeting: "Hallo {{recipient.first_name}},",
     clientFoot: `${FOOT_TAIL} Antworten Sie einfach auf diese E-Mail – einer von uns liest sie.`,
     studioFoot: "Gesendet von {{practice.name}} an {{practice.reply_to}}. Was wir Ihnen melden, ändern Sie in den Einstellungen.",
+    payButton: "{{invoice.balance}} online bezahlen",
+    payNote: "Sie bezahlen auf der Seite von Stripe oder PayPal.",
     "proposal-sent": {
       name: "Angebot gesendet",
       subject: "Angebot für {{client.company}} — {{proposal.number}}",
@@ -177,6 +179,8 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
     greeting: "Bonjour {{recipient.first_name}},",
     clientFoot: `${FOOT_TAIL} Répondez à cet e-mail : l’un de nous le lira.`,
     studioFoot: "Envoyé par {{practice.name}} à {{practice.reply_to}}. Choisissez ce que nous vous signalons dans les réglages.",
+    payButton: "Payer {{invoice.balance}} en ligne",
+    payNote: "Vous paierez sur la page Stripe ou PayPal.",
     "proposal-sent": {
       name: "Proposition envoyée",
       subject: "Proposition pour {{client.company}} — {{proposal.number}}",
@@ -342,6 +346,8 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
     greeting: "Hej {{recipient.first_name}},",
     clientFoot: `${FOOT_TAIL} Svar på denne e-mail, så læser en af os den.`,
     studioFoot: "Sendt af {{practice.name}} til {{practice.reply_to}}. Vælg, hvad vi fortæller dig, under Indstillinger.",
+    payButton: "Betal {{invoice.balance}} online",
+    payNote: "Du betaler på Stripe- eller PayPal-siden.",
     "proposal-sent": {
       name: "Tilbud sendt",
       subject: "Tilbud til {{client.company}} — {{proposal.number}}",
@@ -507,6 +513,8 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
     greeting: "Dobrý den, {{recipient.first_name}},",
     clientFoot: `${FOOT_TAIL} Odpovězte na tento e-mail a jeden z nás si ho přečte.`,
     studioFoot: "Odesláno ze studia {{practice.name}} na {{practice.reply_to}}. Co vám hlásíme, změníte v Nastavení.",
+    payButton: "Zaplatit {{invoice.balance}} online",
+    payNote: "Zaplatíte na stránce Stripe nebo PayPal.",
     "proposal-sent": {
       name: "Nabídka odeslána",
       subject: "{{client.company}}: nabídka {{proposal.number}}",
@@ -672,6 +680,8 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
     greeting: "مرحبًا {{recipient.first_name}}،",
     clientFoot: `${FOOT_TAIL} رُدّ على هذه الرسالة وسيقرؤها أحدنا.`,
     studioFoot: "أرسلها {{practice.name}} إلى {{practice.reply_to}}. غيّر ما نُخبرك به من الإعدادات.",
+    payButton: "ادفع {{invoice.balance}} عبر الإنترنت",
+    payNote: "ستدفع على صفحة Stripe أو PayPal.",
     "proposal-sent": {
       name: "أُرسل العرض",
       subject: "عرض لـ {{client.company}} — {{proposal.number}}",
@@ -832,6 +842,8 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
     greeting: "{{recipient.first_name}}，您好：",
     clientFoot: `${FOOT_TAIL} 直接回复这封邮件，我们中会有人读到。`,
     studioFoot: "由 {{practice.name}} 发送至 {{practice.reply_to}}。在设置中更改我们通知您的内容。",
+    payButton: "在线支付 {{invoice.balance}}",
+    payNote: "您将在 Stripe 或 PayPal 页面上付款。",
     "proposal-sent": {
       name: "提案已发送",
       subject: "给 {{client.company}} 的提案 — {{proposal.number}}",
@@ -977,6 +989,8 @@ export const EMAIL_TRANSLATIONS: Record<Exclude<Tag, "en-US">, EmailWords> = {
     greeting: "{{recipient.first_name}}，您好：",
     clientFoot: `${FOOT_TAIL} 直接回覆這封郵件，我們會有人讀到。`,
     studioFoot: "由 {{practice.name}} 寄至 {{practice.reply_to}}。在設定中更改我們通知您的內容。",
+    payButton: "線上支付 {{invoice.balance}}",
+    payNote: "您將在 Stripe 或 PayPal 頁面上付款。",
     "proposal-sent": {
       name: "提案已送出",
       subject: "給 {{client.company}} 的提案 — {{proposal.number}}",

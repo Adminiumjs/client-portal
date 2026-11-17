@@ -21,3 +21,13 @@ describe("the customer config's other keys", () => {
     expect(await resolveSurfaceConfig({ ...opts, fetchImpl: served({ publishableKey: "adm_pub_portal", publicKeys: { handover: 42, other: "" } }) as never })).not.toHaveProperty("publicKeys");
   });
 });
+
+describe("a rehearsal's token", () => {
+  it("is carried when the server serves it to the person rehearsing, and never made up", async () => {
+    const config = await resolveSurfaceConfig({ ...opts, fetchImpl: served({ publishableKey: "adm_pub_portal", rehearsal: { until: "2026-11-16T10:00:00.000Z", csrfToken: "tok_rehearse" } }) as never });
+    expect(config).toMatchObject({ rehearsalCsrfToken: "tok_rehearse" });
+    for (const rehearsal of [undefined, null, {}, { csrfToken: "" }, { csrfToken: 7 }]) {
+      expect(await resolveSurfaceConfig({ ...opts, fetchImpl: served({ publishableKey: "adm_pub_portal", rehearsal }) as never })).not.toHaveProperty("rehearsalCsrfToken");
+    }
+  });
+});

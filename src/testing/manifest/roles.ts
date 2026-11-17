@@ -722,7 +722,7 @@ export function privateShapeIssues(
     ref: string;
     private?: true | undefined;
     belongs?: readonly unknown[] | undefined;
-    states?: { timed?: unknown; effects?: readonly { via?: string }[] | undefined; children?: Readonly<Record<string, { moveOnCreate?: string | undefined }>> | undefined } | undefined;
+    states?: { timed?: unknown; effects?: readonly { via?: string }[] | undefined; children?: Readonly<Record<string, { moveOnCreate?: string | undefined }>> | undefined; supersedes?: unknown } | undefined;
     postings?: unknown;
     adjust?: unknown;
     check?: unknown;
@@ -754,6 +754,8 @@ export function privateShapeIssues(
       for (const [child, rule] of Object.entries(table.states?.children ?? {})) {
         if (rule.moveOnCreate !== undefined) out.push({ path: at('states', 'children', child, 'moveOnCreate'), message: said(table.ref, "another table's new row does not move its rows") });
       }
+      // Nor does one person's new row move the rows of another it shares a link with.
+      if (table.states?.supersedes !== undefined) out.push({ path: at('states', 'supersedes'), message: said(table.ref, "a new row does not move another person's rows") });
       return;
     }
     table.columns.forEach((column, c) => {

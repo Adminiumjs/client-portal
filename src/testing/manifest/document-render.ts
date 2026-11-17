@@ -266,6 +266,11 @@ export const documentPictureValueSchema = z
  * clock. `pay-link` — the record's own live pay link (a `text` slot), or the
  * same link as a code to scan (a `qr` slot, only when it is short enough),
  * when the record can be paid online right now; otherwise the slot stays empty.
+ * A `date` slot of `pay-link` takes the day that same link stops opening, on
+ * the venue's clock (`YYYY-MM-DD`): what a printed document says under the
+ * link ("Works until …"). It is filled only beside a link, from Adminium
+ * 0.3.61; an earlier Adminium puts the link's text in it, so a provider prints
+ * the day only when the value is a `YYYY-MM-DD` day.
  */
 export const OUTLINE_SLOT_DEFAULTS = ['sequence', 'connection', 'setting', 'now', 'pay-link'] as const;
 export type OutlineSlotDefault = (typeof OUTLINE_SLOT_DEFAULTS)[number];

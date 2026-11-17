@@ -13,13 +13,14 @@ import { today } from "../../lib/clock.ts";
 import { usePortal, usePortalRows } from "../../state/portal.ts";
 import { openSheet } from "../../state/sheets.ts";
 import { open, toast, useUi } from "../../state/ui.ts";
+import { madeOnline } from "../../lib/money.ts";
 import { PERIODS, statement, type Period } from "./statement/model.ts";
 import { BackHome, Section, useDay } from "./shared/bits.tsx";
 import { invoiceState, isOpen } from "./shared/model.ts";
 import { openInNewTab, portOrNull, useSignedIn } from "./shared/page.ts";
 
 const PERIOD_KEYS = { all: "client.statement.all", year: "client.statement.year", "12m": "client.statement.twelve" } as const;
-const METHOD_KEYS = { "bank-transfer": "client.method.bank", card: "client.method.card", cheque: "client.method.cheque", cash: "client.method.cash", other: "client.method.other" } as const;
+const METHOD_KEYS = { "bank-transfer": "client.method.bank", card: "client.method.card", cheque: "client.method.cheque", cash: "client.method.cash", other: "client.method.other", online: "client.method.online" } as const;
 
 export default function Statement() {
   const { t, money, locale, number } = useI18n();
@@ -114,7 +115,7 @@ export default function Statement() {
               <li key={payment.id} className="cl-pay">
                 <span className="cl-pay-main">
                   <span className="cl-pay-when">{date(payment.paid_on, "long")}</span>
-                  <span className="cl-mono-small">{[invoice.number, t(METHOD_KEYS[payment.method])].filter((x) => x !== null && x !== "").join(" · ")}</span>
+                  <span className="cl-mono-small">{[invoice.number, t(madeOnline(payment) ? "client.method.online" : METHOD_KEYS[payment.method])].filter((x) => x !== null && x !== "").join(" · ")}</span>
                 </span>
                 <span className="cl-pay-figures">
                   <span className="cl-pay-amount money">{money(payment.amount, payment.currency ?? invoice.currency)}</span>

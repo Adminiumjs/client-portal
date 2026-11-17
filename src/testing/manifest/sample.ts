@@ -31,7 +31,10 @@
  *                               days from today
  *   `{"@day": 3}`              a date in the venue's own zone
  *   `{"@t": {"en-US": "…"}}`   the adding person's language
- *   `{"@asset": "<label>"}`    a file from `assets`, added to the Files library
+ *   `{"@asset": "<label>"}`    a file from `assets`, added to the Files library:
+ *                               a picture (in a picture column) or a product
+ *                               asset — an SVG or a model (.glb, .stl, .3mf) —
+ *                               in a column of one asset that takes its kind
  *   `{"@table": "<table>"}`    that table's stored name, for a column that
  *                               holds one (`rules.tableRef`): the name it has
  *                               on this install, whichever app made the table
@@ -91,13 +94,14 @@
  * tables (its items, its recipes — never its history), and rows of the app's
  * own tables that link into them, each marked `"own": true`. It is named by
  * the manifest's `sampleData.addOns.<key>.file` and loaded only while the
- * add-on is there. `sampleSectionIssues` checks one.
+ * add-on is there. Its `assets` are its own: its rows' `@asset`s name them,
+ * and they leave with its rows. `sampleSectionIssues` checks one.
  *
  * Pure: a format and its checks, no I/O. The server resolves the directives.
  */
 import { z } from 'zod';
 
-import { ledgersOf, takesPicturesOnly, type AddOnManifest, type AppManifest, type Manifest } from './schema.ts';
+import { ledgersOf, takesAssetsOnly, takesPicturesOnly, type AddOnManifest, type AppManifest, type Manifest } from './schema.ts';
 
 export const SAMPLE_FORMAT = 'adminium.sample/1';
 
@@ -184,6 +188,30 @@ export type ByStay = z.infer<typeof byStaySchema>;
 
 /** The keys of a row that are directives about the row, not columns. */
 export const ROW_DIRECTIVES: ReadonlySet<string> = new Set(['@label', '@byClock', '@byStay', '@onlyIfEmpty', '@fillEmpty']);
+
+/**
+ * The kinds of file a sample's `assets` may be, by the names they end in: the
+ * pictures, an SVG piece and the models. The server stores each under the
+ * type an upload of it is stored as, and a column's `accept` is judged on it.
+ */
+export const SAMPLE_FILE_EXTENSIONS = {
+  png: ['.png'],
+  jpeg: ['.jpg', '.jpeg'],
+  webp: ['.webp'],
+  gif: ['.gif'],
+  svg: ['.svg'],
+  glb: ['.glb'],
+  stl: ['.stl'],
+  '3mf': ['.3mf'],
+} as const satisfies Readonly<Record<string, readonly string[]>>;
+export type SampleFileKind = keyof typeof SAMPLE_FILE_EXTENSIONS;
+export const SAMPLE_FILE_KINDS = Object.keys(SAMPLE_FILE_EXTENSIONS) as readonly SampleFileKind[];
+
+/** The kind of a sample file by the name it ends in; undefined for a name no sample file kind ends in. */
+export function sampleFileKindOf(file: string): SampleFileKind | undefined {
+  const name = file.toLowerCase();
+  return SAMPLE_FILE_KINDS.find((kind) => SAMPLE_FILE_EXTENSIONS[kind].some((ext) => name.endsWith(ext)));
+}
 
 /** The most moves one file asks for. */
 export const SAMPLE_MOVES_MAX = 50;
@@ -812,17 +840,32 @@ function rowIssues(
           issues.push({ path: `${at}.${column}`, message: `"${table.ref}" has no column "${column}".` });
           continue;
         }
-        // A file is uploaded by a signed-in person: no sample row brings one, but for a picture column's one of the bundle's pictures.
+        // A file is uploaded by a signed-in person: no sample row brings one, but for a picture column's one of the
+        // bundle's pictures, and for a column of one product asset (a model, an SVG piece) one of its files of a kind the column takes.
         const fileColumn = shape.columns.find((c) => c.ref === column) as { semantic?: string; rules?: { file?: { accept: readonly string[]; maxCount?: number | undefined } } } | undefined;
         const fileRule = fileColumn?.rules?.file;
         if (value !== null && !(Array.isArray(value) && value.length === 0) && fileRule !== undefined) {
           const pictureColumn = fileColumn?.semantic === 'image' && fileRule.maxCount === undefined && takesPicturesOnly(fileRule.accept);
-          if (!pictureColumn || sampleDirective(value)?.kind !== 'asset') {
+          // A column of product assets (a kit's model, a piece's cut file): the shop makes its own, and a sample ships them.
+          const assetColumn = fileRule.maxCount === undefined && takesAssetsOnly(fileRule.accept);
+          const given = sampleDirective(value);
+          if ((!pictureColumn && !assetColumn) || given?.kind !== 'asset') {
             issues.push({
               path: `${at}.${column}`,
               message: pictureColumn
                 ? `"${table.ref}.${column}" holds a picture: a sample row gives it one of the bundle's pictures ({"@asset": …}) or leaves it empty.`
-                : `"${table.ref}.${column}" holds files a signed-in person uploads, so a sample row leaves it empty.`,
+                : assetColumn
+                  ? `"${table.ref}.${column}" holds a file: a sample row gives it one of the bundle's files ({"@asset": …}) or leaves it empty.`
+                  : `"${table.ref}.${column}" holds files a signed-in person uploads, so a sample row leaves it empty.`,
+            });
+            continue;
+          }
+          const file = bundle.assets[given.label]?.file;
+          const kind = file === undefined ? undefined : sampleFileKindOf(file);
+          if (file !== undefined && (kind === undefined || !fileRule.accept.includes(kind))) {
+            issues.push({
+              path: `${at}.${column}`,
+              message: `"${table.ref}.${column}" takes ${fileRule.accept.join(', ')} files, and "${given.label}" is ${file}: give it a file of one of those kinds, named for its kind (${fileRule.accept.flatMap((one) => SAMPLE_FILE_EXTENSIONS[one as SampleFileKind] ?? []).join(', ') || 'none a sample can ship'}).`,
             });
             continue;
           }

@@ -15,12 +15,18 @@
  * A studio manager may void a recorded payment (the row stays, struck through,
  * and the balance goes back up).
  *
+ * Once the studio's Adminium takes the invoices online: "Copy pay link" beside
+ * Record payment while clients can pay online; a payment a client made online
+ * says so ("Online · Stripe"), is never voided, and has "Refund…" for someone
+ * who may give money back; what was refunded of it is a line of its own, and
+ * the balance goes back up by it.
+ *
  * Every figure is Adminium's: totals, paid and balance are read back after
  * each payment or void. The running balance down the ledger is the stored
  * total less each unvoided payment; the last line is the stored balance.
  */
 import { useEffect, useState } from "react";
-import { ArrowLeft, ArrowUpRight, Ban, Banknote, Eye, HandCoins, Printer, Send, SquarePen, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Ban, Banknote, Eye, Globe, HandCoins, Link2, Printer, Send, SquarePen, Trash2, Undo2 } from "lucide-react";
 
 import { Alert, Button, DayText, LinesTable, Money, Pill, StatusPill, When } from "../components/ui.tsx";
 import type { Invoice as InvoiceRow, InvoiceLadder, Payment } from "../data/types.ts";
@@ -30,6 +36,7 @@ import { dayLabel } from "../lib/dates.ts";
 import { isPositive } from "../lib/money.ts";
 import { sendSavedInvoice, setLadder } from "../state/actions.ts";
 import { loadInvoice, useDesk, useManager, useRow, useRows } from "../state/desk.ts";
+import { copyPayLink, takenOnline, useMayCopyPayLink, useMayRefund } from "../state/deskPayments.ts";
 import { refusalKey } from "../state/outcome.ts";
 import { previewClient } from "../state/preview.ts";
 import { openSheet } from "../state/sheets.ts";
@@ -46,6 +53,8 @@ export default function Invoice() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const [copying, setCopying] = useState(false);
+  const mayCopyLink = useMayCopyPayLink();
 
   useEffect(() => {
     if (id === null) return;
@@ -96,6 +105,25 @@ export default function Invoice() {
     else setError(t(refusalKey(out.reason), { id: inv.number ?? "" }));
   };
 
+  const copyLink = async () => {
+    setCopying(true);
+    setError(null);
+    const out = await copyPayLink(inv.id);
+    setCopying(false);
+    if (!out.ok) {
+      setError(t("invoices.page.linkFailed"));
+      return;
+    }
+    const until = new Intl.DateTimeFormat(locale, { weekday: "short", day: "numeric", month: "short", year: "numeric" }).format(new Date(out.expiresAt));
+    try {
+      await navigator.clipboard.writeText(out.url);
+      toast(t("invoices.page.linkCopied", { date: until }), { icon: "copy" });
+    } catch {
+      // The browser would not copy: the link is shown, to copy by hand.
+      setError(t("invoices.page.linkShown", { date: until, url: out.url }));
+    }
+  };
+
   const ladder = async (next: InvoiceLadder) => {
     if (next === inv.ladder) return;
     const out = await setLadder(inv.id, next);
@@ -111,6 +139,11 @@ export default function Invoice() {
           {sent && isOpen(inv) && (
             <Button kind="primary" icon={Banknote} onClick={() => openSheet({ kind: "recordPayment", invoiceId: inv.id })}>
               {t("invoices.page.record")}
+            </Button>
+          )}
+          {sent && isOpen(inv) && mayCopyLink && (
+            <Button icon={Link2} busy={copying} onClick={() => void copyLink()}>
+              {t("invoices.page.copyLink")}
             </Button>
           )}
           {draft && (
@@ -330,6 +363,7 @@ function Ledger({ invoice, rows, manager, overdue }: { invoice: InvoiceRow; rows
           );
         }
         if (row.kind === "payment") return <PaymentRow key={`p${String(row.payment.id)}`} payment={row.payment} balance={row.balance} currency={cur} manager={manager} />;
+        if (row.kind === "refund") return <RefundRow key={`r${String(row.payment.id)}`} payment={row.payment} amount={row.amount} balance={row.balance} currency={cur} />;
         const settled = row.settled;
         return (
           <div className="inv-ledger-row inv-ledger-close" role="row" key="closing">
@@ -366,6 +400,10 @@ function PaymentRow({ payment, balance, currency, manager }: { payment: Payment;
   const voided = payment.voided;
   const amount = money(payment.amount, currency);
   const on = dayLabel(payment.paid_on, locale);
+  // Taken online: the service says so, it is refunded rather than voided, and only by someone who may.
+  const online = takenOnline(payment);
+  const mayRefund = useMayRefund(payment);
+  const refunded = isPositive(payment.refunded_amount);
   return (
     <div className={`inv-ledger-row${voided ? " inv-ledger-row--voided" : ""}`} role="row">
       <span role="cell" className="inv-ledger-date">
@@ -375,7 +413,7 @@ function PaymentRow({ payment, balance, currency, manager }: { payment: Payment;
         <span className="inv-ledger-entry-text">
           <span className="inv-ledger-label">{voided ? t("invoices.ledger.voided") : t("invoices.ledger.received")}</span>
           <span className="inv-ledger-sub">
-            {t(`invoices.method.${payment.method}`)}
+            {online ? t("invoices.method.online") : t(`invoices.method.${payment.method}`)}
             {payment.method_note !== null && payment.method_note !== "" ? ` (${payment.method_note})` : ""}
             {payment.number !== null && (
               <>
@@ -392,11 +430,25 @@ function PaymentRow({ payment, balance, currency, manager }: { payment: Payment;
             {voided && payment.void_reason !== null && payment.void_reason !== "" ? ` · ${payment.void_reason}` : ""}
           </span>
         </span>
-        {!voided && manager && (
-          <Button size="small" className="inv-ledger-void" onClick={() => openSheet({ kind: "voidPayment", paymentId: payment.id })} aria-label={t("invoices.ledger.voidLabel", { amount, day: on })}>
-            {t("invoices.ledger.void")}
-          </Button>
-        )}
+        <span className="inv-ledger-tail">
+          {online && (
+            <span className="inv-chip inv-chip--online">
+              <Globe size={12} aria-hidden="true" />
+              {t("invoices.ledger.online", { provider: payment.provider ?? "" })}
+            </span>
+          )}
+          {online && refunded && <span className="inv-chip inv-chip--refunded">{t("invoices.ledger.refunded")}</span>}
+          {!voided && manager && !online && (
+            <Button size="small" className="inv-ledger-void" onClick={() => openSheet({ kind: "voidPayment", paymentId: payment.id })} aria-label={t("invoices.ledger.voidLabel", { amount, day: on })}>
+              {t("invoices.ledger.void")}
+            </Button>
+          )}
+          {mayRefund && (
+            <Button size="small" icon={Undo2} className="inv-ledger-void" onClick={() => openSheet({ kind: "refundPayment", paymentId: payment.id })} aria-label={t("invoices.ledger.refundLabel", { amount, day: on })}>
+              {t("invoices.ledger.refund")}
+            </Button>
+          )}
+        </span>
       </span>
       <span role="cell" className={`inv-ledger-num inv-ledger-amount ${voided ? "inv-ledger-struck" : "inv-ledger-pos"}`}>
         −{amount}
@@ -408,3 +460,28 @@ function PaymentRow({ payment, balance, currency, manager }: { payment: Payment;
   );
 }
 
+/** What was given back of a payment taken online: a line under it, and the balance back up by it. */
+function RefundRow({ payment, amount, balance, currency }: { payment: Payment; amount: string; balance: string | null; currency: string | null }) {
+  const { t, money } = useI18n();
+  return (
+    <div className="inv-ledger-row inv-ledger-row--refund" role="row">
+      <span role="cell" className="inv-ledger-date" />
+      <span role="cell" className="inv-ledger-entry">
+        <span className="inv-ledger-entry-text">
+          <span className="inv-ledger-label">{t("invoices.ledger.refundRow")}</span>
+          <span className="inv-ledger-sub">
+            {t("invoices.ledger.online", { provider: payment.provider ?? "" })}
+            {payment.number !== null ? ` · ${payment.number}` : ""}
+            <span className="inv-ledger-narrow"> · +{money(amount, currency)}</span>
+          </span>
+        </span>
+      </span>
+      <span role="cell" className="inv-ledger-num inv-ledger-amount inv-ledger-muted">
+        +{money(amount, currency)}
+      </span>
+      <span role="cell" className="inv-ledger-num inv-ledger-strong">
+        {balance === null ? "" : money(balance, currency)}
+      </span>
+    </div>
+  );
+}

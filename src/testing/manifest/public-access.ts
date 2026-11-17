@@ -669,6 +669,27 @@ export const publicAccessSchema = z
       .optional(),
     /** A proof-of-work the browser solves before the write (or the claim) is taken. */
     humanCheck: z.literal(true).optional(),
+    /**
+     * A create here answers the new row's pay link (`payUrl`), when the app
+     * takes payments online right now: one round trip at checkout. Only on a
+     * create of one of the app's payable tables, behind the human check.
+     */
+    pay: z.literal(true).optional(),
+    /**
+     * Open only while the app takes payments online for this entry's table
+     * (`on`: a create that must be paid for), or only while it does not
+     * (`off`: the way a create is made when payments are off). "Takes
+     * payments" is what `GET /public/payments/available` answers, for this
+     * table: the app's payable switched on, a live service, reachable, not
+     * paused. Closed, a write here is refused as a switched-off setting is
+     * (`PUBLIC_SWITCHED_OFF`). With `requireSetting`, both must hold: a hotel
+     * that asks guests to pay at booking opens its paying entry with
+     * `requireSetting` "required" and `requirePayments: "on"`, and its unpaid
+     * one for "required" only with `requirePayments: "off"` — so no caller
+     * books unpaid while paying is required and possible, and none is held to
+     * pay while it is not. Only on a create of one of the app's payable tables.
+     */
+    requirePayments: z.enum(['on', 'off']).optional(),
     /** The rows a create carries with it, by child table (see `childEntrySchema`). */
     children: childTablesSchema(childEntrySchema).optional(),
     /** Checks the created row's own values must pass (guests no more than a room sleeps). */
@@ -721,9 +742,13 @@ export const publicAccessSchema = z
       .strict()
       .refine((l) => l.perValue !== undefined || l.plainText !== undefined, { message: 'limits name a per-value cap, plain-text columns, or both' })
       .optional(),
-    /** Refused while a bool in the settings row is false (only for a session-less create with `anonymous`). */
+    /**
+     * Refused while a bool in the settings row is false (only for a session-less create with `anonymous`); with `in`,
+     * while the setting holds none of those values (a hotel that asks for payment at booking: the entry that takes a
+     * booking unpaid is open only while the setting is "nothing" or "optional").
+     */
     requireSetting: z
-      .array(settingRefSchema.extend({ when: z.literal('anonymous').optional() }).strict())
+      .array(settingRefSchema.extend({ when: z.literal('anonymous').optional(), in: z.array(z.string().min(1).max(64)).min(1).max(8).optional() }).strict())
       .max(4)
       .optional(),
     /** Which browser key serves the entry: `customer`, or one of `publicKeys`. */
@@ -1645,8 +1670,15 @@ export function publicAccessIssues(entries: readonly PublicAccess[], ctx: Public
       }
     }
     for (const [r, setting] of (entry.requireSetting ?? []).entries()) {
-      if (index.column(setting.table, setting.column)?.type !== 'bool') {
-        out.push({ path: at('requireSetting', r), message: `"${setting.table}.${setting.column}" is not a bool of this app` });
+      const found = index.column(setting.table, setting.column) as { type?: string; enum?: readonly string[] } | undefined;
+      if (setting.in === undefined) {
+        if (found?.type !== 'bool') out.push({ path: at('requireSetting', r), message: `"${setting.table}.${setting.column}" is not a bool of this app` });
+      } else if (found?.type !== 'enum') {
+        out.push({ path: at('requireSetting', r, 'in'), message: `"${setting.table}.${setting.column}" is not a choice (an enum) of this app, so it holds none of these values` });
+      } else {
+        for (const value of setting.in) {
+          if (!(found.enum ?? []).includes(value)) out.push({ path: at('requireSetting', r, 'in'), message: `"${value}" is not a value of "${setting.table}.${setting.column}"` });
+        }
       }
       if (setting.when === 'anonymous' && entry.claimedBy?.optional !== true) {
         out.push({ path: at('requireSetting', r, 'when'), message: 'only an entry a session is optional on is ever anonymous' });

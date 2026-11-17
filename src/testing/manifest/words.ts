@@ -26,6 +26,7 @@
  * It reads the plain document, not the typed manifest, so the schema file may
  * import it without the two files importing each other.
  */
+import { OUTBOX_PRODUCERS_BEFORE } from './outbox.ts';
 import { placeholdersIn } from './placeholders.ts';
 
 export interface ManifestWord {
@@ -258,6 +259,8 @@ export const INSTALL_FLOOR_WORD_NAMES = [
   'appGrants.more',
   // An app role that finds, downloads and erases a person's data (`privacy:@:people`).
   'roles.privacyPeople',
+  // An app role that gives back the money paid online for the app's own records (`payments:@:refund`).
+  'roles.paymentsRefund',
   // The columns a records page's list opens on, in order (`config.columns`).
   'config.columns',
   // An add-on kept once per server rather than installed per database.
@@ -322,6 +325,39 @@ export const INSTALL_FLOOR_WORD_NAMES = [
   'publicAccess.pagination',
   'publicAccess.rateLimit',
   'publicAccess.response',
+  // A new row that moves the earlier rows sharing its link on (a proof sent again).
+  'states.supersedes',
+  // Words of a sample FILE, not of the manifest: an app's rows for an add-on that ship files of their own, and
+  // a sample that gives an SVG or a model to a column of product assets. `installFloorWords` cannot see them;
+  // the app check reads the sample files and holds the floor to them.
+  'sampleData.addOns.assets',
+  'sampleData.productAssets',
+  // A form's reference picker narrowed by another field of the same form (an order line among the chosen order's).
+  'form.referenceScope',
+  // A stamp that never moves its date earlier than the one the column holds.
+  'stamp.notEarlier',
+  // Other states a new row may be made in (an order made already waiting for its payment).
+  'states.starts',
+  // A public entry open only while a choice in the settings row holds some values.
+  'publicAccess.requireSettingIn',
+  // Payable tables in a catalog app's own file, and what a payable says beyond the payments screen's mapping:
+  // when a row may be paid, where the customer comes back, who sends the receipt, the columns only a payment fills.
+  'payments.appPayables',
+  'payments.payableExtras',
+  // A timed move that waits while a payment for the row is on its way.
+  'states.waitsForPayment',
+  // A public create that answers the new row's pay link.
+  'publicAccess.pay',
+  // A move refused while a payment for the row is on its way.
+  'states.noPaymentInFlight',
+  // A public entry open only while the app takes payments online for its table (or only while it does not).
+  'publicAccess.requirePayments',
+  // An outbox producer queued only while payments are on (or off) for the row its message is about.
+  'outbox.producerPayments',
+  // More than 24 outbox producers (up to 32).
+  'outbox.manyProducers',
+  // Further plain columns an online payment's move to paid writes (a ticket order's paid_method).
+  'payments.statusSet',
 ] as const;
 export type ManifestWordName = (typeof INSTALL_FLOOR_WORD_NAMES)[number];
 
@@ -546,6 +582,7 @@ export const WORD_FLOORS: Readonly<Partial<Record<ManifestWordName, string>>> = 
   'roles.addOnActions': '0.3.47',
   'appGrants.more': '0.3.47',
   'roles.privacyPeople': '0.3.47',
+  'roles.paymentsRefund': '0.3.60',
   // A release before ignores the key, and the list opens on the columns Adminium picks.
   'config.columns': '0.3.47',
   'addOn.scope': '0.3.49',
@@ -598,6 +635,29 @@ export const WORD_FLOORS: Readonly<Partial<Record<ManifestWordName, string>>> = 
   'publicAccess.pagination': '0.3.49',
   'publicAccess.rateLimit': '0.3.49',
   'publicAccess.response': '0.3.49',
+  // A new row moves the earlier rows sharing its link: a release before refuses the key.
+  'states.supersedes': '0.3.50',
+  // A release before adds an add-on section with none of its files (its rows that name one are refused), and
+  // gives a sample's file to a picture column only.
+  'sampleData.addOns.assets': '0.3.51',
+  'sampleData.productAssets': '0.3.51',
+  // A release before drops the key at install, and the picker offers every row.
+  'form.referenceScope': '0.3.53',
+  // A release before refuses the key.
+  'stamp.notEarlier': '0.3.53',
+  // A release before refuses the key (and a new row made outside `initial`), or the value list.
+  'states.starts': '0.3.60',
+  'publicAccess.requireSettingIn': '0.3.60',
+  // A release before refuses payables from any file but a local one, and the keys it does not know.
+  'payments.appPayables': '0.3.60',
+  'payments.payableExtras': '0.3.60',
+  'states.waitsForPayment': '0.3.60',
+  'states.noPaymentInFlight': '0.3.62',
+  'publicAccess.pay': '0.3.60',
+  'publicAccess.requirePayments': '0.3.62',
+  'outbox.producerPayments': '0.3.62',
+  'outbox.manyProducers': '0.3.62',
+  'payments.statusSet': '0.3.62',
 };
 
 /** The kinds of file a column takes from the release that cleans SVG and reads models and fonts whole (`ASSET_FILE_KINDS`). */
@@ -698,12 +758,31 @@ export function installFloorWords(document: unknown): ManifestWord[] {
         const ref = typeof grant === 'string' ? /^page:@([a-z][a-z0-9-]*):view$/.exec(grant)?.[1] : undefined;
         if (ref !== undefined && !ownPages.has(ref)) out.push({ word: 'roles.addOnPages', path: `roles.${String(r)}.permissions.${String(g)}` });
         if (grant === 'privacy:@:people') out.push({ word: 'roles.privacyPeople', path: `roles.${String(r)}.permissions.${String(g)}` });
+        if (grant === 'payments:@:refund') out.push({ word: 'roles.paymentsRefund', path: `roles.${String(r)}.permissions.${String(g)}` });
       });
     });
     // What only a file made on an Adminium carries.
     for (const block of ['reports', 'invoiceLayouts', 'scheduledReports', 'payments'] as const) {
       if (document[block] !== undefined) out.push({ word: block, path: block });
     }
+    // Payables any app carries, and what a payable says beyond the payments screen's mapping.
+    const local = isDoc(document['publisher']) && document['publisher']['id'] === 'local';
+    const payables = isDoc(document['payments']) ? list(document['payments']['payables']) : [];
+    if (!local && payables.length > 0) out.push({ word: 'payments.appPayables', path: 'payments.payables' });
+    const EXTRAS = ['shape', 'payableWhen', 'returnTo', 'receipt', 'onlyOnline', 'instantOnly', 'refunds', 'refundOn'];
+    const PAYMENT_EXTRAS = ['paidAt', 'provider', 'approvalCode', 'last4', 'currency', 'refundedElsewhere', 'tip'];
+    payables.forEach((payable, p) => {
+      if (!isDoc(payable)) return;
+      const payments = isDoc(payable['payments']) ? payable['payments'] : null;
+      const status = isDoc(payable['status']) ? payable['status'] : null;
+      const extra =
+        EXTRAS.some((key) => payable[key] !== undefined) ||
+        (isDoc(payable['currency']) && payable['currency']['setting'] !== undefined) ||
+        (status !== null && (status['from'] !== undefined || status['refundedFrom'] !== undefined)) ||
+        (payments !== null && payments['kind'] === 'table' && (payments['date'] === undefined || PAYMENT_EXTRAS.some((key) => payments[key] !== undefined)));
+      if (extra) out.push({ word: 'payments.payableExtras', path: `payments.payables.${String(p)}` });
+      if (status !== null && status['set'] !== undefined) out.push({ word: 'payments.statusSet', path: `payments.payables.${String(p)}.status.set` });
+    });
     // A row removed through a public entry of an app (an add-on's own link says `publicAccess.ownDelete`).
     list(document['publicAccess']).forEach((entry, e) => {
       if (isDoc(entry) && Array.isArray(entry['methods']) && entry['methods'].includes('DELETE')) out.push({ word: 'publicAccess.delete', path: `publicAccess.${String(e)}.methods` });
@@ -721,6 +800,12 @@ export function installFloorWords(document: unknown): ManifestWord[] {
 
   // An agreement on a text's length, on an entry or on its child rows (two levels).
   list(document['publicAccess']).forEach((entry, e) => {
+    if (isDoc(entry) && entry['pay'] !== undefined) out.push({ word: 'publicAccess.pay', path: `publicAccess.${String(e)}.pay` });
+    if (isDoc(entry) && entry['requirePayments'] !== undefined) out.push({ word: 'publicAccess.requirePayments', path: `publicAccess.${String(e)}.requirePayments` });
+    // A choice in the settings row that must hold one of some values.
+    list(isDoc(entry) ? entry['requireSetting'] : undefined).forEach((setting, r) => {
+      if (isDoc(setting) && setting['in'] !== undefined) out.push({ word: 'publicAccess.requireSettingIn', path: `publicAccess.${String(e)}.requireSetting.${String(r)}.in` });
+    });
     const lengths = (holder: unknown, at: string): void => {
       if (!isDoc(holder)) return;
       list(holder['agrees']).forEach((agree, a) => {
@@ -772,11 +857,17 @@ export function installFloorWords(document: unknown): ManifestWord[] {
         list(moves).forEach((move, m) => {
           if (isDoc(move) && move['planned'] === true) out.push({ word: 'states.planned', path: `${at}.states.moves.${from}.${String(m)}.planned` });
           if (isDoc(move) && isDoc(move['requires']) && move['requires']['notPast'] !== undefined) out.push({ word: 'states.notPast', path: `${at}.states.moves.${from}.${String(m)}.requires.notPast` });
+          if (isDoc(move) && isDoc(move['requires']) && move['requires']['noPaymentInFlight'] !== undefined) out.push({ word: 'states.noPaymentInFlight', path: `${at}.states.moves.${from}.${String(m)}.requires.noPaymentInFlight` });
         });
       }
       for (const [child, rule] of Object.entries(isDoc(table['states']['children']) ? table['states']['children'] : {})) {
         if (isDoc(rule) && rule['moveOnCreate'] !== undefined) out.push({ word: 'states.moveOnCreate', path: `${at}.states.children.${child}.moveOnCreate` });
       }
+      if (table['states']['supersedes'] !== undefined) out.push({ word: 'states.supersedes', path: `${at}.states.supersedes` });
+      if (table['states']['starts'] !== undefined) out.push({ word: 'states.starts', path: `${at}.states.starts` });
+      list(table['states']['timed']).forEach((rule, r) => {
+        if (isDoc(rule) && rule['waitsForPayment'] !== undefined) out.push({ word: 'states.waitsForPayment', path: `${at}.states.timed.${String(r)}.waitsForPayment` });
+      });
     }
     list(table['columns']).forEach((column, c) => {
       const rules = isDoc(column) && isDoc(column['rules']) ? column['rules'] : null;
@@ -816,6 +907,7 @@ export function installFloorWords(document: unknown): ManifestWord[] {
         else if (bound !== undefined && ((type !== 'date' && type !== 'timestamptz') || (isDoc(bound) && bound['days'] !== undefined))) out.push({ word: 'bounds.other', path: `${here}.${side}` });
       }
       if (isDoc(rules['stamp']) && rules['stamp']['strict'] !== undefined) out.push({ word: 'stamp.strict', path: `${here}.stamp.strict` });
+      if (isDoc(rules['stamp']) && rules['stamp']['notEarlier'] !== undefined) out.push({ word: 'stamp.notEarlier', path: `${here}.stamp.notEarlier` });
       if (rules['band'] !== undefined) out.push({ word: 'column.band', path: `${here}.band` });
       if (isDoc(rules['stamp']) && isDoc(rules['stamp']['set']) && rules['stamp']['set']['addWorkingDays'] !== undefined) {
         out.push({ word: 'stamp.addWorkingDays', path: `${here}.stamp.set.addWorkingDays` });
@@ -907,6 +999,15 @@ export function installFloorWords(document: unknown): ManifestWord[] {
     if (config['bulk'] !== undefined) out.push({ word: 'config.bulk', path: `${here}.bulk` });
     if (config['columns'] !== undefined) out.push({ word: 'config.columns', path: `${here}.columns` });
     if (config['board'] !== undefined) out.push({ word: 'config.board', path: `${here}.board` });
+    // A reference picker narrowed by another field of its form.
+    const form = isDoc(config['form']) ? config['form'] : {};
+    list(form['sections']).forEach((section, si) => {
+      list(isDoc(section) ? section['fields'] : undefined).forEach((field, fi) => {
+        if (isDoc(field) && isDoc(field['reference']) && field['reference']['scope'] !== undefined) {
+          out.push({ word: 'form.referenceScope', path: `${here}.form.sections.${String(si)}.fields.${String(fi)}.reference.scope` });
+        }
+      });
+    });
     const board = isDoc(config['board']) ? config['board'] : {};
     const boardCard = isDoc(board['card']) ? board['card'] : {};
     if (board['toolbar'] !== undefined) out.push({ word: 'board.toolbar', path: `${here}.board.toolbar` });
@@ -935,7 +1036,9 @@ export function installFloorWords(document: unknown): ManifestWord[] {
   if (outbox['classes'] !== undefined) out.push({ word: 'outbox.classes', path: 'outbox.classes' });
   if (outbox['purposes'] !== undefined) out.push({ word: 'outbox.purposes', path: 'outbox.purposes' });
   if (outbox['surveyLinks'] !== undefined) out.push({ word: 'outbox.surveyLinks', path: 'outbox.surveyLinks' });
+  if (list(outbox['producers']).length > OUTBOX_PRODUCERS_BEFORE) out.push({ word: 'outbox.manyProducers', path: 'outbox.producers' });
   list(outbox['producers']).forEach((producer, p) => {
+    if (isDoc(producer) && producer['payments'] !== undefined) out.push({ word: 'outbox.producerPayments', path: `outbox.producers.${String(p)}.payments` });
     if (isDoc(producer) && producer['replyTo'] !== undefined) out.push({ word: 'outbox.replyTo', path: `outbox.producers.${String(p)}.replyTo` });
     // A message about a row that was removed.
     if (isDoc(producer) && producer['onDelete'] !== undefined) out.push({ word: 'outbox.onDelete', path: `outbox.producers.${String(p)}.onDelete` });

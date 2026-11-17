@@ -11,6 +11,9 @@
  * shapes arrived in 1.0.3, but 1.0.4 and 1.0.5 changed what a client prints
  * (a receipt says what the money was for; an Arabic copy keeps each amount in
  * order), so an older add-on would print copies this app never showed anyone.
+ * 1.0.13 is the first with the invoice shape's second version, which takes
+ * payments online, and prints an invoice's pay link and its code to scan
+ * while something is owed; the invoices are built on it.
  *
  * It SUGGESTS Holiday calendars: with it, the public holidays it keeps come
  * out of the days Capacity counts the studio free. Nothing else needs it, so
@@ -22,7 +25,7 @@
 import { l } from "./labels.ts";
 
 /** The Invoices & Receipts release the contract, the demo's copies and the shapes are held to. */
-export const INVOICES_RANGE = ">=1.0.5";
+export const INVOICES_RANGE = ">=1.0.13";
 
 /** The first Holiday calendars release that attaches to this app. */
 export const HOLIDAYS_RANGE = ">=1.0.3";

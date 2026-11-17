@@ -11,12 +11,13 @@ import { Button } from "../../components/ui.tsx";
 import { useI18n } from "../../i18n/index.tsx";
 import { dayLabel } from "../../lib/dates.ts";
 import { isPositive } from "../../lib/money.ts";
+import { madeOnline } from "../../lib/money.ts";
 import { usePortal, usePortalRow } from "../../state/portal.ts";
 import type { ClientSheet } from "../../state/sheets.ts";
 import { toast, useUi } from "../../state/ui.ts";
 import { openInNewTab, portOrNull } from "../../screens/client/shared/page.ts";
 
-const METHOD_KEYS = { "bank-transfer": "client.method.bank", card: "client.method.card", cheque: "client.method.cheque", cash: "client.method.cash", other: "client.method.other" } as const;
+const METHOD_KEYS = { "bank-transfer": "client.method.bank", card: "client.method.card", cheque: "client.method.cheque", cash: "client.method.cash", other: "client.method.other", online: "client.method.online" } as const;
 
 export default function Receipt({ sheet, onClose }: { sheet: Extract<ClientSheet, { kind: "receipt" }>; onClose: () => void }) {
   const { t, money, locale } = useI18n();
@@ -43,7 +44,7 @@ export default function Receipt({ sheet, onClose }: { sheet: Extract<ClientSheet
   };
   const rows: [string, string, boolean][] = [
     [t("client.sheet.paidOn"), dayLabel(payment.paid_on, locale, "long"), true],
-    [t("client.sheet.method"), t(METHOD_KEYS[payment.method]), false],
+    [t("client.sheet.method"), t(madeOnline(payment) ? "client.method.online" : METHOD_KEYS[payment.method]), false],
     [t("client.sheet.against"), invoice.number ?? "", true],
     [t("client.sheet.for"), invoice.title ?? "", false],
     [t("client.sheet.invoiceTotal"), money(invoice.total, invoice.currency), true],
