@@ -225,6 +225,10 @@ export async function boot(engine: Engine, port: number, now: number, options: B
     E2E_SMTP_PORT: String(port + 1),
     E2E_SINK_PORT: String(port + 2),
     E2E_FAKE_LLM_PORT: "0",
+    // Invoices is staged from a local build, which never matches a released package's bytes. From Adminium 0.3.66
+    // a document-render provider loads only from a package Adminium vouches for, so the harness names it as a
+    // developer's own (ignored when NODE_ENV is production), keeping any keys the caller already set.
+    ADMINIUM_ADD_ON_DEV_TRUST: [process.env["ADMINIUM_ADD_ON_DEV_TRUST"], "invoices"].filter((k) => k !== undefined && k !== "").join(","),
     // Its own database, so a contract never meets another run's rows (`CONTRACT_DB_SUFFIX` keeps two checkouts' runs apart).
     E2E_DATABASE: options.database ?? `cp_contract_${engine}${process.env["CONTRACT_DB_SUFFIX"] ?? ""}`,
     CONTRACT_NOW: String(now),
